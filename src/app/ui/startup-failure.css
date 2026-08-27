@@ -1,0 +1,37 @@
+.startup-status {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+  background: #f3f4f6;
+}
+
+.startup-status section {
+  width: min(40rem, 100%);
+  padding: 2rem;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.startup-status--failure section {
+  border-color: #b91c1c;
+}
+
+.startup-status__eyebrow {
+  margin: 0 0 0.75rem;
+  color: #7f1d1d;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.startup-status h1 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.2;
+}
+
+.startup-status p {
+  line-height: 1.6;
+}
