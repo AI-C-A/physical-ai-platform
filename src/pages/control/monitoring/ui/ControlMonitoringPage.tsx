@@ -12,6 +12,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 import {
   RobotInfoTable,
+  RobotModelViewer,
   useRobotCatalog,
   useRobotOperationalStatus,
   type RobotDescriptor,
@@ -264,10 +265,12 @@ function MonitoringLayout({
           contentClassName="min-h-0 overflow-y-auto"
           title="로봇 정보"
         >
-          {selectedRobot === undefined || operationalStatus === null ? (
-            <p role="status">표시할 Robot이 없습니다.</p>
-          ) : (
-            <div className="grid gap-4">
+          <div className="grid gap-4">
+            <RobotModelViewer />
+            {selectedRobot === undefined || operationalStatus === null ? (
+              <p role="status">표시할 Robot이 없습니다.</p>
+            ) : (
+              <>
               <RobotInfoTable
                 operationalStatus={operationalStatus}
                 robot={selectedRobot}
@@ -275,8 +278,9 @@ function MonitoringLayout({
               <Link className="text-sm font-semibold underline" to={appendPathSegment('/control/monitoring', selectedRobot.id)}>
                 영상 관제
               </Link>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </Panel>
       </div>
     </>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -160,6 +160,8 @@ describe('ControlMonitoringPage', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('Mapbox 토큰 환경변수가 없으면 명확한 설정 오류를 표시한다', async () => {
@@ -196,6 +198,25 @@ describe('ControlMonitoringPage', () => {
     expect(screen.queryByText(/Robot 운영 상태|\.data|객체여야/u)).not.toBeInTheDocument();
   });
 
+  it('3D 뷰어 기본 로딩 표시 대신 공용 스피너를 표시한다', async () => {
+    vi.stubGlobal('WebGLRenderingContext', class {});
+    vi.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
+    renderPage();
+
+    const modelViewerContainer = await screen.findByRole('group', {
+      name: '로봇 3D 모델',
+    });
+    const spinner = within(modelViewerContainer).getByRole('status', {
+      name: '3D 모델 불러오는 중',
+    });
+    const modelViewer = modelViewerContainer.querySelector('model-viewer');
+    if (modelViewer === null) throw new Error('3D 모델 뷰어를 찾을 수 없습니다.');
+
+    fireEvent.load(modelViewer);
+
+    await waitFor(() => expect(spinner).not.toBeInTheDocument());
+  });
+
   it('Mapbox 배경 위에 로봇 선택과 Raw 정보 패널만 표시한다', async () => {
     renderPage();
 
@@ -206,6 +227,16 @@ describe('ControlMonitoringPage', () => {
     expect(pageHeading).toHaveClass('sr-only');
     expect(screen.getByRole('heading', { name: '로봇 선택' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '로봇 정보' })).toBeInTheDocument();
+    const modelViewer = screen.getByRole('group', { name: '로봇 3D 모델' });
+    const modelViewerElement = modelViewer.querySelector('model-viewer');
+    expect(modelViewerElement).toHaveAttribute('src', '/assets/go2_walk.glb');
+    expect(modelViewerElement).toHaveAttribute(
+      'interaction-prompt',
+      'none',
+    );
+    expect(
+      modelViewerElement?.querySelector('[slot="progress-bar"]'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '현재 위치 지도' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '운영 요약' })).not.toBeInTheDocument();
     expect(

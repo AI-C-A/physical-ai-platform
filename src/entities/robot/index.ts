@@ -34,3 +34,4 @@ export type {
 } from './model/robot-operational-status';
 export type { RobotDescriptor } from './model/robot';
 export { RobotInfoTable } from './ui/RobotInfoTable';
+export { RobotModelViewer } from './ui/RobotModelViewer';
