@@ -40,7 +40,7 @@ describe('createApplicationServices', () => {
 
   it('등록되지 않은 external 구현으로 자동 fallback하지 않는다', () => {
     expect(() => createApplicationServices(createConfig('external'))).toThrow(
-      'external Adapter factory가 아직 등록되지 않았습니다.',
+      'external Adapter factory가 등록되지 않았습니다.',
     );
   });
 });

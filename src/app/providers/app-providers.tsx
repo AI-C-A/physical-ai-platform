@@ -1,13 +1,19 @@
 import { type PropsWithChildren, useEffect, useRef } from 'react';
 
+import { AnalyticsContext } from '@/entities/analytics';
+import { CaptureOperationsContext } from '@/entities/capture-session';
+import { DatasetRepositoryContext } from '@/entities/dataset';
+import { EpisodeRepositoryContext } from '@/entities/episode';
 import {
   RobotCatalogContext,
   RobotOperationalStatusContext,
 } from '@/entities/robot';
+import { RobotEventRepositoryContext } from '@/entities/robot-event';
 import {
   RobotGeolocationContext,
   RobotTelemetryContext,
 } from '@/entities/robot-telemetry';
+import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
 import { BrandingContext, type BrandingConfig } from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
 import { ToastProvider } from '@/shared/ui/toast';
@@ -45,17 +51,33 @@ export function AppProviders({
   return (
     <BrandingContext.Provider value={branding}>
       <ClockContext.Provider value={services.clock}>
-        <RobotCatalogContext.Provider value={services.robotCatalog}>
-          <RobotOperationalStatusContext.Provider value={services.robotOperationalStatus}>
+      <RobotCatalogContext.Provider value={services.robotCatalog}>
+        <RobotOperationalStatusContext.Provider value={services.robotOperationalStatus}>
+        <SensorDeviceCatalogContext.Provider
+          value={services.sensorDeviceCatalog}
+        >
           <RobotTelemetryContext.Provider value={services.robotTelemetry}>
             <RobotGeolocationContext.Provider value={services.robotGeolocation}>
-              <TooltipProvider>
-                <ToastProvider>{children}</ToastProvider>
-              </TooltipProvider>
+            <CaptureOperationsContext.Provider
+              value={services.captureOperations}
+            >
+              <EpisodeRepositoryContext.Provider value={services.episodeRepository}>
+                <DatasetRepositoryContext.Provider value={services.datasetRepository}>
+                  <RobotEventRepositoryContext.Provider value={services.robotEventRepository}>
+                    <AnalyticsContext.Provider value={services.analytics}>
+                      <TooltipProvider>
+                        <ToastProvider>{children}</ToastProvider>
+                      </TooltipProvider>
+                    </AnalyticsContext.Provider>
+                  </RobotEventRepositoryContext.Provider>
+                </DatasetRepositoryContext.Provider>
+              </EpisodeRepositoryContext.Provider>
+            </CaptureOperationsContext.Provider>
             </RobotGeolocationContext.Provider>
           </RobotTelemetryContext.Provider>
-          </RobotOperationalStatusContext.Provider>
-        </RobotCatalogContext.Provider>
+        </SensorDeviceCatalogContext.Provider>
+        </RobotOperationalStatusContext.Provider>
+      </RobotCatalogContext.Provider>
       </ClockContext.Provider>
     </BrandingContext.Provider>
   );
