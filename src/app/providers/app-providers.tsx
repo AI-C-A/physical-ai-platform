@@ -13,6 +13,7 @@ import {
   RobotGeolocationContext,
   RobotTelemetryContext,
 } from '@/entities/robot-telemetry';
+import { RobotVideoContext } from '@/entities/robot-video';
 import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
 import { BrandingContext, type BrandingConfig } from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
@@ -58,6 +59,7 @@ export function AppProviders({
         >
           <RobotTelemetryContext.Provider value={services.robotTelemetry}>
             <RobotGeolocationContext.Provider value={services.robotGeolocation}>
+              <RobotVideoContext.Provider value={services.robotVideo}>
             <CaptureOperationsContext.Provider
               value={services.captureOperations}
             >
@@ -73,6 +75,7 @@ export function AppProviders({
                 </DatasetRepositoryContext.Provider>
               </EpisodeRepositoryContext.Provider>
             </CaptureOperationsContext.Provider>
+              </RobotVideoContext.Provider>
             </RobotGeolocationContext.Provider>
           </RobotTelemetryContext.Provider>
         </SensorDeviceCatalogContext.Provider>

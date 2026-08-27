@@ -1,0 +1,26 @@
+{
+  "branding": {
+    "productName": "ROBOT Army TIGER+",
+    "shortName": "ROBOT Army TIGER+",
+    "logo": "/assets/army-tiger-logo.png"
+  },
+  "adapters": {
+    "mode": "bundle",
+    "implementation": "external"
+  },
+  "connections": {
+    "patrol": {
+      "endpoint": "/api/integrations/patrol"
+    },
+    "telemetry": {
+      "endpoint": null,
+      "integrationProfileId": null
+    },
+    "video": {
+      "endpoint": null
+    },
+    "capture": {
+      "endpoint": null
+    }
+  }
+}

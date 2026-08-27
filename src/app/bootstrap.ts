@@ -5,6 +5,7 @@ import { loadRuntimeConfig } from '@/shared/config';
 
 import { App } from './App';
 import { createApplicationServices } from './composition/application-services';
+import { createPatrolExternalAdapters } from './composition/patrol-external-adapters';
 import { DEFAULT_BRANDING } from './config';
 import './styles/global.css';
 import { StartupFailure, StartupLoading } from './ui/startup-failure';
@@ -31,7 +32,9 @@ export async function bootstrapApplication(
 
   try {
     const runtimeConfig = await loadRuntimeConfig(DEFAULT_BRANDING);
-    const services = createApplicationServices(runtimeConfig);
+    const services = createApplicationServices(runtimeConfig, {
+      externalAdapterFactory: createPatrolExternalAdapters,
+    });
     root.render(createElement(App, { branding: runtimeConfig.branding, services }));
   } catch (error: unknown) {
     root.render(

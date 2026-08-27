@@ -13,6 +13,10 @@ import {
   type RobotDescriptor,
 } from '@/entities/robot';
 import {
+  RobotVideoContext,
+  type RobotVideoPort,
+} from '@/entities/robot-video';
+import {
   SensorDeviceCatalogContext,
   type SensorDeviceCatalogPort,
   type SensorDeviceDescriptor,
@@ -104,6 +108,11 @@ const sensorCatalog: SensorDeviceCatalogPort = {
   getSensorDevice: () => Promise.resolve(sensor),
 };
 
+const video: RobotVideoPort = {
+  listSources: () => Promise.resolve([]),
+  openSource: () => Promise.reject(new Error('source가 없습니다.')),
+};
+
 function makeOperations(
   overrides: Partial<CaptureOperationsPort> = {},
 ): CaptureOperationsPort {
@@ -140,11 +149,13 @@ function renderCapturePage(operations: CaptureOperationsPort) {
   return render(
     <RobotCatalogContext.Provider value={robotCatalog}>
       <SensorDeviceCatalogContext.Provider value={sensorCatalog}>
-        <CaptureOperationsContext.Provider value={operations}>
-          <MemoryRouter>
-            <CapturePage />
-          </MemoryRouter>
-        </CaptureOperationsContext.Provider>
+        <RobotVideoContext.Provider value={video}>
+          <CaptureOperationsContext.Provider value={operations}>
+            <MemoryRouter>
+              <CapturePage />
+            </MemoryRouter>
+          </CaptureOperationsContext.Provider>
+        </RobotVideoContext.Provider>
       </SensorDeviceCatalogContext.Provider>
     </RobotCatalogContext.Provider>,
   );
@@ -200,11 +211,13 @@ describe('CapturePage', () => {
     render(
       <RobotCatalogContext.Provider value={unavailableRobotCatalog}>
         <SensorDeviceCatalogContext.Provider value={unavailableSensorCatalog}>
-          <CaptureOperationsContext.Provider value={operations}>
-            <MemoryRouter>
-              <CapturePage />
-            </MemoryRouter>
-          </CaptureOperationsContext.Provider>
+          <RobotVideoContext.Provider value={video}>
+            <CaptureOperationsContext.Provider value={operations}>
+              <MemoryRouter>
+                <CapturePage />
+              </MemoryRouter>
+            </CaptureOperationsContext.Provider>
+          </RobotVideoContext.Provider>
         </SensorDeviceCatalogContext.Provider>
       </RobotCatalogContext.Provider>,
     );
@@ -270,11 +283,13 @@ describe('CapturePage', () => {
     render(
       <RobotCatalogContext.Provider value={robotCatalog}>
         <SensorDeviceCatalogContext.Provider value={sensorCatalog}>
-          <CaptureOperationsContext.Provider value={operations}>
-            <MemoryRouter>
-              <CapturePage />
-            </MemoryRouter>
-          </CaptureOperationsContext.Provider>
+          <RobotVideoContext.Provider value={video}>
+            <CaptureOperationsContext.Provider value={operations}>
+              <MemoryRouter>
+                <CapturePage />
+              </MemoryRouter>
+            </CaptureOperationsContext.Provider>
+          </RobotVideoContext.Provider>
         </SensorDeviceCatalogContext.Provider>
       </RobotCatalogContext.Provider>,
     );

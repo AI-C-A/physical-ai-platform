@@ -20,6 +20,7 @@ import {
   type RobotGeolocationQueryPort,
   type RobotTelemetryPort,
 } from '@/entities/robot-telemetry';
+import { InMemoryRobotVideoAdapter, type RobotVideoPort } from '@/entities/robot-video';
 import {
   createInMemorySensorDeviceCatalogWithData,
   type SensorDeviceCatalogPort,
@@ -33,6 +34,7 @@ export interface InMemoryCoreAdapterBundle {
   readonly sensorDeviceCatalog: SensorDeviceCatalogPort;
   readonly robotTelemetry: RobotTelemetryPort;
   readonly robotGeolocation: RobotGeolocationQueryPort;
+  readonly robotVideo: RobotVideoPort;
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
@@ -73,6 +75,7 @@ export function createInMemoryAdapterFactories(
         clock,
         inMemoryRobotLocations,
       ),
+      robotVideo: () => own(new InMemoryRobotVideoAdapter(inMemoryRobotIds)),
       captureOperations: () => own(new InMemoryCaptureOperationsAdapter({
         initialSessions: createInMemoryCaptureSessions(clock),
         scheduler,

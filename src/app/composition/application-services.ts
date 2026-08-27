@@ -11,6 +11,7 @@ import {
   type RobotGeolocationQueryPort,
   type RobotTelemetryPort,
 } from '@/entities/robot-telemetry';
+import type { RobotVideoPort } from '@/entities/robot-video';
 import type { SensorDeviceCatalogPort } from '@/entities/sensor-device';
 import type { RuntimeConfig } from '@/shared/config';
 import { systemClock, type ClockPort } from '@/shared/lib/clock';
@@ -20,6 +21,7 @@ import {
   createInMemoryAdapterFactories,
   type InMemoryCoreAdapterBundle,
 } from './in-memory-adapter-factories';
+import { AvailableStreamCaptureOperations } from './available-stream-capture-operations';
 
 export interface ApplicationServices {
   readonly clock: ClockPort;
@@ -28,6 +30,7 @@ export interface ApplicationServices {
   readonly sensorDeviceCatalog: SensorDeviceCatalogPort;
   readonly robotTelemetry: RobotTelemetryPort;
   readonly robotGeolocation: RobotGeolocationQueryPort;
+  readonly robotVideo: RobotVideoPort;
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
@@ -61,6 +64,7 @@ const adapterServiceNames = [
   'sensorDeviceCatalog',
   'robotTelemetry',
   'robotGeolocation',
+  'robotVideo',
   'captureOperations',
   'datasetRepository',
   'episodeRepository',
@@ -223,7 +227,15 @@ export function createApplicationServices(
       inMemoryAdapters.factories.sensorDeviceCatalog();
     const robotTelemetry = inMemoryAdapters.factories.robotTelemetry();
     const robotGeolocation = inMemoryAdapters.factories.robotGeolocation();
-    const captureOperations = inMemoryAdapters.factories.captureOperations();
+    const robotVideo = inMemoryAdapters.factories.robotVideo();
+    const selectedCaptureOperations =
+      inMemoryAdapters.factories.captureOperations();
+    const captureOperations = new AvailableStreamCaptureOperations(
+      selectedCaptureOperations,
+      robotOperationalStatus,
+      robotTelemetry,
+      robotVideo,
+    );
     const robotEventRepository =
       inMemoryAdapters.factories.robotEventRepository();
     const episodeRepository = inMemoryAdapters.factories.episodeRepository();
@@ -234,6 +246,7 @@ export function createApplicationServices(
       sensorDeviceCatalog,
       robotTelemetry,
       robotGeolocation,
+      robotVideo,
       captureOperations,
       robotEventRepository,
       episodeRepository,

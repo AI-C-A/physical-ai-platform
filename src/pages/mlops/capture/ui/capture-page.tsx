@@ -16,6 +16,7 @@ import {
   type ExecutionProvenance,
 } from '@/entities/capture-session';
 import { useRobotCatalog } from '@/entities/robot';
+import { RobotCameraGrid } from '@/entities/robot-video';
 import { useSensorDeviceCatalog } from '@/entities/sensor-device';
 import { useAsyncQuery } from '@/shared/lib/async-query';
 import {
@@ -676,11 +677,11 @@ export function CapturePage() {
             </div>
             <Badge>{captureRobot?.displayName ?? targetRobotId}</Badge>
           </div>
-          <Panel title="카메라 미리보기 준비 중">
-            <p className="text-sm text-neutral-600">
-              수집 세션과 기록 대상 스트림은 먼저 구성할 수 있습니다.
-            </p>
-          </Panel>
+          <RobotCameraGrid
+            presentation="workspace"
+            recordingEnabled
+            robotId={targetRobotId}
+          />
         </div>
       </section>
 
