@@ -79,7 +79,12 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      'e2e/build-freshness.test.ts',
+      'e2e/playwright-config.test.ts',
+      'e2e/soak-metrics.test.ts',
+    ],
     setupFiles: ['./src/test/setup.ts'],
   },
 }));

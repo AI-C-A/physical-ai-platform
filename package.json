@@ -10,8 +10,7 @@
     "build": "npm run build:mock",
     "build:mock": "npm run typecheck && vite build --configLoader runner --mode mock",
     "build:real": "npm run typecheck && vite build --configLoader runner --mode patrol",
-    "preview": "vite preview --configLoader runner",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit --pretty false && tsc -p tsconfig.node.json --noEmit --pretty false",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit --pretty false && tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.e2e.json --noEmit --pretty false",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "test:unit": "vitest run --configLoader runner",
@@ -19,9 +18,13 @@
     "test:gateway": "node --test gateway/*.test.mjs",
     "test:segmentation": "node scripts/test-segmentation.mjs",
     "smoke:patrol-camera": "node --env-file-if-exists=.env.local scripts/patrol-camera-smoke.mjs",
-    "gateway:dev": "node --env-file-if-exists=.env.local gateway/server.mjs",
     "segmentation:dev": "node scripts/run-segmentation.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation"
+    "gateway:dev": "node --env-file-if-exists=.env.local gateway/server.mjs",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:soak": "npm run build && playwright test e2e/telemetry-video-soak.spec.ts --project=chrome-1440 --config=playwright.soak.config.ts",
+    "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation",
+    "verify:browser": "npm run test:e2e",
+    "preview": "vite preview --configLoader runner"
   },
   "dependencies": {
     "@aws-sdk/client-kinesis-video-signaling": "3.1116.0",
@@ -46,6 +49,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.5",
