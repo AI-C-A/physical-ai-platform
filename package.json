@@ -17,9 +17,11 @@
     "test:unit": "vitest run --configLoader runner",
     "test:tools": "node --test scripts/*.test.mjs",
     "test:gateway": "node --test gateway/*.test.mjs",
+    "test:segmentation": "node scripts/test-segmentation.mjs",
     "smoke:patrol-camera": "node --env-file-if-exists=.env.local scripts/patrol-camera-smoke.mjs",
     "gateway:dev": "node --env-file-if-exists=.env.local gateway/server.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run test:tools && npm run test:gateway"
+    "segmentation:dev": "node scripts/run-segmentation.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation"
   },
   "dependencies": {
     "@aws-sdk/client-kinesis-video-signaling": "3.1116.0",

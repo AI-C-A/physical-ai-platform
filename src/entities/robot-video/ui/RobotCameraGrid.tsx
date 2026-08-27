@@ -17,6 +17,7 @@ import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Spinner } from '@/shared/ui/spinner';
 
+import type { SegmentationLabel } from '../api/segmentation-client';
 import { useRobotVideoPort } from '../model/robot-video-context';
 import type {
   RobotVideoPort,
@@ -25,6 +26,7 @@ import type {
   RobotVideoSource,
   VideoConnectionStatus,
 } from '../model/robot-video';
+import { useSegmentationOverlay } from './use-segmentation-overlay';
 
 const videoStatusLabels = {
   connecting: '영상 불러오는 중',
@@ -99,18 +101,61 @@ function getVideoStatusTone(
   return 'warning';
 }
 
+function SegmentationLabels({
+  labels,
+}: {
+  readonly labels: readonly SegmentationLabel[];
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+      data-segmentation-labels="true"
+    >
+      {labels.map((label, index) => (
+        <span
+          className="absolute max-w-40 truncate rounded-sm px-1 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap text-neutral-950 shadow-sm"
+          key={`${label.className}-${String(index)}`}
+          style={{
+            backgroundColor: label.color,
+            top: `${String(label.top * 100)}%`,
+            transform: label.top < 0.08
+              ? 'translateY(2px)'
+              : 'translateY(calc(-100% - 2px))',
+            ...(label.left > 0.72
+              ? { right: `${String((1 - label.right) * 100)}%` }
+              : { left: `${String(label.left * 100)}%` }),
+          }}
+        >
+          {label.className}
+          {label.confidence === null ? null : ` ${label.confidence.toFixed(2)}`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function VideoSurface({
+  segmentationEnabled,
   onAspectRatioChange,
   presentation,
   stream,
   label,
 }: {
+  readonly segmentationEnabled?: boolean;
   readonly onAspectRatioChange?: (width: number, height: number) => void;
   readonly presentation: 'default' | 'compact' | 'monitoring';
   readonly stream: MediaStream;
   readonly label: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLImageElement>(null);
+
+  const segmentationOverlay = useSegmentationOverlay({
+    enabled: segmentationEnabled ?? false,
+    overlayRef,
+    videoRef,
+  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -132,7 +177,8 @@ function VideoSurface({
   }, [onAspectRatioChange, stream]);
 
   return (
-    <video
+    <>
+      <video
       aria-label={label}
       autoPlay
       className={
@@ -145,7 +191,28 @@ function VideoSurface({
       muted
       playsInline
         ref={videoRef}
-    />
+      />
+      {segmentationEnabled === true ? (
+        <>
+          <img
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+            data-segmentation-overlay="true"
+            ref={overlayRef}
+          />
+          <SegmentationLabels labels={segmentationOverlay.labels} />
+          <div
+            className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-white/15 bg-black/65 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white shadow-sm backdrop-blur-sm"
+            data-segmentation-metrics="true"
+          >
+            {segmentationOverlay.metrics === null
+              ? 'AI 측정 중'
+              : `지연 ${String(Math.round(segmentationOverlay.metrics.latencyMs))} ms · 처리 ${segmentationOverlay.metrics.framesPerSecond.toFixed(1)} FPS`}
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -172,6 +239,7 @@ function CameraCard({
   const [status, setStatus] =
     useState<VideoConnectionStatus>('connecting');
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [segmentationEnabled, setSegmentationEnabled] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<VideoAspectRatio>(
     defaultVideoAspectRatio,
   );
@@ -279,6 +347,7 @@ function CameraCard({
             label={`${source.displayName} 영상`}
             onAspectRatioChange={updateVideoAspectRatio}
             presentation="monitoring"
+            segmentationEnabled={segmentationEnabled}
             stream={stream}
           />
         )}
@@ -287,6 +356,18 @@ function CameraCard({
             {source.displayName}
           </h2>
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+            {stream !== null ? (
+              <Button
+                aria-label={`${source.displayName} 세그멘테이션 ${segmentationEnabled ? '끄기' : '켜기'}`}
+                aria-pressed={segmentationEnabled}
+                className="size-10 min-h-10 border-white/25 bg-black/55 p-0 text-xs text-white opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] duration-200 group-hover:opacity-100 group-focus-within:opacity-100 hover:scale-105 hover:bg-black/75 active:scale-95 aria-pressed:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+                onClick={() => setSegmentationEnabled((value) => !value)}
+                title={`AI 세그멘테이션 ${segmentationEnabled ? '끄기' : '켜기'}`}
+                variant="ghost"
+              >
+                AI
+              </Button>
+            ) : null}
             {canFocus && (stream !== null || isFocused) ? (
               <Button
                 aria-label={isFocused
@@ -501,7 +582,7 @@ function CameraRecordingControls({
   return (
     <Panel title="카메라 원본 녹화">
       <p className="text-sm text-neutral-600">
-        논리 카메라를 선택하면 원본 영상을 기록합니다.
+        논리 카메라를 선택하면 원본 영상과 분할 메타데이터를 함께 기록합니다.
       </p>
       <fieldset className="mt-3 grid gap-2 sm:grid-cols-2">
         <legend className="sr-only">녹화할 카메라</legend>

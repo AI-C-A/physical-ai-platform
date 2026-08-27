@@ -62,6 +62,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     proxy: {
       '/api/integrations/patrol': 'http://127.0.0.1:8787',
+      '/api/segmentation': {
+        target: 'http://127.0.0.1:8790',
+        rewrite: (path) => path.replace(/^\/api\/segmentation/u, ''),
+      },
     },
   },
   resolve: {
