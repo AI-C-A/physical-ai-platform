@@ -156,6 +156,8 @@ function VideoSurface({
     overlayRef,
     videoRef,
   });
+  const isSegmentationLoading = segmentationOverlay.status === 'idle'
+    || segmentationOverlay.status === 'loading';
 
   useEffect(() => {
     const video = videoRef.current;
@@ -203,12 +205,30 @@ function VideoSurface({
           />
           <SegmentationLabels labels={segmentationOverlay.labels} />
           <div
-            className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-white/15 bg-black/65 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white shadow-sm backdrop-blur-sm"
+            aria-atomic="true"
+            aria-busy={isSegmentationLoading}
+            className={
+              segmentationOverlay.status === 'error'
+                ? 'pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-md border border-red-400/40 bg-red-950/80 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-red-100 shadow-sm backdrop-blur-sm'
+                : 'pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-md border border-white/15 bg-black/65 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white shadow-sm backdrop-blur-sm'
+            }
             data-segmentation-metrics="true"
+            data-segmentation-status={segmentationOverlay.status}
+            role="status"
           >
-            {segmentationOverlay.metrics === null
-              ? 'AI 측정 중'
-              : `지연 ${String(Math.round(segmentationOverlay.metrics.latencyMs))} ms · 처리 ${segmentationOverlay.metrics.framesPerSecond.toFixed(1)} FPS`}
+            {isSegmentationLoading ? (
+              <Spinner
+                className="size-3 shrink-0"
+                data-segmentation-loading-spinner="true"
+              />
+            ) : null}
+            <span>
+              {segmentationOverlay.status === 'error'
+                ? 'AI 분석 실패 · 다시 시도 중'
+                : segmentationOverlay.metrics === null
+                  ? 'AI 분석 중'
+                  : `지연 ${String(Math.round(segmentationOverlay.metrics.latencyMs))} ms · 처리 ${segmentationOverlay.metrics.framesPerSecond.toFixed(1)} FPS`}
+            </span>
           </div>
         </>
       ) : null}

@@ -16,9 +16,12 @@ interface SegmentationMetrics {
   readonly latencyMs: number;
 }
 
+type SegmentationStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 interface SegmentationOverlayState {
   readonly labels: readonly SegmentationLabel[];
   readonly metrics: SegmentationMetrics | null;
+  readonly status: SegmentationStatus;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -49,6 +52,7 @@ export function useSegmentationOverlay({
 }): SegmentationOverlayState {
   const [labels, setLabels] = useState<readonly SegmentationLabel[]>([]);
   const [metrics, setMetrics] = useState<SegmentationMetrics | null>(null);
+  const [status, setStatus] = useState<SegmentationStatus>('idle');
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -56,8 +60,11 @@ export function useSegmentationOverlay({
       if (overlay !== null) overlay.removeAttribute('src');
       setLabels([]);
       setMetrics(null);
+      setStatus('idle');
       return;
     }
+
+    setStatus('loading');
 
     const canvas = document.createElement('canvas');
     let active = true;
@@ -123,6 +130,7 @@ export function useSegmentationOverlay({
         overlay.src = nextOverlayUrl;
         if (previousOverlayUrl !== null) URL.revokeObjectURL(previousOverlayUrl);
         setLabels(result.labels);
+        setStatus('ready');
         retryCount = 0;
 
         if (staleTimer !== null) clearTimeout(staleTimer);
@@ -153,6 +161,7 @@ export function useSegmentationOverlay({
         schedule(Math.max(0, minimumFramePeriodMs - cycleElapsedMs));
       } catch (error: unknown) {
         if (!active || isAbortError(error)) return;
+        setStatus('error');
         retryCount += 1;
         const retryDelayMs = Math.min(
           maximumRetryDelayMs,
@@ -174,5 +183,5 @@ export function useSegmentationOverlay({
     };
   }, [enabled, overlayRef, videoRef]);
 
-  return { labels, metrics };
+  return { labels, metrics, status };
 }

@@ -29,6 +29,7 @@ beforeEach(() => {
   vi.mocked(useSegmentationOverlay).mockReturnValue({
     labels: [],
     metrics: null,
+    status: 'loading',
   });
 });
 
@@ -122,6 +123,7 @@ describe('RobotCameraGrid workspace', () => {
         top: 0.5,
       }],
       metrics: { framesPerSecond: 12, latencyMs: 40 },
+      status: 'ready',
     });
     const user = userEvent.setup();
     const stream = { getTracks: () => [] } as unknown as MediaStream;
@@ -158,6 +160,55 @@ describe('RobotCameraGrid workspace', () => {
       transform: 'translateY(calc(-100% - 2px))',
     });
     expect(label).toHaveClass('text-[10px]', 'text-neutral-950');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '지연 40 ms · 처리 12.0 FPS',
+    );
+  });
+
+  it('세그멘테이션 요청 실패를 표시하면서 재시도를 알린다', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.mocked(useSegmentationOverlay).mockReturnValue({
+      labels: [],
+      metrics: null,
+      status: 'error',
+    });
+    const user = userEvent.setup();
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const port: RobotVideoPort = {
+      listSources: () => Promise.resolve([{
+        id: 'camera-front',
+        robotId: 'robot-001',
+        displayName: '전방 Camera',
+      }]),
+      openSource: () => Promise.resolve({
+        close: () => undefined,
+        mediaStream: stream,
+        subscribeStatus: (listener) => {
+          listener('connected');
+          return () => undefined;
+        },
+      }),
+    };
+
+    render(
+      <RobotVideoContext.Provider value={port}>
+        <RobotCameraGrid presentation="monitoring" robotId="robot-001" />
+      </RobotVideoContext.Provider>,
+    );
+    await user.click(await screen.findByRole('button', {
+      name: '전방 Camera 세그멘테이션 켜기',
+    }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'AI 분석 실패 · 다시 시도 중',
+    );
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-segmentation-status',
+      'error',
+    );
+    expect(screen.getByRole('status')).toHaveClass('bg-red-950/80');
+    expect(document.querySelector('[data-segmentation-loading-spinner="true"]'))
+      .not.toBeInTheDocument();
   });
 
   it('관제 화면은 연결 상태 장식을 숨기고 영상 원본 비율을 유지한다', async () => {
@@ -291,6 +342,10 @@ describe('RobotCameraGrid workspace', () => {
       name: '전방 Camera 세그멘테이션 끄기',
     })).toHaveAttribute('aria-pressed', 'true');
     expect(document.querySelector('[data-segmentation-overlay="true"]'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('AI 분석 중');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(document.querySelector('[data-segmentation-loading-spinner="true"]'))
       .toBeInTheDocument();
 
     await user.click(screen.getByRole('button', {

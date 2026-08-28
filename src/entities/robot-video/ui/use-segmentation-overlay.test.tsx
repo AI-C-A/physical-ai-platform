@@ -24,6 +24,7 @@ function SegmentationHarness({ enabled = true }: { readonly enabled?: boolean })
       <output data-testid="metrics">
         {state.metrics === null ? '' : String(state.metrics.latencyMs)}
       </output>
+      <output data-testid="status">{state.status}</output>
     </>
   );
 }
@@ -86,6 +87,7 @@ describe('useSegmentationOverlay', () => {
     );
     expect(screen.getByTestId('labels')).toHaveTextContent('person');
     expect(screen.getByTestId('metrics')).not.toHaveTextContent('');
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
 
     view.unmount();
 
@@ -104,11 +106,13 @@ describe('useSegmentationOverlay', () => {
     makeVideoReady();
     await act(async () => vi.advanceTimersByTimeAsync(0));
     expect(requestQueuedSegmentationOverlay).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('status')).toHaveTextContent('error');
 
     await act(async () => vi.advanceTimersByTimeAsync(399));
     expect(requestQueuedSegmentationOverlay).toHaveBeenCalledOnce();
     await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(requestQueuedSegmentationOverlay).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
 
     view.unmount();
     expect(vi.getTimerCount()).toBe(0);
