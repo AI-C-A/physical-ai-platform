@@ -76,8 +76,17 @@ function writeSidebarCollapsed(collapsed: boolean): void {
   }
 }
 
+function getSiteSelectionSearch(search: string): string {
+  const siteId = new URLSearchParams(search).get('siteId');
+  if (siteId === null) return '';
+
+  return `?${new URLSearchParams({ siteId }).toString()}`;
+}
+
 function Brand({ compact }: { readonly compact: boolean }) {
   const branding = useBranding();
+  const location = useLocation();
+  const siteSelectionSearch = getSiteSelectionSearch(location.search);
   return (
     <Link
       aria-label={`${branding.productName} 모니터링으로 이동`}
@@ -86,7 +95,10 @@ function Brand({ compact }: { readonly compact: boolean }) {
           ? 'flex min-h-12 items-center justify-center'
           : 'flex min-h-12 min-w-0 items-center gap-3'
       }
-      to="/control/monitoring"
+      to={{
+        pathname: '/control/monitoring',
+        search: siteSelectionSearch,
+      }}
     >
       {branding.logo === null ? (
         <span
@@ -124,7 +136,9 @@ function MiniAppSwitcher({
   readonly miniApps: readonly MiniAppNavigationItem[];
   readonly onNavigate?: () => void;
 }) {
+  const location = useLocation();
   const navigate = useNavigate();
+  const siteSelectionSearch = getSiteSelectionSearch(location.search);
   const trigger = (
     <Button
       className={
@@ -154,7 +168,10 @@ function MiniAppSwitcher({
         icon: <Icon name={miniApp.icon} />,
         label: miniApp.label,
         onSelect: () => {
-          void navigate(miniApp.homePath);
+          void navigate({
+            pathname: miniApp.homePath,
+            search: siteSelectionSearch,
+          });
           onNavigate?.();
         },
         selected: miniApp.id === currentMiniApp.id,
@@ -177,6 +194,7 @@ function InnerNavigation({
   readonly onNavigate?: () => void;
 }) {
   const location = useLocation();
+  const siteSelectionSearch = getSiteSelectionSearch(location.search);
 
   return (
     <nav
@@ -196,7 +214,10 @@ function InnerNavigation({
                 : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 ${collapsed ? 'justify-center' : 'gap-3'}`
             }
             onClick={onNavigate}
-            to={item.path}
+            to={{
+              pathname: item.path,
+              search: siteSelectionSearch,
+            }}
           >
             <Icon name={item.icon} />
             {collapsed ? null : <span>{item.label}</span>}

@@ -48,7 +48,9 @@ test('잘못된 Runtime Config는 시작을 중단하고 다시 불러오기로 
 
   await page.getByRole('button', { name: '다시 불러오기' }).click();
   await expectApplicationReady(page);
-  await expect(page).toHaveURL(/\/control\/monitoring$/u);
+  await expect(page).toHaveURL(
+    /\/control\/monitoring\?siteId=pangyo-outdoor-zone$/u,
+  );
   await expect(
     page.getByRole('heading', { level: 1, name: '모니터링' }),
   ).toBeVisible();

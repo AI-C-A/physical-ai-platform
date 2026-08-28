@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -18,6 +18,12 @@ import {
   type RobotDescriptor,
   type RobotOperationalStatus,
 } from '@/entities/robot';
+import {
+  IndoorSiteMap,
+  monitoringSites,
+  type OutdoorSiteDescriptor,
+  type SiteDescriptor,
+} from '@/entities/site';
 import {
   isValidRobotGeolocation,
   useRobotGeolocation,
@@ -31,14 +37,22 @@ import { ErrorMessage } from '@/shared/ui/error-message';
 import { Input } from '@/shared/ui/input';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
+import { Select } from '@/shared/ui/select';
 
 const monitoringViewportClassName =
   'relative h-[calc(100dvh-3.5rem)] min-h-0 overflow-hidden lg:h-dvh';
+const siteIdSearchParameter = 'siteId';
 
-const PANGYO_STATION_MAP_CENTER = {
-  latitude: 37.39472,
-  longitude: 127.11153,
-} as const;
+const siteOptions = monitoringSites.map((site) => ({
+  label: site.displayName,
+  value: site.id,
+}));
+
+function getRobotSubtitle(robot: RobotDescriptor): string {
+  const serialNumber = robot.serialNumber ?? '—';
+  if (robot.name === null || robot.name === robot.displayName) return serialNumber;
+  return `${serialNumber} · ${robot.name}`;
+}
 
 interface RobotMapLocation {
   readonly label: string;
@@ -66,9 +80,11 @@ function getRobotMapLocation(
 
 function MonitoringMap({
   location,
+  site,
   status,
 }: {
   readonly location: RobotMapLocation | null;
+  readonly site: OutdoorSiteDescriptor;
   readonly status: ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,13 +93,18 @@ function MonitoringMap({
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? '';
   const styleUrl = import.meta.env.VITE_MAPBOX_STYLE_URL?.trim() ?? '';
+  const mapCenterLatitude = site.mapCenter.latitude;
+  const mapCenterLongitude = site.mapCenter.longitude;
 
   useEffect(() => {
     const container = containerRef.current;
     if (container === null || accessToken === '' || styleUrl === '') return undefined;
 
     const initialLocation = initialLocationRef.current;
-    const initialMapCenter = initialLocation ?? PANGYO_STATION_MAP_CENTER;
+    const initialMapCenter = initialLocation ?? {
+      latitude: mapCenterLatitude,
+      longitude: mapCenterLongitude,
+    };
     const cameraOptions = {
       bearing: 347.2,
       center: [
@@ -112,7 +133,7 @@ function MonitoringMap({
       mapRef.current = null;
       map.remove();
     };
-  }, [accessToken, styleUrl]);
+  }, [accessToken, mapCenterLatitude, mapCenterLongitude, styleUrl]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -174,9 +195,11 @@ function MonitoringMap({
 function RobotLocationMap({
   geolocation,
   robot,
+  site,
 }: {
   readonly geolocation: RobotGeolocationLoadState | null;
   readonly robot: RobotDescriptor | undefined;
+  readonly site: OutdoorSiteDescriptor;
 }) {
   let location: RobotMapLocation | null = null;
   let status: ReactNode = null;
@@ -200,7 +223,30 @@ function RobotLocationMap({
   return (
     <MonitoringMap
       location={location}
+      site={site}
       status={status}
+    />
+  );
+}
+
+function SiteMap({
+  geolocation,
+  robot,
+  site,
+}: {
+  readonly geolocation: RobotGeolocationLoadState | null;
+  readonly robot: RobotDescriptor | undefined;
+  readonly site: SiteDescriptor;
+}) {
+  if (site.environment === 'indoor') {
+    return <IndoorSiteMap site={site} />;
+  }
+
+  return (
+    <RobotLocationMap
+      geolocation={geolocation}
+      robot={robot}
+      site={site}
     />
   );
 }
@@ -210,9 +256,12 @@ interface MonitoringLayoutProps {
   readonly monitoredRobots: readonly RobotDescriptor[];
   readonly onSearchChange: (value: string) => void;
   readonly onSelectRobot: (robotId: string) => void;
+  readonly onSelectSite: (siteId: string) => void;
   readonly operationalStatus: AsyncQueryState<RobotOperationalStatus | null> | null;
+  readonly robotMonitoringSearch: string;
   readonly search: string;
   readonly selectedRobot: RobotDescriptor | undefined;
+  readonly selectedSite: SiteDescriptor;
 }
 
 function MonitoringLayout({
@@ -220,20 +269,36 @@ function MonitoringLayout({
   monitoredRobots,
   onSearchChange,
   onSelectRobot,
+  onSelectSite,
   operationalStatus,
+  robotMonitoringSearch,
   search,
   selectedRobot,
+  selectedSite,
 }: MonitoringLayoutProps) {
+  const robotInfoTitle = selectedRobot?.displayName ?? '로봇 정보';
+
   return (
     <>
-      <RobotLocationMap geolocation={geolocation} robot={selectedRobot} />
+      <SiteMap
+        geolocation={geolocation}
+        robot={selectedRobot}
+        site={selectedSite}
+      />
       <div className="pointer-events-none relative z-10 grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4 overflow-hidden p-4 md:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_minmax(15rem,18rem)] md:grid-rows-[minmax(0,1fr)] xl:grid-cols-[minmax(14rem,17rem)_minmax(22rem,1fr)_minmax(15rem,18rem)]">
         <Panel
           className="pointer-events-auto flex min-h-0 flex-col overflow-hidden"
           contentClassName="flex min-h-0 flex-1 flex-col"
           title="로봇 선택"
         >
+          <Select
+            label="사이트"
+            onValueChange={onSelectSite}
+            options={siteOptions}
+            value={selectedSite.id}
+          />
           <Input
+            className="mt-4"
             label="로봇 검색"
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="이름 또는 ID"
@@ -252,7 +317,12 @@ function MonitoringLayout({
                     onClick={() => onSelectRobot(robot.id)}
                     variant={selectedRobot?.id === robot.id ? 'secondary' : 'ghost'}
                   >
-                    <span><span className="block">{robot.displayName}</span><span className="block text-xs font-normal">{robot.id}</span></span>
+                    <span>
+                      <span className="block">{robot.displayName}</span>
+                      <span className="block text-xs font-normal">
+                        {getRobotSubtitle(robot)}
+                      </span>
+                    </span>
                   </Button>
                 </li>
               ))}
@@ -263,22 +333,28 @@ function MonitoringLayout({
         <Panel
           className="pointer-events-auto flex min-h-0 flex-col overflow-hidden md:col-start-3 md:row-start-1"
           contentClassName="min-h-0 overflow-y-auto"
-          title="로봇 정보"
+          title={robotInfoTitle}
         >
           <div className="grid gap-4">
+            {selectedRobot === undefined || operationalStatus === null ? null : (
+              <Link
+                className="text-sm font-semibold underline"
+                to={{
+                  pathname: appendPathSegment('/control/monitoring', selectedRobot.id),
+                  search: robotMonitoringSearch,
+                }}
+              >
+                영상 관제
+              </Link>
+            )}
             <RobotModelViewer />
             {selectedRobot === undefined || operationalStatus === null ? (
               <p role="status">표시할 Robot이 없습니다.</p>
             ) : (
-              <>
               <RobotInfoTable
                 operationalStatus={operationalStatus}
                 robot={selectedRobot}
               />
-              <Link className="text-sm font-semibold underline" to={appendPathSegment('/control/monitoring', selectedRobot.id)}>
-                영상 관제
-              </Link>
-              </>
             )}
           </div>
         </Panel>
@@ -293,20 +369,62 @@ function SelectedRobotMonitoringLayout(
   },
 ) {
   const operationalStatus = useRobotOperationalStatus(props.selectedRobot.id);
-  const geolocation = useRobotGeolocation(props.selectedRobot.id);
+  if (props.selectedSite.environment === 'indoor') {
+    return (
+      <MonitoringLayout
+        {...props}
+        geolocation={null}
+        operationalStatus={operationalStatus}
+      />
+    );
+  }
+
   return (
-    <MonitoringLayout
+    <OutdoorSelectedRobotMonitoringLayout
       {...props}
-      geolocation={geolocation}
       operationalStatus={operationalStatus}
     />
   );
 }
 
+function OutdoorSelectedRobotMonitoringLayout(
+  props: Omit<MonitoringLayoutProps, 'geolocation' | 'operationalStatus'> & {
+    readonly operationalStatus: AsyncQueryState<RobotOperationalStatus | null>;
+    readonly selectedRobot: RobotDescriptor;
+  },
+) {
+  const geolocation = useRobotGeolocation(props.selectedRobot.id);
+  return (
+    <MonitoringLayout
+      {...props}
+      geolocation={geolocation}
+      operationalStatus={props.operationalStatus}
+    />
+  );
+}
+
 export function ControlMonitoringPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const robots = useRobotCatalog();
+  const requestedSiteId = searchParams.get(siteIdSearchParameter);
+  const selectedSite = monitoringSites.find((site) => site.id === requestedSiteId)
+    ?? monitoringSites[0];
+  const robotMonitoringSearchParams = new URLSearchParams(searchParams);
+  robotMonitoringSearchParams.set(siteIdSearchParameter, selectedSite.id);
+  const robotMonitoringSearch = `?${robotMonitoringSearchParams.toString()}`;
+
+  useEffect(() => {
+    if (requestedSiteId === selectedSite.id) return;
+
+    setSearchParams((currentSearchParams) => {
+      const nextSearchParams = new URLSearchParams(currentSearchParams);
+      nextSearchParams.set(siteIdSearchParameter, selectedSite.id);
+      return nextSearchParams;
+    }, { replace: true });
+  }, [requestedSiteId, selectedSite.id, setSearchParams]);
+
   const monitoredRobots = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
     return robots.robots
@@ -352,8 +470,19 @@ export function ControlMonitoringPage() {
     monitoredRobots,
     onSearchChange: setSearch,
     onSelectRobot: setSelectedRobotId,
+    onSelectSite: (siteId: string) => {
+      if (!monitoringSites.some((site) => site.id === siteId)) return;
+
+      setSearchParams((currentSearchParams) => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams);
+        nextSearchParams.set(siteIdSearchParameter, siteId);
+        return nextSearchParams;
+      });
+    },
+    robotMonitoringSearch,
     search,
     selectedRobot,
+    selectedSite,
   };
 
   return (

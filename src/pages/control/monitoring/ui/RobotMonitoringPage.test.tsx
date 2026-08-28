@@ -43,11 +43,12 @@ const emptyVideo: RobotVideoPort = {
 function renderRobotMonitoring(
   catalogPort: RobotCatalogPort = catalog,
   videoPort: RobotVideoPort = emptyVideo,
+  initialEntry = '/control/monitoring/robot-001',
 ) {
   return render(
     <RobotCatalogContext.Provider value={catalogPort}>
       <RobotVideoContext.Provider value={videoPort}>
-        <MemoryRouter initialEntries={['/control/monitoring/robot-001']}>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
             <Route
               element={<RobotMonitoringPage />}
@@ -64,7 +65,11 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('RobotMonitoringPage', () => {
   it('중복 상세 정보 없이 선택 Robot의 카메라 관제 화면을 표시한다', async () => {
-    renderRobotMonitoring();
+    renderRobotMonitoring(
+      catalog,
+      emptyVideo,
+      '/control/monitoring/robot-001?siteId=pangyo-army-ax-hub',
+    );
 
     expect(
       await screen.findByRole('heading', { level: 1, name: robot.displayName }),
@@ -72,7 +77,7 @@ describe('RobotMonitoringPage', () => {
     expect(screen.queryByText('전체 화면 관제')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '모니터링으로 돌아가기' })).toHaveAttribute(
       'href',
-      '/control/monitoring',
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
     );
     expect(screen.queryByRole('heading', { name: '로봇 정보' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '운영 상태' })).not.toBeInTheDocument();

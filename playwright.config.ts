@@ -18,7 +18,8 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: true,
   retries: process.env.CI === 'true' ? 1 : 0,
-  workers: process.env.CI === 'true' ? 1 : undefined,
+  // 동시 WebGL page가 model-viewer의 500ms render 확인을 굶겨 가짜 console warning을 만들지 않게 직렬화한다.
+  workers: 1,
   timeout: 45_000,
   expect: {
     timeout: 10_000,

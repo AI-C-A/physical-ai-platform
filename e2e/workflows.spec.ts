@@ -152,7 +152,7 @@ test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다'
     page.getByRole('heading', { level: 2, name: '로봇 선택' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { level: 2, name: '로봇 정보' }),
+    page.getByRole('heading', { level: 2, name: '수송 로봇 02' }),
   ).toBeVisible();
   await expect(
     page.getByRole('region', { name: '로봇 위치 지도' }),
@@ -170,7 +170,7 @@ test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다'
 
   await page.getByRole('button', { name: /정찰 로봇 01/u }).click();
   const selectedRobot = page
-    .getByRole('heading', { name: '로봇 정보' })
+    .getByRole('heading', { level: 2, name: '정찰 로봇 01' })
     .locator('..');
   const rawInfoTable = page.getByRole('table', {
     name: '정찰 로봇 01 로봇 정보',

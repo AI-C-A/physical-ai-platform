@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 
 import { useRobot, type RobotDescriptor } from '@/entities/robot';
 import { RobotCameraGrid } from '@/entities/robot-video';
@@ -6,14 +6,20 @@ import { decodePathSegment } from '@/shared/lib/navigation';
 import { Icon } from '@/shared/ui/icon';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 
-function RobotMonitoringContent({ robot }: { readonly robot: RobotDescriptor }) {
+function RobotMonitoringContent({
+  returnPath,
+  robot,
+}: {
+  readonly returnPath: string;
+  readonly robot: RobotDescriptor;
+}) {
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-100">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-neutral-300 bg-white px-3 sm:px-4">
         <Link
           aria-label="모니터링으로 돌아가기"
           className="inline-flex size-10 shrink-0 items-center justify-center rounded-md hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
-          to="/control/monitoring"
+          to={returnPath}
         >
           <Icon name="back" />
         </Link>
@@ -36,8 +42,10 @@ function RobotMonitoringContent({ robot }: { readonly robot: RobotDescriptor }) 
 
 export function RobotMonitoringPage() {
   const { robotId: encodedRobotId = '' } = useParams();
+  const location = useLocation();
   const robotId = decodePathSegment(encodedRobotId);
   const robot = useRobot(robotId);
+  const returnPath = `/control/monitoring${location.search}`;
 
   if (robot.status === 'loading') {
     return (
@@ -60,7 +68,7 @@ export function RobotMonitoringPage() {
         <Link
           aria-label="모니터링으로 돌아가기"
           className="inline-flex size-10 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
-          to="/control/monitoring"
+          to={returnPath}
         >
           <Icon name="back" />
         </Link>
@@ -68,5 +76,5 @@ export function RobotMonitoringPage() {
     );
   }
 
-  return <RobotMonitoringContent robot={robot.data} />;
+  return <RobotMonitoringContent returnPath={returnPath} robot={robot.data} />;
 }

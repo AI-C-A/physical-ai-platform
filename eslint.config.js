@@ -89,6 +89,7 @@ export default defineConfig(
               group: [
                 '@base-ui-components/**',
                 '@chakra-ui/**',
+                '@google/model-viewer',
                 '@headlessui/**',
                 '@mui/**',
                 '@radix-ui/**',

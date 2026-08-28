@@ -36,7 +36,9 @@ test('데스크톱 Shell을 키보드로 전환하고 접힘 상태를 복구한
   const mlopsItem = page.getByRole('menuitem', { name: 'MLOps' });
   await mlopsItem.focus();
   await mlopsItem.press('Enter');
-  await expect(page).toHaveURL(/\/mlops\/capture$/u);
+  await expect(page).toHaveURL(
+    /\/mlops\/capture\?siteId=pangyo-outdoor-zone$/u,
+  );
   await expect(main).toBeFocused();
   await expect(page).toHaveTitle('데이터 수집 | ROBOT Army TIGER+');
 

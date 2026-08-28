@@ -8,3 +8,4 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+*.glb filter=lfs diff=lfs merge=lfs -text

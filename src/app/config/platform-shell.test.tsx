@@ -6,7 +6,12 @@ import {
   waitFor,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BrandingContext, type BrandingConfig } from '@/shared/config';
@@ -20,10 +25,20 @@ const branding: BrandingConfig = {
   logo: '/assets/army-tiger-logo.png',
 };
 
+function CurrentLocation() {
+  const location = useLocation();
+  return (
+    <output data-testid="current-location" hidden>
+      {`${location.pathname}${location.search}`}
+    </output>
+  );
+}
+
 function renderShell(initialPath = '/control/monitoring') {
   return render(
     <BrandingContext.Provider value={branding}>
       <MemoryRouter initialEntries={[initialPath]}>
+        <CurrentLocation />
         <Routes>
           <Route
             element={<PlatformShell miniApps={MINI_APP_REGISTRY} />}
@@ -164,6 +179,41 @@ describe('PlatformShell', () => {
     );
     await user.click(screen.getByRole('menuitem', { name: 'BigData' }));
     expect(screen.getByText('BigData 개요 화면')).toBeInTheDocument();
+  });
+
+  it('사이드바 메뉴와 미니앱을 이동해도 선택한 사이트 ID를 유지한다', async () => {
+    const user = userEvent.setup();
+    renderShell('/control/monitoring?search=robot&siteId=pangyo-army-ax-hub');
+
+    expect(screen.getByRole('link', { name: '로봇 관리' })).toHaveAttribute(
+      'href',
+      '/control/robots?siteId=pangyo-army-ax-hub',
+    );
+    await user.click(screen.getByRole('link', { name: '로봇 관리' }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/robots?siteId=pangyo-army-ax-hub',
+    );
+
+    expect(screen.getByRole('link', { name: '모니터링' })).toHaveAttribute(
+      'href',
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
+    );
+    await user.click(screen.getByRole('link', { name: '모니터링' }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
+    );
+
+    await user.click(screen.getByRole('button', { name: '미니앱 전환 · 관제' }));
+    await user.click(screen.getByRole('menuitem', { name: 'MLOps' }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/mlops/capture?siteId=pangyo-army-ax-hub',
+    );
+
+    await user.click(screen.getByRole('button', { name: '미니앱 전환 · MLOps' }));
+    await user.click(screen.getByRole('menuitem', { name: '관제' }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
+    );
   });
 
   it('접힘 상태를 브라우저에 저장하고 메뉴의 접근 가능한 이름을 유지한다', async () => {

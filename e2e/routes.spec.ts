@@ -79,7 +79,9 @@ test('루트는 모니터링으로 이동하고 알 수 없는 경로는 404를 
 
   await page.goto('/');
   await expectApplicationReady(page);
-  await expect(page).toHaveURL(/\/control\/monitoring$/u);
+  await expect(page).toHaveURL(
+    /\/control\/monitoring\?siteId=pangyo-outdoor-zone$/u,
+  );
   await expect(
     page.getByRole('heading', { level: 1, name: '모니터링' }),
   ).toBeVisible();

@@ -1,7 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import {
   createInMemoryRobotCatalogWithData,
@@ -74,6 +83,31 @@ vi.mock('mapbox-gl', () => ({
   },
 }));
 
+const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'scrollIntoView',
+);
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+    writable: true,
+  });
+});
+
+afterAll(() => {
+  if (scrollIntoViewDescriptor === undefined) {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+    return;
+  }
+  Object.defineProperty(
+    HTMLElement.prototype,
+    'scrollIntoView',
+    scrollIntoViewDescriptor,
+  );
+});
+
 function createOperationalStatus(
   robotId: string,
   overrides: Partial<RobotOperationalStatus> = {},
@@ -123,17 +157,28 @@ function renderPage(
   catalog: RobotCatalogPort = createInMemoryRobotCatalogWithData(),
   status: RobotOperationalStatusQueryPort = operationalStatus,
   location: RobotGeolocationQueryPort = geolocation,
+  initialEntry = '/control/monitoring',
 ) {
   return render(
     <RobotCatalogContext.Provider value={catalog}>
       <RobotOperationalStatusContext.Provider value={status}>
         <RobotGeolocationContext.Provider value={location}>
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[initialEntry]}>
             <ControlMonitoringPage />
+            <CurrentLocation />
           </MemoryRouter>
         </RobotGeolocationContext.Provider>
       </RobotOperationalStatusContext.Provider>
     </RobotCatalogContext.Provider>,
+  );
+}
+
+function CurrentLocation() {
+  const location = useLocation();
+  return (
+    <output data-testid="current-location" hidden>
+      {`${location.pathname}${location.search}`}
+    </output>
   );
 }
 
@@ -214,7 +259,7 @@ describe('ControlMonitoringPage', () => {
     await waitFor(() => expect(spinner).not.toBeInTheDocument());
   });
 
-  it('Mapbox 배경 위에 로봇 선택과 Raw 정보 패널만 표시한다', async () => {
+  it('기본 실외 사이트의 Mapbox 배경 위에 로봇 선택과 Raw 정보 패널을 표시한다', async () => {
     renderPage();
 
     const pageHeading = await screen.findByRole('heading', {
@@ -223,7 +268,19 @@ describe('ControlMonitoringPage', () => {
     });
     expect(pageHeading).toHaveClass('sr-only');
     expect(screen.getByRole('heading', { name: '로봇 선택' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '로봇 정보' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '사이트' })).toHaveTextContent(
+      '판교',
+    );
+    expect(screen.getByRole('combobox', { name: '사이트' })).not.toHaveTextContent('· 실외');
+    expect(await screen.findByRole('heading', { name: '수송 로봇 02' })).toBeInTheDocument();
+    const robotSelection = screen.getByRole('heading', { name: '로봇 선택' }).closest('section');
+    expect(robotSelection).not.toBeNull();
+    const fallbackNameButton = within(robotSelection as HTMLElement).getByRole('button', {
+      name: /수송 로봇 02/u,
+    });
+    expect(within(fallbackNameButton).getByText('N0000002')).toBeInTheDocument();
+    expect(within(fallbackNameButton).queryByText('N0000002 · 수송 로봇 02'))
+      .not.toBeInTheDocument();
     const modelViewer = screen.getByRole('group', { name: '로봇 3D 모델' });
     const modelViewerElement = modelViewer.querySelector('model-viewer');
     expect(modelViewerElement).toHaveAttribute('src', '/assets/go2_walk.glb');
@@ -275,6 +332,178 @@ describe('ControlMonitoringPage', () => {
     expect(within(latitudeRow as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(serialNumberRow as HTMLElement).getByText('MOCK00001')).toBeInTheDocument();
     expect(screen.queryByText('연결됨')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('current-location')).toHaveTextContent(
+        '/control/monitoring?siteId=pangyo-outdoor-zone',
+      );
+    });
+  });
+
+  it('URL의 사이트 ID로 선택 상태와 지도를 복원한다', async () => {
+    vi.stubGlobal('WebGLRenderingContext', class {});
+    vi.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
+    renderPage(
+      createInMemoryRobotCatalogWithData(),
+      operationalStatus,
+      geolocation,
+      '/control/monitoring?view=compact&siteId=pangyo-army-ax-hub',
+    );
+
+    expect(await screen.findByRole('combobox', { name: '사이트' })).toHaveTextContent(
+      '판교 육군 AX 거점',
+    );
+    expect(screen.getByRole('combobox', { name: '사이트' })).not.toHaveTextContent('· 실내');
+    expect(await screen.findByRole('region', {
+      name: '판교 육군 AX 거점 실내 지도',
+    })).toBeInTheDocument();
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring?view=compact&siteId=pangyo-army-ax-hub',
+    );
+  });
+
+  it('실내 사이트를 선택하면 Mapbox 대신 해당 사이트 GLB 지도를 표시한다', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('WebGLRenderingContext', class {});
+    vi.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
+    renderPage();
+
+    await waitFor(() => expect(createMap).toHaveBeenCalledOnce());
+    const siteSelect = screen.getByRole('combobox', { name: '사이트' });
+    siteSelect.focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('option', {
+      name: '판교 육군 AX 거점',
+    });
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    const indoorMap = await screen.findByRole('region', {
+      name: '판교 육군 AX 거점 실내 지도',
+    });
+    expect(screen.getByRole('combobox', { name: '사이트' })).toHaveTextContent(
+      '판교 육군 AX 거점',
+    );
+    expect(screen.getByRole('combobox', { name: '사이트' })).not.toHaveTextContent('· 실내');
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
+    );
+    expect(screen.getByRole('link', { name: '영상 관제' })).toHaveAttribute(
+      'href',
+      '/control/monitoring/robot-002?siteId=pangyo-army-ax-hub',
+    );
+    const indoorModelViewer = indoorMap.querySelector('model-viewer');
+    expect(indoorModelViewer).toHaveAttribute('src', '/assets/sites/pangyo-v1.glb');
+    expect(indoorModelViewer).toHaveAttribute('camera-orbit', '-15deg 50deg 145%');
+    expect(indoorModelViewer).toHaveAttribute('disable-tap');
+    expect(indoorModelViewer).toHaveAttribute('field-of-view', '40deg');
+    expect(indoorModelViewer).toHaveAttribute('environment-image', 'legacy');
+    expect(indoorModelViewer).toHaveAttribute('exposure', '0.5');
+    expect(indoorModelViewer).toHaveAttribute('interpolation-decay', '0');
+    expect(indoorModelViewer).toHaveAttribute('max-camera-orbit', 'auto auto 180%');
+    expect(indoorModelViewer).toHaveAttribute('min-camera-orbit', 'auto auto 20%');
+    expect(indoorModelViewer).toHaveAttribute('shadow-intensity', '0.3');
+    expect(indoorModelViewer).toHaveAttribute('shadow-softness', '0.85');
+    expect(indoorModelViewer).toHaveAttribute('tone-mapping', 'neutral');
+    expect(indoorModelViewer?.querySelector('[slot="pan-target"]'))
+      .toHaveClass('hidden');
+
+    const receivedButtons: number[] = [];
+    indoorModelViewer?.addEventListener('pointerdown', (event) => {
+      receivedButtons.push(event.button);
+    });
+    const leftPointerDown = new MouseEvent('pointerdown', {
+      bubbles: true,
+      button: 0,
+    });
+    Object.defineProperty(leftPointerDown, 'pointerType', { value: 'mouse' });
+    const rightPointerDown = new MouseEvent('pointerdown', {
+      bubbles: true,
+      button: 2,
+    });
+    Object.defineProperty(rightPointerDown, 'pointerType', { value: 'mouse' });
+    indoorModelViewer?.dispatchEvent(leftPointerDown);
+    indoorModelViewer?.dispatchEvent(rightPointerDown);
+    expect(receivedButtons).toEqual([2, 0]);
+    let pointerUpAltKey = false;
+    indoorModelViewer?.addEventListener('pointerup', (event) => {
+      pointerUpAltKey = event.altKey;
+    });
+    const pointerUp = new MouseEvent('pointerup', { bubbles: true });
+    Object.defineProperty(pointerUp, 'pointerType', { value: 'mouse' });
+    indoorModelViewer?.dispatchEvent(pointerUp);
+    expect(pointerUpAltKey).toBe(true);
+
+    const animationFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    Object.assign(indoorModelViewer as HTMLElement, {
+      cameraOrbit: '',
+      cameraTarget: '',
+      getBoundingClientRect: vi.fn(() => ({
+        bottom: 100,
+        height: 100,
+        left: 0,
+        right: 100,
+        top: 0,
+        width: 100,
+        x: 0,
+        y: 0,
+      })),
+      getCameraOrbit: vi.fn(() => ({
+        phi: Math.PI / 4,
+        radius: 100,
+        theta: 0,
+      })),
+      getCameraTarget: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+      getFieldOfView: vi.fn(() => 40),
+      jumpCameraToGoal: vi.fn(),
+      positionAndNormalFromPoint: vi.fn(() => ({
+        normal: { x: 0, y: 1, z: 0 },
+        position: { x: 10, y: 0, z: 20 },
+      })),
+      updateComplete: Promise.resolve(),
+    });
+    const wheelEventAllowed = fireEvent.wheel(indoorModelViewer as HTMLElement, {
+      clientX: 75,
+      clientY: 50,
+      deltaY: -100,
+    });
+    expect(wheelEventAllowed).toBe(false);
+    expect((indoorModelViewer as HTMLElement & { cameraOrbit: string }).cameraOrbit)
+      .toBe('');
+    const expectedRadius = 100 * Math.exp(-100 * 0.0015);
+    animationFrames.shift()?.(performance.now() + 220);
+    const expectedScaleRatio = expectedRadius / 100;
+    expect((indoorModelViewer as HTMLElement & { cameraOrbit: string }).cameraOrbit)
+      .toBe(`0rad ${Math.PI / 4}rad ${expectedRadius}m`);
+    const mapPlaneAnchorX = 50 * Math.tan(40 * Math.PI / 360);
+    const cameraTarget = (
+      indoorModelViewer as HTMLElement & { cameraTarget: string }
+    ).cameraTarget.split(' ').map(Number.parseFloat);
+    expect(cameraTarget[0]).toBeCloseTo(
+      mapPlaneAnchorX * (1 - expectedScaleRatio),
+    );
+    expect(cameraTarget[1]).toBeCloseTo(0);
+    expect(cameraTarget[2]).toBeCloseTo(0);
+
+    expect(
+      within(indoorMap).getByRole('status', { name: '실내 지도 불러오는 중' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '로봇 위치 지도' })).not.toBeInTheDocument();
+    expect(createMap).toHaveBeenCalledOnce();
+
+    if (indoorModelViewer === null) throw new Error('실내 model-viewer가 필요합니다.');
+    fireEvent.error(indoorModelViewer);
+    expect(within(indoorMap).getByRole('alert')).toHaveTextContent(
+      '실내 지도를 표시할 수 없습니다.',
+    );
+    await user.click(within(indoorMap).getByRole('button', { name: '다시 시도' }));
+    expect(
+      within(indoorMap).getByRole('status', { name: '실내 지도 불러오는 중' }),
+    ).toBeInTheDocument();
+    expect(indoorMap.querySelector('model-viewer')).toBe(indoorModelViewer);
   });
 
   it('검증된 위치 조회 결과를 선택 로봇 마커와 지도 중심에 반영한다', async () => {
@@ -338,15 +567,20 @@ describe('ControlMonitoringPage', () => {
     await waitFor(() => expect(createMap).toHaveBeenCalledOnce());
     await user.click(screen.getByRole('button', { name: /정찰 로봇 01/u }));
 
-    const selected = screen.getByRole('heading', { name: '로봇 정보' }).closest('section');
+    const selected = screen.getByRole('heading', { name: '정찰 로봇 01' }).closest('section');
     expect(selected).not.toBeNull();
     expect(await screen.findByRole('table', {
       name: '정찰 로봇 01 로봇 정보',
     })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '영상 관제' })).toHaveAttribute(
       'href',
-      '/control/monitoring/robot-001',
+      '/control/monitoring/robot-001?siteId=pangyo-outdoor-zone',
     );
+    expect(
+      screen.getByRole('link', { name: '영상 관제' }).compareDocumentPosition(
+        screen.getByRole('group', { name: '로봇 3D 모델' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(createMap).toHaveBeenCalledOnce();
   });
 
@@ -357,7 +591,7 @@ describe('ControlMonitoringPage', () => {
     await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
     await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '정찰 로봇 01');
 
-    const selected = screen.getByRole('heading', { name: '로봇 정보' }).closest('section');
+    const selected = screen.getByRole('heading', { name: '정찰 로봇 01' }).closest('section');
     expect(selected).not.toBeNull();
     expect(await within(selected as HTMLElement).findByRole('table', {
       name: '정찰 로봇 01 로봇 정보',
@@ -392,6 +626,11 @@ describe('ControlMonitoringPage', () => {
     const robotSelection = screen.getByRole('heading', { name: '로봇 선택' }).closest('section');
     expect(robotSelection).not.toBeNull();
     expect(within(robotSelection as HTMLElement).getAllByRole('button')).toHaveLength(25);
+    const firstRobotButton = within(robotSelection as HTMLElement).getByRole('button', {
+      name: /로봇 01/u,
+    });
+    expect(within(firstRobotButton).getByText('MOCK00001 · API name 01'))
+      .toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '로봇 25');
     expect(await screen.findByRole('table', {
