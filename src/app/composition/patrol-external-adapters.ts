@@ -2,6 +2,7 @@ import {
   PatrolRobotCatalogAdapter,
   PatrolRobotOperationalStatusQuery,
 } from '@/entities/robot';
+import { PatrolRobotEventRepository } from '@/entities/robot-event';
 import { KinesisCameraAdapter } from '@/entities/robot-video';
 
 import type { ExternalAdapterFactory } from './application-services';
@@ -28,7 +29,7 @@ export const createPatrolExternalAdapters: ExternalAdapterFactory = (
     robotTelemetry: noData.robotTelemetry,
     robotGeolocation: noData.robotGeolocation,
     captureOperations: noData.captureOperations,
-    robotEventRepository: noData.robotEventRepository,
+    robotEventRepository: new PatrolRobotEventRepository({ endpoint }),
     episodeRepository: noData.episodeRepository,
     datasetRepository: noData.datasetRepository,
     analytics: noData.analytics,

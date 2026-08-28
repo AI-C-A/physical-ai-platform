@@ -7,22 +7,22 @@ const robots: readonly RobotDescriptor[] = [
   {
     id: 'robot-027',
     serialNumber: 'SERIAL027',
+    name: '시설 점검 로봇',
     displayName: '시설 점검 로봇',
-    description: null,
     integrationProfileId: 'profile-test',
   },
   {
     id: 'robot-103',
     serialNumber: 'SERIAL103',
+    name: '자재 운반 로봇',
     displayName: '자재 운반 로봇',
-    description: null,
     integrationProfileId: 'profile-test',
   },
   {
     id: 'robot-005',
     serialNumber: 'SERIAL005',
+    name: '시설 점검 로봇',
     displayName: '시설 점검 로봇',
-    description: null,
     integrationProfileId: 'profile-alpha',
   },
 ];

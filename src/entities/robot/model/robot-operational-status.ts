@@ -1,17 +1,14 @@
-/** Patrol robot_status가 제공한 필드를 이름과 값의 변환 없이 보존한다. */
+/** Patrol robot_status에서 FE가 사용하는 필드만 이름과 값의 변환 없이 보존한다. */
 export interface PatrolRobotSnapshot {
   readonly id: number;
   readonly serialNumber: string | null;
   readonly name: string | null;
   readonly nickname: string | null;
-  readonly description: string | null;
   readonly battery: number;
   readonly isConnecting: boolean;
   readonly isAvailable: boolean | null;
   readonly isCharging: boolean;
   readonly isMovable: boolean;
-  readonly isHeadLightOn: boolean;
-  readonly isCargoOpen: boolean;
   readonly latitude: number | null;
   readonly longitude: number | null;
 }
@@ -30,9 +27,26 @@ export interface RobotOperationalDataSource {
   readonly displayName: string;
 }
 
+export type RobotOperationalStatusSubscriptionEvent =
+  | {
+      readonly kind: 'updated';
+      readonly robotId: string;
+    }
+  | {
+      readonly kind: 'stale';
+      readonly lastSuccessfulAtMs: number | null;
+      readonly message: string;
+      readonly robotId: string;
+    };
+
 export interface RobotOperationalStatusQueryPort {
   listOperationalDataSources(
     robotId: string,
   ): Promise<readonly RobotOperationalDataSource[]>;
   getOperationalStatus(robotId: string): Promise<RobotOperationalStatus | null>;
+  /** 외부 상태 stream이 바뀔 때 query를 무효화한다. 미지원 Adapter는 생략할 수 있다. */
+  subscribeOperationalStatuses?(
+    robotIds: readonly string[],
+    listener: (event: RobotOperationalStatusSubscriptionEvent) => void,
+  ): () => void;
 }

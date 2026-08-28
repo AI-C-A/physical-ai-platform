@@ -29,8 +29,8 @@ function LocationSearchProbe() {
 const robot: RobotDescriptor = {
   id: 'robot-001',
   serialNumber: 'MOCK00001',
+  name: '정찰 로봇 01',
   displayName: '정찰 로봇 01',
-  description: null,
   integrationProfileId: 'robot-profile-v1',
 };
 

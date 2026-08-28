@@ -4,6 +4,7 @@ import {
   PatrolRobotCatalogAdapter,
   PatrolRobotOperationalStatusQuery,
 } from '@/entities/robot';
+import { PatrolRobotEventRepository } from '@/entities/robot-event';
 import { KinesisCameraAdapter } from '@/entities/robot-video';
 import type { RuntimeConfig } from '@/shared/config';
 
@@ -42,7 +43,7 @@ describe('Patrol real Adapter 구성', () => {
     await expect(services.robotTelemetry.getChannelDescriptors('robot-1')).resolves.toEqual([]);
     await expect(services.robotGeolocation.getGeolocationObservation('robot-1')).resolves.toBeNull();
     await expect(services.captureOperations.listSessions()).resolves.toEqual([]);
-    await expect(services.robotEventRepository.listEvents()).resolves.toEqual([]);
+    expect(services.robotEventRepository).toBeInstanceOf(PatrolRobotEventRepository);
     await expect(services.episodeRepository.listEpisodes()).resolves.toEqual([]);
     await expect(services.datasetRepository.listDatasets()).resolves.toEqual([]);
     await expect(services.analytics.getOverview({

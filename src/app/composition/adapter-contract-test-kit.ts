@@ -135,7 +135,7 @@ export function describeAdapterBundleContract(
     });
 
     describe('RobotOperationalStatusQueryPort', () => {
-      it('등록 Robot의 원본 운영 상태와 브라우저 수신 시각을 제공한다', async () => {
+      it('등록 Robot의 필요한 운영 상태와 브라우저 수신 시각을 제공한다', async () => {
         const services = createServices();
         const firstRobot = firstOrThrow(
           await services.robotCatalog.listRobots(),
@@ -157,8 +157,6 @@ export function describeAdapterBundleContract(
         expect(status.data.isAvailable === null || typeof status.data.isAvailable === 'boolean').toBe(true);
         expect(typeof status.data.isCharging).toBe('boolean');
         expect(typeof status.data.isMovable).toBe('boolean');
-        expect(typeof status.data.isHeadLightOn).toBe('boolean');
-        expect(typeof status.data.isCargoOpen).toBe('boolean');
         expect(status.data.latitude === null || Number.isFinite(status.data.latitude)).toBe(true);
         expect(status.data.longitude === null || Number.isFinite(status.data.longitude)).toBe(true);
         expect(Number.isFinite(status.receivedTimestampMs)).toBe(true);

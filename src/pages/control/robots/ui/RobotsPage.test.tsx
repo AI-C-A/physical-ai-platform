@@ -25,7 +25,6 @@ const operationalStatus: RobotOperationalStatusQueryPort = {
       serialNumber: 'MOCK00001',
       name: '405',
       nickname: 'Mock Robot',
-      description: null,
       battery: 100,
       isConnecting: true,
       latitude: 0,
@@ -33,8 +32,6 @@ const operationalStatus: RobotOperationalStatusQueryPort = {
       isAvailable: false,
       isCharging: false,
       isMovable: true,
-      isHeadLightOn: false,
-      isCargoOpen: false,
     },
   }),
 };
@@ -47,10 +44,11 @@ function LocationSearchProbe() {
 function renderPage(
   initialEntry = '/control/robots',
   catalog: RobotCatalogPort = createInMemoryRobotCatalogWithData(),
+  status: RobotOperationalStatusQueryPort = operationalStatus,
 ) {
   return render(
     <RobotCatalogContext.Provider value={catalog}>
-      <RobotOperationalStatusContext.Provider value={operationalStatus}>
+      <RobotOperationalStatusContext.Provider value={status}>
         <MemoryRouter initialEntries={[initialEntry]}>
           <LocationSearchProbe />
           <RobotsPage />
@@ -66,8 +64,8 @@ describe('RobotsPage', () => {
     const robots = Array.from({ length: 21 }, (_, index): RobotDescriptor => ({
       id: `robot-focus-${String(index + 1)}`,
       serialNumber: `FOCUS${String(index + 1)}`,
+      name: `포커스 로봇 ${String(index + 1)}`,
       displayName: `포커스 로봇 ${String(index + 1)}`,
-      description: null,
       integrationProfileId: 'profile-focus',
     }));
     let resolveNextPage: (
@@ -126,17 +124,56 @@ describe('RobotsPage', () => {
       await screen.findByRole('heading', { name: '로봇 관리' }),
     ).toBeInTheDocument();
     expect(
-      (await screen
-        .findByText('상태 조회: 완료'))
-        .closest('[role="status"]'),
+      await screen.findByRole('status', { name: '운영 상태: 조회 완료' }),
     ).toHaveAttribute('aria-atomic', 'true');
-    expect(screen.getAllByText('연결됨').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '상태 새로고침' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('온라인')).toHaveLength(8);
     expect(screen.getAllByText('N0000001').length).toBeGreaterThan(0);
     expect(screen.queryByText('사족 보행형')).not.toBeInTheDocument();
     expect(screen.queryByText('위치 텔레메트리')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(
       /\b(?:connected|waiting|disconnected)\b/,
     );
+  });
+
+  it('상태 stream 실패 시 기존 결과와 Retry를 제공한다', async () => {
+    const user = userEvent.setup();
+    let streamListener: Parameters<
+      NonNullable<RobotOperationalStatusQueryPort['subscribeOperationalStatuses']>
+    >[1] = () => undefined;
+    const getOperationalStatus = vi.fn((robotId: string) => (
+      operationalStatus.getOperationalStatus(robotId)
+    ));
+    const status: RobotOperationalStatusQueryPort = {
+      ...operationalStatus,
+      getOperationalStatus,
+      subscribeOperationalStatuses: (_robotIds, listener) => {
+        streamListener = listener;
+        return () => undefined;
+      },
+    };
+    renderPage('/control/robots', createInMemoryRobotCatalogWithData(), status);
+    await screen.findByRole('status', { name: '실시간 상태: 연결 중' });
+    const initialRequestCount = getOperationalStatus.mock.calls.length;
+
+    act(() => streamListener({
+      kind: 'stale',
+      lastSuccessfulAtMs: 1_700_000_000_000,
+      message: '오프라인',
+      robotId: 'robot-001',
+    }));
+
+    expect(await screen.findByRole('status', {
+      name: /실시간 상태: 오프라인/,
+    })).toBeInTheDocument();
+    expect(screen.queryByText(/최신 로봇 상태를 반영하지 못했습니다/)).not.toBeInTheDocument();
+    expect(screen.getByRole('table', { name: '로봇 목록' })).toBeInTheDocument();
+    expect(getOperationalStatus).toHaveBeenCalledTimes(initialRequestCount);
+
+    await user.click(screen.getByRole('button', { name: '다시 연결' }));
+    await waitFor(() => {
+      expect(getOperationalStatus).toHaveBeenCalledTimes(initialRequestCount * 2);
+    });
   });
 
   it('all 검색 문자열을 URL Query에 보존하고 입력 포커스를 유지한다', async () => {

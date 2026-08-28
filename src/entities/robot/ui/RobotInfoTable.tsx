@@ -16,6 +16,7 @@ import type {
   PatrolRobotSnapshot,
   RobotOperationalStatus,
 } from '../model/robot-operational-status';
+import { RobotOfflineNotice } from './RobotOfflineNotice';
 
 type RobotInfoValue = boolean | number | string | null;
 
@@ -34,7 +35,6 @@ function getPatrolRows(status: PatrolRobotSnapshot): readonly RobotInfoRow[] {
     { field: 'serialNumber', value: status.serialNumber },
     { field: 'name', value: status.name },
     { field: 'nickname', value: status.nickname },
-    { field: 'description', value: status.description },
     { field: 'battery', value: status.battery },
     { field: 'isConnecting', value: status.isConnecting },
     { field: 'latitude', value: status.latitude },
@@ -42,8 +42,6 @@ function getPatrolRows(status: PatrolRobotSnapshot): readonly RobotInfoRow[] {
     { field: 'isAvailable', value: status.isAvailable },
     { field: 'isCharging', value: status.isCharging },
     { field: 'isMovable', value: status.isMovable },
-    { field: 'isHeadLightOn', value: status.isHeadLightOn },
-    { field: 'isCargoOpen', value: status.isCargoOpen },
   ];
 }
 
@@ -57,32 +55,28 @@ export function RobotInfoTable({ operationalStatus, robot }: RobotInfoTableProps
     && operationalStatus.data !== null
     ? getPatrolRows(operationalStatus.data.data)
     : [];
+  const isOffline = operationalStatus.status === 'ready'
+    && operationalStatus.refreshError !== null;
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-end gap-3">
-        {operationalStatus.status === 'loading' ? (
+      {operationalStatus.status === 'loading' ? (
+        <div className="flex items-center justify-end">
           <Spinner label="운영 정보 불러오는 중" />
-        ) : operationalStatus.status === 'error' ? (
+        </div>
+      ) : operationalStatus.status === 'error' ? (
+        <div className="grid gap-2">
           <ErrorMessage>{operationalStatus.message}</ErrorMessage>
-        ) : operationalStatus.data === null ? (
-          <p role="status">운영 정보가 제공되지 않았습니다.</p>
-        ) : null}
-        <Button
-          className="shrink-0"
-          disabled={operationalStatus.status === 'loading'}
-          isLoading={operationalStatus.isRefreshing}
-          onClick={operationalStatus.retry}
-          variant="secondary"
-        >
-          정보 새로고침
-        </Button>
-      </div>
-      {operationalStatus.refreshError === null ? null : (
-        <ErrorMessage>
-          {operationalStatus.refreshError}
-        </ErrorMessage>
-      )}
+          <Button
+            className="justify-self-start"
+            onClick={operationalStatus.retry}
+            variant="secondary"
+          >다시 불러오기</Button>
+        </div>
+      ) : operationalStatus.status === 'ready' && operationalStatus.data === null ? (
+        <p role="status">운영 정보가 제공되지 않았습니다.</p>
+      ) : null}
+      {isOffline ? <RobotOfflineNotice onReconnect={operationalStatus.retry} /> : null}
       <Table aria-label={`${robot.displayName} 로봇 정보`}>
         <TableHeader>
           <TableRow>

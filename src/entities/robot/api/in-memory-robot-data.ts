@@ -30,8 +30,8 @@ const robots: readonly RobotDescriptor[] = definitions.map(
   ([displayName, integrationProfileId], index) => ({
     id: `robot-${String(index + 1).padStart(3, '0')}`,
     serialNumber: `N${String(index + 1).padStart(7, '0')}`,
+    name: displayName,
     displayName,
-    description: null,
     integrationProfileId,
   }),
 );

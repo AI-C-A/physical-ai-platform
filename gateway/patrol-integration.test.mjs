@@ -61,7 +61,7 @@ test('서버 환경의 Robot allowlist를 엄격하게 검증한다', () => {
   );
 });
 
-test('robot_status 정상 응답을 Robot 카탈로그와 운영 상태 DTO로 투영한다', async () => {
+test('robot_status에서 FE에 필요한 필드만 Robot 카탈로그와 운영 상태 DTO로 투영한다', async () => {
   const requests = [];
   const integration = createIntegration(async (url, init) => {
     requests.push({ url: String(url), init });
@@ -72,8 +72,8 @@ test('robot_status 정상 응답을 Robot 카탈로그와 운영 상태 DTO로 �
     items: [{
       id: 'robot-a',
       serialNumber: 'SERIAL001',
-      displayName: '405',
-      description: null,
+      name: '405',
+      displayName: 'Robot A',
       integrationProfileId: 'patrol-rest-v1',
     }],
   });
@@ -85,7 +85,6 @@ test('robot_status 정상 응답을 Robot 카탈로그와 운영 상태 DTO로 �
       serialNumber: 'SERIAL001',
       name: '405',
       nickname: 'Robot A',
-      description: null,
       battery: 100,
       isConnecting: true,
       latitude: 0,
@@ -93,8 +92,6 @@ test('robot_status 정상 응답을 Robot 카탈로그와 운영 상태 DTO로 �
       isAvailable: false,
       isCharging: false,
       isMovable: true,
-      isHeadLightOn: false,
-      isCargoOpen: false,
     },
   });
   assert.equal(requests.length, 2);

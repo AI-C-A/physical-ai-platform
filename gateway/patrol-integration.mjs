@@ -122,7 +122,6 @@ export function parsePatrolRobotStatus(value) {
     serialNumber: optionalString(record.serialNumber, 'robot_status.serialNumber'),
     name: optionalString(record.name, 'robot_status.name'),
     nickname: optionalString(record.nickname, 'robot_status.nickname'),
-    description: optionalString(record.description, 'robot_status.description'),
     battery: requireFiniteNumber(record.battery, 'robot_status.battery'),
     isConnecting: requireBoolean(record.isConnecting, 'robot_status.isConnecting'),
     latitude: optionalFiniteNumber(record.latitude, 'robot_status.latitude'),
@@ -130,8 +129,6 @@ export function parsePatrolRobotStatus(value) {
     isAvailable: optionalBoolean(record.isAvailable, 'robot_status.isAvailable'),
     isCharging: requireBoolean(record.isCharging, 'robot_status.isCharging'),
     isMovable: requireBoolean(record.isMovable, 'robot_status.isMovable'),
-    isHeadLightOn: requireBoolean(record.isHeadLightOn, 'robot_status.isHeadLightOn'),
-    isCargoOpen: requireBoolean(record.isCargoOpen, 'robot_status.isCargoOpen'),
   };
 }
 
@@ -266,8 +263,8 @@ export function createPatrolIntegration(options) {
         return {
           id: registration.id,
           serialNumber: status.serialNumber,
-          displayName: status.name ?? status.nickname ?? registration.serialNumber,
-          description: status.description,
+          name: status.name,
+          displayName: status.nickname ?? status.name ?? registration.serialNumber,
           integrationProfileId: registration.integrationProfileId,
         };
       }));
@@ -284,7 +281,6 @@ export function createPatrolIntegration(options) {
           serialNumber: status.serialNumber,
           name: status.name,
           nickname: status.nickname,
-          description: status.description,
           battery: status.battery,
           isConnecting: status.isConnecting,
           latitude: status.latitude,
@@ -292,8 +288,6 @@ export function createPatrolIntegration(options) {
           isAvailable: status.isAvailable,
           isCharging: status.isCharging,
           isMovable: status.isMovable,
-          isHeadLightOn: status.isHeadLightOn,
-          isCargoOpen: status.isCargoOpen,
         },
       };
     },

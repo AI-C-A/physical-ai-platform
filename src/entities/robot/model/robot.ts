@@ -2,7 +2,7 @@
 export interface RobotDescriptor {
   readonly id: string;
   readonly serialNumber: string | null;
+  readonly name: string | null;
   readonly displayName: string;
-  readonly description: string | null;
   readonly integrationProfileId: string;
 }

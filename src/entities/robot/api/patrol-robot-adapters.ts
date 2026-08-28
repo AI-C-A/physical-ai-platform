@@ -7,6 +7,7 @@ import type {
   PatrolRobotSnapshot,
   RobotOperationalStatus,
   RobotOperationalStatusQueryPort,
+  RobotOperationalStatusSubscriptionEvent,
 } from '../model/robot-operational-status';
 import type { RobotDescriptor } from '../model/robot';
 
@@ -18,7 +19,14 @@ type ExternalFetcher = (
 interface PatrolAdapterOptions {
   readonly clock: ClockPort;
   readonly endpoint: string;
+  readonly eventSourceFactory?: (url: URL) => StatusEventSource;
   readonly fetcher?: ExternalFetcher;
+}
+
+interface StatusEventSource {
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  close(): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
 }
 
 function requireRecord(value: unknown, fieldName: string): Record<string, unknown> {
@@ -83,13 +91,13 @@ function parseRobotList(value: unknown): readonly RobotDescriptor[] {
         robot.serialNumber,
         `Robot 목록.items[${String(index)}].serialNumber`,
       ),
+      name: optionalString(
+        robot.name,
+        `Robot 목록.items[${String(index)}].name`,
+      ),
       displayName: requireString(
         robot.displayName,
         `Robot 목록.items[${String(index)}].displayName`,
-      ),
-      description: optionalString(
-        robot.description,
-        `Robot 목록.items[${String(index)}].description`,
       ),
       integrationProfileId: requireString(
         robot.integrationProfileId,
@@ -122,7 +130,6 @@ function parseOperationalStatus(
       serialNumber: optionalString(data.serialNumber, 'Robot 운영 상태.data.serialNumber'),
       name: optionalString(data.name, 'Robot 운영 상태.data.name'),
       nickname: optionalString(data.nickname, 'Robot 운영 상태.data.nickname'),
-      description: optionalString(data.description, 'Robot 운영 상태.data.description'),
       battery: requireFiniteNumber(data.battery, 'Robot 운영 상태.data.battery'),
       isConnecting: requireBoolean(data.isConnecting, 'Robot 운영 상태.data.isConnecting'),
       latitude: optionalFiniteNumber(data.latitude, 'Robot 운영 상태.data.latitude'),
@@ -130,8 +137,6 @@ function parseOperationalStatus(
       isAvailable: optionalBoolean(data.isAvailable, 'Robot 운영 상태.data.isAvailable'),
       isCharging: requireBoolean(data.isCharging, 'Robot 운영 상태.data.isCharging'),
       isMovable: requireBoolean(data.isMovable, 'Robot 운영 상태.data.isMovable'),
-      isHeadLightOn: requireBoolean(data.isHeadLightOn, 'Robot 운영 상태.data.isHeadLightOn'),
-      isCargoOpen: requireBoolean(data.isCargoOpen, 'Robot 운영 상태.data.isCargoOpen'),
     } satisfies PatrolRobotSnapshot,
   };
 }
@@ -189,11 +194,16 @@ export class PatrolRobotOperationalStatusQuery
 implements RobotOperationalStatusQueryPort {
   readonly #base: URL;
   readonly #clock: ClockPort;
+  readonly #eventSourceFactory: (url: URL) => StatusEventSource;
   readonly #fetcher: ExternalFetcher | undefined;
+  readonly #streamedStatuses = new Map<string, RobotOperationalStatus>();
+  readonly #streamSubscriberCounts = new Map<string, number>();
 
   constructor(options: PatrolAdapterOptions) {
     this.#base = resolveSameOriginEndpoint(options.endpoint);
     this.#clock = options.clock;
+    this.#eventSourceFactory = options.eventSourceFactory
+      ?? ((url) => new EventSource(url));
     this.#fetcher = options.fetcher;
   }
 
@@ -207,6 +217,8 @@ implements RobotOperationalStatusQueryPort {
   }
 
   async getOperationalStatus(robotId: string): Promise<RobotOperationalStatus> {
+    const streamed = this.#streamedStatuses.get(robotId);
+    if (streamed !== undefined) return streamed;
     const value = await requestJson(
       createEndpoint(this.#base, `robots/${encodeURIComponent(robotId)}/status`),
       {},
@@ -217,5 +229,97 @@ implements RobotOperationalStatusQueryPort {
     } catch (error: unknown) {
       throw invalidResponse('로봇 정보를 불러오지 못했습니다.', error);
     }
+  }
+
+  subscribeOperationalStatuses(
+    robotIds: readonly string[],
+    listener: (event: RobotOperationalStatusSubscriptionEvent) => void,
+  ): () => void {
+    const normalizedIds = [...new Set(robotIds)].sort();
+    if (normalizedIds.length === 0) return () => undefined;
+    const allowedIds = new Set(normalizedIds);
+    const url = createEndpoint(this.#base, 'robot-status/events');
+    for (const robotId of normalizedIds) url.searchParams.append('robotId', robotId);
+    const source = this.#eventSourceFactory(url);
+    let active = true;
+    let cleanedUp = false;
+    for (const robotId of normalizedIds) {
+      this.#streamSubscriberCounts.set(robotId, (this.#streamSubscriberCounts.get(robotId) ?? 0) + 1);
+    }
+    const receiveStatus: EventListener = (event) => {
+      if (!active || typeof (event as MessageEvent<unknown>).data !== 'string') return;
+      try {
+        const value: unknown = JSON.parse((event as MessageEvent<string>).data);
+        const record = requireRecord(value, 'Robot 상태 stream');
+        const robotId = requireString(record.robotId, 'Robot 상태 stream.robotId');
+        if (!allowedIds.has(robotId)) return;
+        this.#streamedStatuses.set(
+          robotId,
+          parseOperationalStatus(value, robotId, this.#clock.nowMs()),
+        );
+        listener({ kind: 'updated', robotId });
+      } catch {
+        // 잘못된 한 이벤트는 버리고 현재 연결의 다음 유효 snapshot을 기다린다.
+      }
+    };
+    const receiveStatusError: EventListener = (event) => {
+      if (!active || typeof (event as MessageEvent<unknown>).data !== 'string') return;
+      try {
+        const value: unknown = JSON.parse((event as MessageEvent<string>).data);
+        const record = requireRecord(value, 'Robot 상태 stream 오류');
+        const robotId = requireString(record.robotId, 'Robot 상태 stream 오류.robotId');
+        if (!allowedIds.has(robotId)) return;
+        this.#streamedStatuses.delete(robotId);
+        listener({
+          kind: 'stale',
+          lastSuccessfulAtMs: optionalFiniteNumber(
+            record.lastSuccessfulAtMs,
+            'Robot 상태 stream 오류.lastSuccessfulAtMs',
+          ),
+          message: requireString(record.message, 'Robot 상태 stream 오류.message'),
+          robotId,
+        });
+      } catch {
+        // 검증하지 못한 오류 payload는 사용자 상태로 전달하지 않는다.
+      }
+    };
+    const receiveConnectionError: EventListener = () => {
+      if (!active) return;
+      active = false;
+      source.close();
+      for (const robotId of normalizedIds) {
+        this.#streamedStatuses.delete(robotId);
+        listener({
+          kind: 'stale',
+          lastSuccessfulAtMs: null,
+          message: '오프라인',
+          robotId,
+        });
+      }
+    };
+    source.addEventListener('status-snapshot', receiveStatus);
+    source.addEventListener('status-update', receiveStatus);
+    source.addEventListener('status-error', receiveStatusError);
+    source.addEventListener('error', receiveConnectionError);
+
+    return () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      active = false;
+      source.removeEventListener('status-snapshot', receiveStatus);
+      source.removeEventListener('status-update', receiveStatus);
+      source.removeEventListener('status-error', receiveStatusError);
+      source.removeEventListener('error', receiveConnectionError);
+      source.close();
+      for (const robotId of normalizedIds) {
+        const count = this.#streamSubscriberCounts.get(robotId) ?? 0;
+        if (count <= 1) {
+          this.#streamSubscriberCounts.delete(robotId);
+          this.#streamedStatuses.delete(robotId);
+        } else {
+          this.#streamSubscriberCounts.set(robotId, count - 1);
+        }
+      }
+    };
   }
 }

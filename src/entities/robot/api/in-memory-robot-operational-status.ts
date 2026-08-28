@@ -46,9 +46,8 @@ implements RobotOperationalStatusQueryPort {
       data: {
         id: numericId,
         serialNumber: robot.serialNumber,
-        name: robot.displayName,
+        name: robot.name,
         nickname: null,
-        description: robot.description,
         battery: Math.max(0, 96 - numericId * 4),
         isConnecting: true,
         latitude: location?.latitude ?? null,
@@ -56,8 +55,6 @@ implements RobotOperationalStatusQueryPort {
         isAvailable: true,
         isCharging: numericId % 4 === 0,
         isMovable: true,
-        isHeadLightOn: numericId % 3 === 0,
-        isCargoOpen: false,
       },
     });
   }

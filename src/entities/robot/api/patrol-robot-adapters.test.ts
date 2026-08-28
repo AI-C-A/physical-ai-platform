@@ -23,6 +23,7 @@ describe('PatrolRobotCatalogAdapter', () => {
       items: [{
         id: 'robot-01',
         serialNumber: 'MOCK00001',
+        name: '405',
         displayName: '405',
         description: null,
         integrationProfileId: 'patrol-rest-v1',
@@ -33,8 +34,8 @@ describe('PatrolRobotCatalogAdapter', () => {
     await expect(adapter.listRobots()).resolves.toEqual([{
       id: 'robot-01',
       serialNumber: 'MOCK00001',
+      name: '405',
       displayName: '405',
-      description: null,
       integrationProfileId: 'patrol-rest-v1',
     }]);
     const [input, init] = fetcher.mock.calls[0] ?? [];
@@ -72,6 +73,7 @@ describe('PatrolRobotCatalogAdapter', () => {
         items: [{
           id: 'robot-01',
           serialNumber: null,
+          name: '405',
           displayName: '405',
           description: null,
           integrationProfileId: 'patrol-rest-v1',
@@ -143,7 +145,6 @@ describe('PatrolRobotOperationalStatusQuery', () => {
         serialNumber: 'MOCK00001',
         name: '405',
         nickname: 'Mock Robot',
-        description: null,
         battery: 100,
         isConnecting: true,
         latitude: 0,
@@ -151,8 +152,6 @@ describe('PatrolRobotOperationalStatusQuery', () => {
         isAvailable: null,
         isCharging: false,
         isMovable: true,
-        isHeadLightOn: false,
-        isCargoOpen: false,
       },
     });
     const [input] = fetcher.mock.calls[0] ?? [];

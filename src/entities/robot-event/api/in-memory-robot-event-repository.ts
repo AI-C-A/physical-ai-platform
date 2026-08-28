@@ -15,23 +15,18 @@ class InMemoryRobotEventRepository implements RobotEventRepositoryPort {
     const templates = [
       {
         type: 'info',
-        title: '연결 상태 변경',
-        detail: '로봇 연결 상태가 변경되었습니다.',
+        title: '[OSA-1] 온라인 상태',
+        detail: '로봇이 온라인 상태로 전환되었습니다.',
       },
       {
         type: 'warning',
-        title: '채널 상태 저하',
-        detail: '일부 채널의 수신 품질이 저하되었습니다.',
+        title: '[ADS-1] 배터리 부족',
+        detail: '배터리 잔량이 20%로 임계치 20% 이하입니다.',
       },
       {
         type: 'error',
-        title: '원본 시각 최신성 저하',
-        detail: '원본 시각이 최신 상태가 아닙니다.',
-      },
-      {
-        type: 'warning',
-        title: '전송 연결 재시도',
-        detail: '전송 연결 복구를 시도하고 있습니다.',
+        title: '[OSA-2] 오프라인 상태',
+        detail: '로봇이 오프라인 상태로 전환되었습니다.',
       },
     ] as const satisfies readonly Pick<RobotEvent, 'type' | 'title' | 'detail'>[];
     const events: readonly RobotEvent[] = Array.from({ length: 60 }, (_, index) => {

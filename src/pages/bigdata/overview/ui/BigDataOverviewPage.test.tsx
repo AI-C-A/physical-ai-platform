@@ -65,15 +65,15 @@ const collisionRobots: readonly RobotDescriptor[] = [
   {
     id: 'all',
     serialNumber: 'ALL001',
+    name: 'ALL 실기체',
     displayName: 'ALL 실기체',
-    description: null,
     integrationProfileId: 'profile-all',
   },
   {
     id: 'robot-002',
     serialNumber: 'MOCK00002',
+    name: '두 번째 로봇',
     displayName: '두 번째 로봇',
-    description: null,
     integrationProfileId: 'profile-002',
   },
 ];

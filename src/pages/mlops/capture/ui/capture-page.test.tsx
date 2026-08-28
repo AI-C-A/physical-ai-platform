@@ -27,8 +27,8 @@ import { CapturePage } from './capture-page';
 const robot: RobotDescriptor = {
   id: 'robot-001',
   serialNumber: 'MOCK00001',
+  name: '정찰 Robot 01',
   displayName: '정찰 Robot 01',
-  description: null,
   integrationProfileId: 'robot-profile-v1',
 };
 

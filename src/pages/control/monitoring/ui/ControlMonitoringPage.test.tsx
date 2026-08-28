@@ -87,7 +87,6 @@ function createOperationalStatus(
       serialNumber: 'MOCK00001',
       name: '405',
       nickname: 'Mock Robot',
-      description: null,
       battery: 100,
       isConnecting: true,
       latitude: 0,
@@ -95,8 +94,6 @@ function createOperationalStatus(
       isAvailable: null,
       isCharging: false,
       isMovable: true,
-      isHeadLightOn: false,
-      isCargoOpen: false,
     },
     ...overrides,
   };
@@ -145,8 +142,8 @@ function createRobot(index: number): RobotDescriptor {
   return {
     id: `robot-${String(index).padStart(3, '0')}`,
     serialNumber: `MOCK${String(index).padStart(5, '0')}`,
+    name: `API name ${label}`,
     displayName: `로봇 ${label}`,
-    description: null,
     integrationProfileId: 'patrol-rest-v1',
   };
 }

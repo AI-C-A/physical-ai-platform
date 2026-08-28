@@ -5,6 +5,7 @@ import {
   useRobotCatalogPort,
   useRobotOperationalStatuses,
   useRobotQuery,
+  RobotOfflineNotice,
   type RobotQuery,
 } from '@/entities/robot';
 import {
@@ -128,36 +129,64 @@ export function RobotsPage() {
           id: robot.id,
           serialNumber: robot.serialNumber,
           name: robot.displayName,
-          description: robot.description,
         }));
       },
     });
   }
+
+  const showOfflineNotice = operationalStatuses.status === 'ready'
+    && operationalStatuses.streamStatus === 'stale';
+  const statusIndicatorLabel = operationalStatuses.status === 'error'
+    ? '운영 상태: 조회 오류'
+    : operationalStatuses.status === 'loading'
+      ? '운영 상태: 조회 중'
+      : operationalStatuses.streamStatus === 'online'
+        ? '실시간 상태: 온라인'
+        : operationalStatuses.streamStatus === 'connecting'
+          ? '실시간 상태: 연결 중'
+          : '운영 상태: 조회 완료';
+  const statusIndicatorText = operationalStatuses.status === 'error'
+    ? '조회 오류'
+    : operationalStatuses.status === 'loading'
+      ? '조회 중'
+      : operationalStatuses.streamStatus === 'online'
+        ? '온라인'
+        : operationalStatuses.streamStatus === 'connecting'
+          ? '연결 중'
+          : '조회 완료';
+  const statusIndicatorTone = operationalStatuses.status === 'error'
+    ? 'negative'
+    : operationalStatuses.streamStatus === 'online'
+      ? 'positive'
+      : operationalStatuses.streamStatus === 'unavailable'
+        ? 'neutral'
+        : 'warning';
+  const statusIndicatorPending = operationalStatuses.status === 'loading'
+    || operationalStatuses.streamStatus === 'connecting';
 
   return (
     <div className="grid gap-6">
       <PageHeader
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span
-              aria-atomic="true"
-              aria-label={operationalStatuses.status === 'loading' ? '상태 조회 중' : undefined}
-              role="status"
-            >
-              <Badge tone={operationalStatuses.status === 'error' ? 'negative' : operationalStatuses.status === 'ready' ? 'positive' : 'warning'}>
-                {operationalStatuses.status === 'loading'
-                  ? <Spinner />
-                  : `상태 조회: ${operationalStatuses.status === 'error' ? '오류' : '완료'}`}
-              </Badge>
-            </span>
-            <Button
-              disabled={operationalStatuses.isRefreshing}
-              isLoading={operationalStatuses.isRefreshing}
-              onClick={operationalStatuses.retry}
-              variant="secondary"
-            >
-              상태 새로고침
-            </Button>
+            {showOfflineNotice ? (
+              <RobotOfflineNotice onReconnect={operationalStatuses.retry} />
+            ) : (
+              <span
+                aria-atomic="true"
+                aria-label={statusIndicatorLabel}
+                role="status"
+              >
+                <Badge tone={statusIndicatorTone}>
+                  {statusIndicatorPending ? (
+                    <>
+                      <Spinner />
+                      {statusIndicatorText}
+                    </>
+                  ) : statusIndicatorText}
+                </Badge>
+              </span>
+            )}
             <Dropdown
               items={[
                 {
@@ -266,8 +295,8 @@ export function RobotsPage() {
                           : operationalStatus === null
                             ? '상태 없음'
                             : operationalStatus.data.isConnecting
-                              ? '연결됨'
-                              : '연결 끊김'}
+                              ? '온라인'
+                              : '오프라인'}
                       </Badge>
                     </TableCell>
                     <TableCell>{robot.serialNumber ?? '—'}</TableCell>
