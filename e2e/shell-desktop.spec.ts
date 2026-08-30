@@ -59,7 +59,25 @@ test('데스크톱 Shell을 키보드로 전환하고 접힘 상태를 복구한
   const captureLink = page.getByRole('link', { name: '데이터 수집' });
   await expect(captureLink).toHaveAttribute('aria-current', 'page');
   await captureLink.hover();
-  await expect(page.getByRole('tooltip', { name: '데이터 수집' })).toBeVisible();
+  const captureTooltip = page.getByRole('tooltip', { name: '데이터 수집' });
+  await expect(captureTooltip).toBeVisible();
+
+  const settingsLink = page.getByRole('link', { name: '설정' });
+  await expect(settingsLink).toHaveAttribute(
+    'href',
+    '/mlops/settings?siteId=pangyo-outdoor-zone',
+  );
+  await page.keyboard.press('Escape');
+  await expect(captureTooltip).toHaveCount(0);
+  await settingsLink.hover();
+  await expect(page.getByRole('tooltip', { name: '설정' })).toBeVisible();
+  await settingsLink.click();
+  await expect(page).toHaveURL(
+    /\/mlops\/settings\?siteId=pangyo-outdoor-zone$/u,
+  );
+  await expect(page).toHaveTitle('설정 | ROBOT Army TIGER+');
+  await expect(page.getByText('미설정', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '상태 확인' })).toBeDisabled();
 
   await page.reload();
   await expectApplicationReady(page);
