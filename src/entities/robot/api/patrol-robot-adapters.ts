@@ -313,6 +313,7 @@ implements RobotOperationalStatusQueryPort {
             'Robot 상태 stream 오류.lastSuccessfulAtMs',
           ),
           message: requireString(record.message, 'Robot 상태 stream 오류.message'),
+          reason: 'status-unavailable',
           robotId,
         });
       } catch {
@@ -328,7 +329,8 @@ implements RobotOperationalStatusQueryPort {
         listener({
           kind: 'stale',
           lastSuccessfulAtMs: null,
-          message: '오프라인',
+          message: '게이트웨이 연결이 끊겼습니다.',
+          reason: 'gateway-unreachable',
           robotId,
         });
       }

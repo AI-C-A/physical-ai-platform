@@ -25,6 +25,16 @@ export interface RobotOperationalDataSource {
   readonly displayName: string;
 }
 
+export type RobotOperationalStatusStaleReason =
+  | 'gateway-unreachable'
+  | 'status-unavailable';
+
+export interface RobotOperationalStatusStreamIssue {
+  readonly lastSuccessfulAtMs: number | null;
+  readonly message: string;
+  readonly reason: RobotOperationalStatusStaleReason;
+}
+
 export type RobotOperationalStatusSubscriptionEvent =
   | {
       readonly kind: 'updated';
@@ -34,6 +44,7 @@ export type RobotOperationalStatusSubscriptionEvent =
       readonly kind: 'stale';
       readonly lastSuccessfulAtMs: number | null;
       readonly message: string;
+      readonly reason: RobotOperationalStatusStaleReason;
       readonly robotId: string;
     };
 

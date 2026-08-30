@@ -5,23 +5,30 @@ import { useAsyncQuery, type AsyncQueryState } from '@/shared/lib/async-query';
 import { useRobotOperationalStatusPort } from './robot-operational-status-context';
 import type {
   RobotOperationalStatus,
+  RobotOperationalStatusStreamIssue,
   RobotOperationalStatusSubscriptionEvent,
 } from './robot-operational-status';
 
-type RobotOperationalStatusStreamStatus = 'connecting' | 'online' | 'stale' | 'unavailable';
+type RobotOperationalStatusStreamStatus =
+  | 'connecting'
+  | 'online'
+  | 'stale'
+  | 'unavailable';
 
 type RobotOperationalStatusQueryState<T> = AsyncQueryState<T> & {
+  readonly streamIssue: RobotOperationalStatusStreamIssue | null;
+  readonly streamIssuesByRobotId: Readonly<Record<string, RobotOperationalStatusStreamIssue>>;
   readonly streamStatus: RobotOperationalStatusStreamStatus;
 };
 
 interface RobotStreamState {
-  readonly message: string | null;
+  readonly issue: RobotOperationalStatusStreamIssue | null;
   readonly robotId: string;
   readonly status: 'online' | 'stale';
 }
 
 interface RobotStreamCollectionState {
-  readonly failures: ReadonlyMap<string, string>;
+  readonly failures: ReadonlyMap<string, RobotOperationalStatusStreamIssue>;
   readonly onlineRobotIds: ReadonlySet<string>;
   readonly signature: string;
 }
@@ -52,11 +59,19 @@ export function useRobotOperationalStatus(
       return port.subscribeOperationalStatuses([robotId], (event) => {
         if (event.robotId !== robotId) return;
         if (event.kind === 'updated') {
-          setStreamState({ message: null, robotId, status: 'online' });
+          setStreamState({ issue: null, robotId, status: 'online' });
           invalidate();
           return;
         }
-        setStreamState({ message: event.message, robotId, status: 'stale' });
+        setStreamState({
+          issue: {
+            lastSuccessfulAtMs: event.lastSuccessfulAtMs,
+            message: event.message,
+            reason: event.reason,
+          },
+          robotId,
+          status: 'stale',
+        });
       });
     },
     [port, robotId],
@@ -66,9 +81,13 @@ export function useRobotOperationalStatus(
   const streamStatus = streamSupported
     ? visibleStreamState?.status ?? 'connecting'
     : 'unavailable';
-  const visibleStreamFailure = visibleStreamState?.status === 'stale'
-    ? visibleStreamState.message
+  const visibleStreamIssue = visibleStreamState?.status === 'stale'
+    ? visibleStreamState.issue
     : null;
+  const streamIssuesByRobotId = useMemo(
+    () => visibleStreamIssue === null ? {} : { [robotId]: visibleStreamIssue },
+    [robotId, visibleStreamIssue],
+  );
   const queryRetry = result.retry;
   const retry = useCallback(() => {
     if (streamSupported) setStreamState(null);
@@ -77,10 +96,12 @@ export function useRobotOperationalStatus(
 
   return useMemo(() => ({
     ...result,
-    refreshError: visibleStreamFailure ?? result.refreshError,
+    refreshError: visibleStreamIssue?.message ?? result.refreshError,
     retry,
+    streamIssue: visibleStreamIssue,
+    streamIssuesByRobotId,
     streamStatus,
-  }), [result, retry, streamStatus, visibleStreamFailure]);
+  }), [result, retry, streamIssuesByRobotId, streamStatus, visibleStreamIssue]);
 }
 
 export function useRobotOperationalStatuses(
@@ -127,7 +148,11 @@ export function useRobotOperationalStatuses(
               failures.delete(event.robotId);
               onlineRobotIds.add(event.robotId);
             } else {
-              failures.set(event.robotId, event.message);
+              failures.set(event.robotId, {
+                lastSuccessfulAtMs: event.lastSuccessfulAtMs,
+                message: event.message,
+                reason: event.reason,
+              });
               onlineRobotIds.delete(event.robotId);
             }
             return { failures, onlineRobotIds, signature };
@@ -140,14 +165,23 @@ export function useRobotOperationalStatuses(
   );
   const result = useAsyncQuery(load, subscribe, { queryKey: signature });
   const visibleStreamState = streamState?.signature === signature ? streamState : null;
-  const visibleStreamFailure = useMemo(() => {
+  const visibleStreamIssue = useMemo(() => {
     if (visibleStreamState === null) return null;
+    for (const issue of visibleStreamState.failures.values()) {
+      if (issue.reason === 'gateway-unreachable') return issue;
+    }
     for (const robotId of normalizedIds) {
-      const message = visibleStreamState.failures.get(robotId);
-      if (message !== undefined) return message;
+      const issue = visibleStreamState.failures.get(robotId);
+      if (issue !== undefined) return issue;
     }
     return null;
   }, [normalizedIds, visibleStreamState]);
+  const streamIssuesByRobotId = useMemo(
+    () => visibleStreamState === null
+      ? {}
+      : Object.fromEntries(visibleStreamState.failures),
+    [visibleStreamState],
+  );
   const streamStatus: RobotOperationalStatusStreamStatus = !streamSupported
     || normalizedIds.length === 0
     ? 'unavailable'
@@ -166,8 +200,10 @@ export function useRobotOperationalStatuses(
 
   return useMemo(() => ({
     ...result,
-    refreshError: visibleStreamFailure ?? result.refreshError,
+    refreshError: visibleStreamIssue?.message ?? result.refreshError,
     retry,
+    streamIssue: visibleStreamIssue,
+    streamIssuesByRobotId,
     streamStatus,
-  }), [result, retry, streamStatus, visibleStreamFailure]);
+  }), [result, retry, streamIssuesByRobotId, streamStatus, visibleStreamIssue]);
 }

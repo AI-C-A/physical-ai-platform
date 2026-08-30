@@ -158,6 +158,7 @@ describe('RobotsPage', () => {
       kind: 'stale',
       lastSuccessfulAtMs: 1_700_000_000_000,
       message: '오프라인',
+      reason: 'gateway-unreachable',
       robotId: 'robot-001',
     }));
 

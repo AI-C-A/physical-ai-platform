@@ -109,6 +109,7 @@ describe('PatrolRobotOperationalStatusQuery status stream', () => {
       kind: 'stale',
       lastSuccessfulAtMs: 1_700_000_003_123,
       message: '오프라인',
+      reason: 'status-unavailable',
       robotId: 'robot-01',
     });
     await expect(query.getOperationalStatus('robot-01')).resolves.toMatchObject({
@@ -147,7 +148,8 @@ describe('PatrolRobotOperationalStatusQuery status stream', () => {
     expect(listener).toHaveBeenLastCalledWith({
       kind: 'stale',
       lastSuccessfulAtMs: null,
-      message: '오프라인',
+      message: '게이트웨이 연결이 끊겼습니다.',
+      reason: 'gateway-unreachable',
       robotId: 'robot-01',
     });
 

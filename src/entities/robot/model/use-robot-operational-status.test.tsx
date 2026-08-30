@@ -64,14 +64,20 @@ describe('useRobotOperationalStatus', () => {
     act(() => streamListener({
       kind: 'stale',
       lastSuccessfulAtMs: status.receivedTimestampMs,
-      message: '오프라인',
+      message: '로봇 상태를 가져오지 못했습니다.',
+      reason: 'status-unavailable',
       robotId: 'robot-01',
     }));
 
     expect(result.current).toMatchObject({
       status: 'ready',
       data: status,
-      refreshError: '오프라인',
+      refreshError: '로봇 상태를 가져오지 못했습니다.',
+      streamIssue: {
+        lastSuccessfulAtMs: status.receivedTimestampMs,
+        message: '로봇 상태를 가져오지 못했습니다.',
+        reason: 'status-unavailable',
+      },
       streamStatus: 'stale',
     });
     expect(getOperationalStatus).toHaveBeenCalledOnce();
