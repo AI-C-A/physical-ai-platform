@@ -1,6 +1,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 
-import { Icon } from '@/shared/ui/icon';
+import { cn } from '@/shared/ui/class-names';
+import { Icon, type IconName } from '@/shared/ui/icon';
 
 export interface SelectOption {
   readonly label: string;
@@ -8,27 +9,41 @@ export interface SelectOption {
 }
 
 interface SelectProps {
+  readonly className?: string;
+  readonly contentClassName?: string;
+  readonly itemClassName?: string;
+  readonly leadingIcon?: IconName;
   readonly label: string;
   readonly value: string;
   readonly options: readonly SelectOption[];
   readonly disabled?: boolean;
   readonly placeholder?: string;
   readonly onValueChange: (value: string) => void;
+  readonly showLabel?: boolean;
+  readonly triggerClassName?: string;
 }
 
 export function Select({
+  className,
+  contentClassName,
+  itemClassName,
+  leadingIcon,
   label,
   value,
   options,
   disabled = false,
   placeholder,
   onValueChange,
+  showLabel = true,
+  triggerClassName,
 }: SelectProps) {
   return (
-    <div className="grid min-w-40 gap-1.5">
-      <span className="text-sm font-medium text-neutral-800">
-        {label}
-      </span>
+    <div className={cn('grid min-w-40 gap-1.5', className)}>
+      {showLabel ? (
+        <span className="text-sm font-medium text-foreground">
+          {label}
+        </span>
+      ) : null}
       <SelectPrimitive.Root
         disabled={disabled}
         onValueChange={onValueChange}
@@ -36,9 +51,17 @@ export function Select({
       >
         <SelectPrimitive.Trigger
           aria-label={label}
-          className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-neutral-300 bg-white px-3 py-2 text-left text-sm text-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500"
+          className={cn(
+            'flex min-h-[var(--layout-control-height)] w-full items-center justify-between gap-3 rounded-[var(--design-radius-control)] border border-border bg-layer-base px-3 py-2 text-left text-sm text-foreground disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted',
+            triggerClassName,
+          )}
         >
-          <SelectPrimitive.Value placeholder={placeholder} />
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            {leadingIcon === undefined ? null : (
+              <Icon name={leadingIcon} />
+            )}
+            <SelectPrimitive.Value placeholder={placeholder} />
+          </span>
           <SelectPrimitive.Icon aria-hidden="true">
             <Icon name="chevron-down" />
           </SelectPrimitive.Icon>
@@ -46,13 +69,19 @@ export function Select({
         <SelectPrimitive.Portal>
           <SelectPrimitive.Content
             aria-label={`${label} 선택`}
-            className="z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-neutral-300 bg-white p-1 shadow-lg"
+            className={cn(
+              'z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[var(--design-radius-control)] border-0 bg-layer-floating p-1 text-foreground shadow-lg',
+              contentClassName,
+            )}
             position="popper"
           >
             <SelectPrimitive.Viewport>
               {options.map((option) => (
                 <SelectPrimitive.Item
-                  className="relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-sm text-neutral-900 outline-none data-[highlighted]:bg-neutral-100 data-[disabled]:opacity-50"
+                  className={cn(
+                    'relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-sm text-foreground outline-none data-[highlighted]:bg-action-secondary-hover data-[disabled]:opacity-50',
+                    itemClassName,
+                  )}
                   key={option.value}
                   value={option.value}
                 >

@@ -16,10 +16,10 @@ export function Checkbox({
   onCheckedChange,
 }: CheckboxProps) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-neutral-800 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+    <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
       <CheckboxPrimitive.Root
         checked={checked}
-        className="grid size-5 place-items-center rounded border border-neutral-400 bg-white data-[state=checked]:border-neutral-900 data-[state=checked]:bg-neutral-900 data-[state=checked]:text-white"
+        className="grid size-5 place-items-center rounded border border-border bg-surface data-[state=checked]:border-action-primary data-[state=checked]:bg-action-primary data-[state=checked]:text-action-on-fill"
         disabled={disabled}
         onCheckedChange={(value) => onCheckedChange(value === true)}
       >

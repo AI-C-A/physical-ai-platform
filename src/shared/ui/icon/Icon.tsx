@@ -14,6 +14,7 @@ import {
   GitBranch,
   LayoutGrid,
   Map,
+  MapPin,
   Maximize2,
   Menu,
   Minimize2,
@@ -42,6 +43,7 @@ export type IconName =
   | 'download'
   | 'events'
   | 'intervention'
+  | 'location'
   | 'map'
   | 'maximize'
   | 'menu'
@@ -78,6 +80,7 @@ const icons = {
   download: Download,
   events: CircleAlert,
   intervention: BellRing,
+  location: MapPin,
   map: Map,
   maximize: Maximize2,
   menu: Menu,
