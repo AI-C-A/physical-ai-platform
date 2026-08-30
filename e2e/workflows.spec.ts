@@ -122,7 +122,7 @@ test('Robot 목록에서 영상 관제로 이동한다', async ({
     page.getByRole('heading', { level: 1, name: '정찰 로봇 01' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('link', { name: '모니터링으로 돌아가기' }),
+    page.getByRole('link', { name: '영상 관제 나가기' }),
   ).toBeVisible();
   await expect(page.getByRole('link', { name: '로봇 관리' })).toHaveCount(0);
   const frontCamera = page.getByLabel('전방 카메라 영상', { exact: true });
@@ -141,19 +141,20 @@ test('Robot 목록에서 영상 관제로 이동한다', async ({
   issues.assertNone();
 });
 
-test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다', async ({
+test('Monitoring은 위치 지도 위에 사이트 드롭다운과 로봇 선택 패널을 분리해 표시한다', async ({
   page,
 }, testInfo) => {
   const issues = observeBrowserIssues(page);
   await page.goto('/control/monitoring');
   await expectApplicationReady(page);
 
-  await expect(
-    page.getByRole('heading', { level: 2, name: '로봇 선택' }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { level: 2, name: '수송 로봇 02' }),
-  ).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '사이트' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '로봇 선택' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '사이트 선택' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '로봇 선택' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '로봇 정보 패널 닫기' }))
+    .toHaveCount(0);
+  await expect(page.getByRole('group', { name: '로봇 3D 모델' })).toHaveCount(0);
   await expect(
     page.getByRole('region', { name: '로봇 위치 지도' }),
   ).toBeVisible();
@@ -169,30 +170,38 @@ test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다'
   ).toHaveCount(0);
 
   await page.getByRole('button', { name: /정찰 로봇 01/u }).click();
-  const selectedRobot = page
-    .getByRole('heading', { level: 2, name: '정찰 로봇 01' })
-    .locator('..');
-  const rawInfoTable = page.getByRole('table', {
+  const selectedRobot = page.getByRole('region', {
+    name: '정찰 로봇 01 로봇 패널',
+  });
+  const robotInfoOverview = page.getByRole('region', {
     name: '정찰 로봇 01 로봇 정보',
   });
-  await expect(rawInfoTable).toBeVisible();
-  await expect(rawInfoTable.getByRole('row', { name: 'battery 92' })).toBeVisible();
-  await expect(rawInfoTable.getByRole('row', { name: 'isAvailable true' })).toBeVisible();
-  await expect(rawInfoTable.getByText('null', { exact: true }).first()).toBeVisible();
-  const robotSelector = page
-    .getByRole('heading', { name: '로봇 선택' })
-    .locator('..');
+  await expect(robotInfoOverview).toBeVisible();
+  await expect(
+    robotInfoOverview.getByRole('progressbar', { name: '배터리 잔량' }),
+  ).toHaveAttribute('aria-valuetext', '92%');
+  await expect(robotInfoOverview.getByText('37.39472° N')).toBeVisible();
+  await expect(robotInfoOverview.getByText('127.11153° E')).toBeVisible();
+  await expect(robotInfoOverview.getByText('null', { exact: true })).toHaveCount(0);
+  const robotSelector = page.getByRole('region', { name: '로봇 선택' });
+  const siteSelector = page.getByRole('combobox', { name: '사이트' });
   const map = page.getByRole('region', { name: '로봇 위치 지도' });
-  const [mapBox, selectorPanelBox, infoPanelBox] = await Promise.all([
+  const [mapBox, sitePanelBox, robotPanelBox, infoPanelBox] = await Promise.all([
     map.boundingBox(),
+    siteSelector.boundingBox(),
     robotSelector.boundingBox(),
     selectedRobot.boundingBox(),
   ]);
   expect(mapBox).not.toBeNull();
-  expect(selectorPanelBox).not.toBeNull();
+  expect(sitePanelBox).not.toBeNull();
+  expect(robotPanelBox).not.toBeNull();
   expect(infoPanelBox).not.toBeNull();
   expect(
-    (selectorPanelBox?.x ?? 0) - (mapBox?.x ?? 0),
+    (sitePanelBox?.x ?? 0) - (mapBox?.x ?? 0),
+    '사이트 드롭다운 왼쪽 여백',
+  ).toBe(16);
+  expect(
+    (robotPanelBox?.x ?? 0) - (mapBox?.x ?? 0),
     '로봇 선택 패널 왼쪽 여백',
   ).toBe(16);
   expect(
@@ -201,18 +210,19 @@ test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다'
     '로봇 정보 패널 오른쪽 여백',
   ).toBe(16);
   expect(
-    (selectorPanelBox?.y ?? 0) - (mapBox?.y ?? 0),
-    '로봇 선택 패널 위쪽 여백',
+    (sitePanelBox?.y ?? 0) - (mapBox?.y ?? 0),
+    '사이트 드롭다운 위쪽 여백',
   ).toBe(16);
   expect(
     ((mapBox?.y ?? 0) + (mapBox?.height ?? 0))
-      - ((selectorPanelBox?.y ?? 0) + (selectorPanelBox?.height ?? 0)),
+      - ((robotPanelBox?.y ?? 0) + (robotPanelBox?.height ?? 0)),
     '로봇 선택 패널 아래쪽 여백',
   ).toBe(16);
   expect(
-    Math.abs((selectorPanelBox?.height ?? 0) - ((mapBox?.height ?? 0) - 32)),
-    '로봇 선택 패널 높이',
-  ).toBeLessThanOrEqual(1);
+    (robotPanelBox?.y ?? 0)
+      - ((sitePanelBox?.y ?? 0) + (sitePanelBox?.height ?? 0)),
+    '사이트 드롭다운과 로봇 선택 패널 사이 여백',
+  ).toBe(16);
   expect(
     Math.abs((infoPanelBox?.height ?? 0) - ((mapBox?.height ?? 0) - 32)),
     '로봇 정보 패널 높이',
@@ -229,6 +239,16 @@ test('Monitoring은 위치 지도 위의 좌우 패널로 viewport를 채운다'
     body: await page.screenshot(),
     contentType: 'image/png',
   });
+
+  await selectedRobot.getByRole('button', { name: '로봇 정보 패널 닫기' }).click();
+  await expect(selectedRobot).toHaveCount(0);
+  await expect(page.getByRole('group', { name: '로봇 3D 모델' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /정찰 로봇 01/u }))
+    .toHaveAttribute('aria-pressed', 'false');
+
+  await expect(robotSelector).toBeVisible();
+  await expect(siteSelector).toBeVisible();
+  await expect(map).toBeVisible();
   issues.assertNone();
 });
 

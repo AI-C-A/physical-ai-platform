@@ -217,8 +217,8 @@ test('Camera 화면의 heap·DOM·Long Task가 제한되고 이탈 시 track을 
     maxLongTaskDurationBudgetMs,
   );
 
-  await page.getByRole('link', { name: '모니터링으로 돌아가기' }).click();
-  await expect(page).toHaveURL(/\/control\/monitoring$/u);
+  await page.getByRole('link', { name: '영상 관제 나가기' }).click();
+  await expect(page).toHaveURL((url) => url.pathname === '/control/monitoring');
   await expect
     .poll(() =>
       page.evaluate(() => {
