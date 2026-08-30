@@ -7,11 +7,11 @@ interface BadgeProps {
 
 export function Badge({ children, tone = 'neutral' }: BadgeProps) {
   const tones = {
-    neutral: 'border-neutral-300 bg-neutral-100 text-neutral-700',
-    positive: 'border-green-300 bg-green-50 text-green-800',
-    warning: 'border-amber-300 bg-amber-50 text-amber-900',
-    negative: 'border-red-300 bg-red-50 text-red-900',
-    info: 'border-blue-300 bg-blue-50 text-blue-900',
+    neutral: 'border-transparent bg-status-neutral-background text-status-neutral-foreground',
+    positive: 'border-transparent bg-status-positive-background text-status-positive-foreground',
+    warning: 'border-transparent bg-status-warning-background text-status-warning-foreground',
+    negative: 'border-transparent bg-status-negative-background text-status-negative-foreground',
+    info: 'border-transparent bg-status-info-background text-status-info-foreground',
   } as const;
 
   return (

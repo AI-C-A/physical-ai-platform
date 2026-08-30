@@ -7,7 +7,7 @@ type ErrorMessageProps = Omit<ComponentProps<'p'>, 'role'>;
 export function ErrorMessage({ className, ...props }: ErrorMessageProps) {
   return (
     <p
-      className={cn('rounded-md bg-red-50 px-3 py-2 text-sm text-red-900', className)}
+      className={cn('rounded-md bg-status-negative-background px-3 py-2 text-sm text-status-negative-foreground', className)}
       role="alert"
       {...props}
     />

@@ -41,7 +41,9 @@ export function ToastProvider({ children }: PropsWithChildren) {
       <div className="fixed right-4 bottom-4 z-[70] grid max-w-sm gap-2">
         {messages.map((item) => (
           <div
-            className={item.tone === 'error' ? 'rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 shadow-lg' : 'rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 shadow-lg'}
+            className={item.tone === 'error'
+              ? 'rounded-md bg-status-negative-background p-3 text-sm text-status-negative-foreground shadow-lg'
+              : 'rounded-md bg-status-positive-background p-3 text-sm text-status-positive-foreground shadow-lg'}
             key={item.id}
             role={item.tone === 'error' ? 'alert' : 'status'}
           >
