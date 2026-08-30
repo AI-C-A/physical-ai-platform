@@ -10,10 +10,10 @@ import {
 import { getExecutionProvenanceLabel } from '@/shared/domain';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
+import { DetailPane } from '@/shared/ui/detail-pane';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Input } from '@/shared/ui/input';
 import { Pagination } from '@/shared/ui/pagination';
-import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Textarea } from '@/shared/ui/textarea';
 
@@ -111,14 +111,14 @@ function ValidatedInitialEpisodeEditor({
   return (
     <div className="grid gap-6">
       {initialEpisode.refreshError === null ? null : (
-        <Panel title="자동 선택 에피소드 정보를 갱신하지 못했습니다">
+        <DetailPane title="자동 선택 에피소드 정보를 갱신하지 못했습니다">
           <ErrorMessage>
             기존 선택은 유지했습니다. {initialEpisode.refreshError}
           </ErrorMessage>
           <Button className="mt-4" onClick={initialEpisode.retry} variant="secondary">
             다시 확인하기
           </Button>
-        </Panel>
+        </DetailPane>
       )}
       <DatasetEditorForm
         dataset={undefined}
@@ -285,12 +285,12 @@ function DatasetEditorForm({
         />
       ) : null}
       {selectedOutsidePageIds.length === 0 ? null : (
-        <Panel title="현재 목록 밖의 선택">
+        <DetailPane title="현재 목록 밖의 선택">
           <p role="status">
             현재 검색 또는 페이지에 표시되지 않은 선택 {String(selectedOutsidePageIds.length)}개를
             저장 시 그대로 유지합니다.
           </p>
-          <ul className="mt-2 grid gap-2 text-sm text-neutral-700">
+          <ul className="mt-2 grid gap-2 text-sm text-muted">
             {selectedOutsidePageIds.map((episodeId) => (
               <li className="flex flex-wrap items-center justify-between gap-2" key={episodeId}>
                 <span className="break-all">{getSelectedEpisodeLabel(episodeId)}</span>
@@ -307,10 +307,10 @@ function DatasetEditorForm({
               </li>
             ))}
           </ul>
-        </Panel>
+        </DetailPane>
       )}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
-        <Panel
+        <DetailPane
           title="데이터셋 정보"
         >
           <div className="grid gap-4">
@@ -343,8 +343,8 @@ function DatasetEditorForm({
               value={tags}
             />
           </div>
-        </Panel>
-        <Panel
+        </DetailPane>
+        <DetailPane
           description={`검색 결과 ${String(episodes.data.totalItems)}개 · 선택 ${String(episodeIds.length)}개`}
           title="에피소드 구성"
         >
@@ -394,7 +394,7 @@ function DatasetEditorForm({
               />
             )}
           </div>
-        </Panel>
+        </DetailPane>
       </div>
       {displayedError === null || hasNameValidationError ? null : (
         <ErrorMessage ref={errorRef} tabIndex={-1}>

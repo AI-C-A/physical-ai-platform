@@ -69,7 +69,7 @@ export function NewDatasetPage() {
       />
       <section
         aria-label="데이터셋 편집 영역"
-        className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+        className="rounded-[var(--design-radius-surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         ref={editorRegionRef}
         tabIndex={-1}
       >

@@ -22,11 +22,13 @@ import {
 import { collectAllPages } from '@/shared/lib/query';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -174,8 +176,7 @@ export function DatasetsPage() {
       )}
       {recordExport.error === null ? null : <ErrorMessage>{recordExport.error}</ErrorMessage>}
 
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-[minmax(18rem,1fr)_minmax(10rem,0.35fr)_minmax(12rem,0.4fr)]">
+      <PageToolbar aria-label="데이터셋 검색 및 정렬">
           <Input
             label="데이터셋 또는 태그 검색"
             onChange={(event) => update('search', event.target.value)}
@@ -201,8 +202,7 @@ export function DatasetsPage() {
             ]}
             value={sort}
           />
-        </div>
-      </Panel>
+      </PageToolbar>
 
       <section aria-labelledby="dataset-list-title" className="grid gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -210,7 +210,7 @@ export function DatasetsPage() {
             <h2 className="text-base font-bold" id="dataset-list-title">
               데이터셋 목록
             </h2>
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="mt-1 text-sm text-muted">
               총 {String(datasets.data.totalItems)}개 · 현재 페이지{' '}
               {String(datasets.data.items.length)}개
             </p>
@@ -218,59 +218,61 @@ export function DatasetsPage() {
           <Badge>{tag === '' ? '전체 태그' : tag}</Badge>
         </div>
 
-        {datasets.isRefreshing ? (
-          <QueryFeedback kind="loading" />
-        ) : null}
-        {datasets.data.items.length === 0 ? (
-          datasets.isRefreshing ? null : (
-          <QueryFeedback kind="empty" message="조건에 맞는 초안 데이터셋이 없습니다." />
-          )
-        ) : <Table aria-label="데이터셋 목록">
-          <TableHeader>
-            <TableRow>
-              <TableHead>데이터셋</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead>태그</TableHead>
-              <TableHead>에피소드</TableHead>
-              <TableHead>수정 시각</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {datasets.data.items.map((dataset) => (
-              <TableRow key={dataset.id}>
-                <TableCell>
-                  <Link
-                    className="font-semibold underline"
-                    to={appendPathSegment('/mlops/datasets', dataset.id)}
-                  >
-                    {dataset.name}
-                  </Link>
-                  <span className="mt-1 block max-w-xl truncate text-xs text-neutral-500">
-                    {dataset.description}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-neutral-500">
-                    {dataset.id}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge>{getDatasetStatusLabel(dataset.status)}</Badge>
-                </TableCell>
-                <TableCell>{dataset.tags.join(', ') || '—'}</TableCell>
-                <TableCell>{String(dataset.episodeIds.length)}개</TableCell>
-                <TableCell>{formatDateTime(dataset.updatedAtMs)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>}
+        <DataView
+          footer={datasets.data.items.length === 0 ? undefined : (
+            <Pagination
+              isPending={datasets.isRefreshing}
+              onPageChange={(value) => update('page', String(value))}
+              page={datasets.data.page}
+              pageSize={datasets.data.pageSize}
+              totalItems={datasets.data.totalItems}
+            />
+          )}
+          message="조건에 맞는 초안 데이터셋이 없습니다."
+          state={datasets.data.items.length === 0 && !datasets.isRefreshing ? 'empty' : 'ready'}
+        >
+          {datasets.isRefreshing ? <QueryFeedback kind="loading" /> : null}
+          {datasets.data.items.length === 0 ? null : (
+            <Table aria-label="데이터셋 목록">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>데이터셋</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead>태그</TableHead>
+                  <TableHead>에피소드</TableHead>
+                  <TableHead>수정 시각</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {datasets.data.items.map((dataset) => (
+                  <TableRow key={dataset.id}>
+                    <TableCell>
+                      <Link
+                        className="font-semibold underline"
+                        to={appendPathSegment('/mlops/datasets', dataset.id)}
+                      >
+                        {dataset.name}
+                      </Link>
+                      <span className="mt-1 block max-w-xl truncate text-xs text-muted">
+                        {dataset.description}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {dataset.id}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge>{getDatasetStatusLabel(dataset.status)}</Badge>
+                    </TableCell>
+                    <TableCell>{dataset.tags.join(', ') || '—'}</TableCell>
+                    <TableCell>{String(dataset.episodeIds.length)}개</TableCell>
+                    <TableCell>{formatDateTime(dataset.updatedAtMs)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DataView>
       </section>
-
-      {datasets.data.items.length === 0 ? null : <Pagination
-        isPending={datasets.isRefreshing}
-        onPageChange={(value) => update('page', String(value))}
-        page={datasets.data.page}
-        pageSize={datasets.data.pageSize}
-        totalItems={datasets.data.totalItems}
-      />}
     </div>
   );
 }

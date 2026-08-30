@@ -12,11 +12,12 @@ import { decodePathSegment } from '@/shared/lib/navigation';
 import { Badge } from '@/shared/ui/badge';
 import { Breadcrumb } from '@/shared/ui/breadcrumb';
 import { Button } from '@/shared/ui/button';
+import { DetailPane } from '@/shared/ui/detail-pane';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { PageHeader } from '@/shared/ui/page-header';
-import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
+import { StatTile } from '@/shared/ui/stat-tile';
 import { useToast } from '@/shared/ui/toast';
 
 import { DatasetEditor, type DatasetEditorValue } from './DatasetEditor';
@@ -110,12 +111,12 @@ function DatasetDetailContent({ datasetId }: { readonly datasetId: string }) {
         {result.status === 'loading' ? (
           <QueryFeedback kind="loading" />
         ) : result.status === 'error' ? (
-          <Panel title="데이터셋 원본을 불러오지 못했습니다">
+          <DetailPane title="데이터셋 원본을 불러오지 못했습니다">
             <ErrorMessage>저장 시도 입력은 유지했습니다. {result.message}</ErrorMessage>
             <Button className="mt-4" onClick={result.retry} variant="secondary">
               다시 불러오기
             </Button>
-          </Panel>
+          </DetailPane>
         ) : (
           <QueryFeedback
             kind="not-found"
@@ -124,7 +125,7 @@ function DatasetDetailContent({ datasetId }: { readonly datasetId: string }) {
         )}
         <section
           aria-label="데이터셋 편집 영역"
-          className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+          className="rounded-[var(--design-radius-surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           ref={editorRegionRef}
           tabIndex={-1}
         >
@@ -180,57 +181,43 @@ function DatasetDetailContent({ datasetId }: { readonly datasetId: string }) {
       {result.status === 'loading' && retainedDataset !== null ? (
         <QueryFeedback kind="loading" />
       ) : result.status === 'error' ? (
-        <Panel title="최신 데이터셋 정보를 불러오지 못했습니다">
+        <DetailPane title="최신 데이터셋 정보를 불러오지 못했습니다">
           <ErrorMessage>방금 저장한 결과는 유지했습니다. {result.message}</ErrorMessage>
           <Button className="mt-4" onClick={result.retry} variant="secondary">
             다시 불러오기
           </Button>
-        </Panel>
+        </DetailPane>
       ) : result.status === 'ready' && result.data === null && retainedDataset !== null ? (
-        <Panel title="저장 결과를 상세 조회에서 확인하지 못했습니다">
+        <DetailPane title="저장 결과를 상세 조회에서 확인하지 못했습니다">
           <ErrorMessage>방금 저장한 결과를 유지했습니다. 원본을 다시 확인해 주세요.</ErrorMessage>
           <Button className="mt-4" onClick={result.retry} variant="secondary">
             다시 불러오기
           </Button>
-        </Panel>
+        </DetailPane>
       ) : result.refreshError === null ? null : (
-        <Panel title="최신 데이터셋 정보를 반영하지 못했습니다">
+        <DetailPane title="최신 데이터셋 정보를 반영하지 못했습니다">
           <ErrorMessage>입력 중인 내용은 유지했습니다. {result.refreshError}</ErrorMessage>
           <Button className="mt-4" onClick={result.retry} variant="secondary">
             다시 불러오기
           </Button>
-        </Panel>
+        </DetailPane>
       )}
       <section
         aria-label="데이터셋 요약"
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <Panel>
-          <p className="text-xs text-neutral-500">상태</p>
-          <strong className="mt-2 block text-lg">{getDatasetStatusLabel(displayDataset.status)}</strong>
-        </Panel>
-        <Panel>
-          <p className="text-xs text-neutral-500">에피소드</p>
-          <strong className="mt-2 block text-lg">
-            {String(displayDataset.episodeIds.length)}개
-          </strong>
-        </Panel>
-        <Panel>
-          <p className="text-xs text-neutral-500">태그</p>
-          <strong className="mt-2 block text-sm">
-            {displayDataset.tags.join(', ') || '—'}
-          </strong>
-        </Panel>
-        <Panel>
-          <p className="text-xs text-neutral-500">최근 수정</p>
-          <strong className="mt-2 block text-sm">
-            {formatDateTime(displayDataset.updatedAtMs)}
-          </strong>
-        </Panel>
+        <StatTile
+          emphasis="primary"
+          label="상태"
+          value={getDatasetStatusLabel(displayDataset.status)}
+        />
+        <StatTile label="에피소드" value={`${String(displayDataset.episodeIds.length)}개`} />
+        <StatTile label="태그" value={displayDataset.tags.join(', ') || '—'} />
+        <StatTile label="최근 수정" value={formatDateTime(displayDataset.updatedAtMs)} />
       </section>
       <section
         aria-label="데이터셋 편집 영역"
-        className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+        className="rounded-[var(--design-radius-surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         ref={editorRegionRef}
         tabIndex={-1}
       >
