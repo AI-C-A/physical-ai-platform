@@ -15,9 +15,9 @@ export function Tooltip({ content, trigger }: TooltipProps) {
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content className="z-50 max-w-64 rounded bg-neutral-950 px-2 py-1 text-xs text-white shadow" sideOffset={6}>
+        <TooltipPrimitive.Content className="z-50 max-w-64 rounded bg-foreground px-2 py-1 text-xs text-surface shadow" sideOffset={6}>
           {content}
-          <TooltipPrimitive.Arrow className="fill-neutral-950" />
+          <TooltipPrimitive.Arrow className="fill-foreground" />
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Portal>
     </TooltipPrimitive.Root>

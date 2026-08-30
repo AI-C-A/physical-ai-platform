@@ -19,7 +19,7 @@ export function Pagination({
 
   return (
     <nav aria-label="페이지 이동" className="flex flex-wrap items-center justify-between gap-3">
-      <span aria-atomic="true" className="text-sm text-neutral-600" role="status">
+      <span aria-atomic="true" className="text-sm text-muted" role="status">
         {String(page)} / {String(totalPages)} 페이지 · 총 {String(totalItems)}건
       </span>
       <div className="flex gap-2">

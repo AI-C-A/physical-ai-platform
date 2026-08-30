@@ -21,10 +21,10 @@ export function Tabs({ defaultValue, items, onValueChange, value }: TabsProps) {
       {...(onValueChange === undefined ? {} : { onValueChange })}
       {...(value === undefined ? {} : { value })}
     >
-      <TabsPrimitive.List className="flex gap-1 border-b border-neutral-300" aria-label="보기 전환">
+      <TabsPrimitive.List className="flex gap-1 border-b border-border" aria-label="보기 전환">
         {items.map((item) => (
           <TabsPrimitive.Trigger
-            className="border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-neutral-600 data-[state=active]:border-neutral-900 data-[state=active]:text-neutral-950"
+            className="border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-muted data-[state=active]:border-foreground data-[state=active]:text-foreground"
             key={item.value}
             value={item.value}
           >

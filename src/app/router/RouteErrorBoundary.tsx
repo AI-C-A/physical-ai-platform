@@ -27,7 +27,7 @@ export function RouteErrorBoundary() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl items-center px-6 py-16">
       <section aria-labelledby="route-error-title" className="space-y-4">
-        <p className="text-sm font-semibold text-red-700">화면 오류</p>
+        <p className="text-sm font-semibold text-negative">화면 오류</p>
         <h1
           className="text-2xl font-bold"
           id="route-error-title"
@@ -36,7 +36,7 @@ export function RouteErrorBoundary() {
         >
           요청한 화면을 표시하지 못했습니다
         </h1>
-        <ErrorMessage className="text-neutral-700">
+        <ErrorMessage className="text-muted">
           {getErrorMessage(error)}
         </ErrorMessage>
         <Button onClick={() => window.location.reload()}>화면 다시 불러오기</Button>

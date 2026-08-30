@@ -45,7 +45,7 @@ export function Chart({
               <Tooltip />
               <Bar
                 dataKey="value"
-                fill="#404040"
+                fill="var(--action-primary)"
                 isAnimationActive={false}
               />
             </BarChart>
@@ -59,7 +59,7 @@ export function Chart({
                 dataKey="value"
                 dot={false}
                 isAnimationActive={false}
-                stroke="#404040"
+                stroke="var(--action-primary)"
                 strokeWidth={2}
               />
             </LineChart>
@@ -76,7 +76,7 @@ export function Chart({
           {data.map((datum, index) => (
             <button
               aria-disabled={isPending}
-              className="rounded border border-neutral-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-neutral-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              className="rounded border border-border bg-action-secondary px-2 py-1 text-xs font-semibold text-foreground hover:bg-action-secondary-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
               key={`${datum.id ?? datum.label}-${String(index)}`}
               onClick={() => {
                 if (!isPending) onDatumSelect(datum);

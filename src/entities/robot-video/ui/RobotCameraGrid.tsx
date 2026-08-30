@@ -601,7 +601,7 @@ function CameraRecordingControls({
   const isBusy = status !== 'idle';
   return (
     <Panel title="카메라 원본 녹화">
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted">
         논리 카메라를 선택하면 원본 영상과 분할 메타데이터를 함께 기록합니다.
       </p>
       <fieldset className="mt-3 grid gap-2 sm:grid-cols-2">
