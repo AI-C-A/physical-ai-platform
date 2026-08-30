@@ -59,6 +59,13 @@ function optionalNumberInRange(value, fieldName, minimum, maximum) {
   return requireNumberInRange(value, fieldName, minimum, maximum);
 }
 
+function requirePositiveTimer(value, fieldName) {
+  if (!Number.isInteger(value) || value < 1 || value > 2_147_483_647) {
+    throw new Error(`${fieldName}는 Node.js timer 범위 안의 양의 정수여야 합니다.`);
+  }
+  return value;
+}
+
 function parseHttpsOrigin(value) {
   const raw = requireEnvironmentString(value, 'PATROL_ORIGIN');
   let origin;
@@ -223,6 +230,10 @@ export function createPatrolIntegration(options) {
   const registrations = options.registrations;
   const fetcher = options.fetcher ?? globalThis.fetch;
   const createViewerSession = options.createViewerSession;
+  const requestTimeoutMs = requirePositiveTimer(
+    options.requestTimeoutMs,
+    'PATROL_API_REQUEST_TIMEOUT_MS',
+  );
   if (typeof fetcher !== 'function') throw new Error('서버 fetch 구현이 필요합니다.');
   if (typeof createViewerSession !== 'function') throw new Error('Kinesis Viewer Session factory가 필요합니다.');
 
@@ -239,34 +250,61 @@ export function createPatrolIntegration(options) {
   async function requestPatrol(path, registration) {
     const url = new URL(path, origin);
     url.searchParams.set('robotSerialNumber', registration.serialNumber);
-    let response;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = globalThis.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, requestTimeoutMs);
     try {
-      response = await fetcher(url, {
-        method: 'GET',
-        headers: { Accept: 'application/json', apiKey, secret },
-        cache: 'no-store',
-        redirect: 'error',
-      });
-    } catch (error) {
-      throw new GatewayError(
-        503,
-        'INTEGRATION_UNAVAILABLE',
-        'Patrol 서비스에 연결하지 못했습니다.',
-        { cause: error },
-      );
-    }
-    if (!response.ok) {
-      throw mapUpstreamFailure(response.status, await readUpstreamCode(response));
-    }
-    try {
-      return await response.json();
-    } catch (error) {
-      throw new GatewayError(
-        502,
-        'INVALID_UPSTREAM_RESPONSE',
-        'Patrol JSON 응답을 확인하지 못했습니다.',
-        { cause: error },
-      );
+      let response;
+      try {
+        response = await fetcher(url, {
+          method: 'GET',
+          headers: { Accept: 'application/json', apiKey, secret },
+          cache: 'no-store',
+          redirect: 'error',
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (timedOut) {
+          throw new GatewayError(
+            504,
+            'UPSTREAM_TIMEOUT',
+            'Patrol API 응답 시간이 초과되었습니다.',
+            { cause: error },
+          );
+        }
+        throw new GatewayError(
+          503,
+          'INTEGRATION_UNAVAILABLE',
+          'Patrol 서비스에 연결하지 못했습니다.',
+          { cause: error },
+        );
+      }
+      if (!response.ok) {
+        throw mapUpstreamFailure(response.status, await readUpstreamCode(response));
+      }
+      try {
+        return await response.json();
+      } catch (error) {
+        if (timedOut) {
+          throw new GatewayError(
+            504,
+            'UPSTREAM_TIMEOUT',
+            'Patrol API 응답 시간이 초과되었습니다.',
+            { cause: error },
+          );
+        }
+        throw new GatewayError(
+          502,
+          'INVALID_UPSTREAM_RESPONSE',
+          'Patrol JSON 응답을 확인하지 못했습니다.',
+          { cause: error },
+        );
+      }
+    } finally {
+      globalThis.clearTimeout(timeoutId);
     }
   }
 

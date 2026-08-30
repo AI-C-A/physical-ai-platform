@@ -32,15 +32,23 @@ function sendError(response, error) {
   });
 }
 
-function parseStatusPollInterval(value) {
+function parseTimerEnvironment(value, fieldName) {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error('PATROL_STATUS_POLL_INTERVAL_MS 환경변수가 필요합니다.');
+    throw new Error(`${fieldName} 환경변수가 필요합니다.`);
   }
-  const intervalMs = Number(value);
-  if (!Number.isInteger(intervalMs) || intervalMs < 1 || intervalMs > 2_147_483_647) {
-    throw new Error('PATROL_STATUS_POLL_INTERVAL_MS는 Node.js timer 범위 안의 양의 정수여야 합니다.');
+  const timerMs = Number(value);
+  if (!Number.isInteger(timerMs) || timerMs < 1 || timerMs > 2_147_483_647) {
+    throw new Error(`${fieldName}는 Node.js timer 범위 안의 양의 정수여야 합니다.`);
   }
-  return intervalMs;
+  return timerMs;
+}
+
+function parseStatusPollInterval(value) {
+  return parseTimerEnvironment(value, 'PATROL_STATUS_POLL_INTERVAL_MS');
+}
+
+export function parsePatrolApiRequestTimeout(value) {
+  return parseTimerEnvironment(value, 'PATROL_API_REQUEST_TIMEOUT_MS');
 }
 
 export function parseBatteryLowThreshold(value) {
@@ -244,6 +252,9 @@ export function createGatewayFromEnvironment(environment = process.env) {
     secret: environment.PATROL_API_SECRET,
     cameraConfigPath: environment.PATROL_CAMERA_CONFIG_PATH,
     registrations: parseRobotRegistrations(environment.PATROL_ROBOTS_JSON),
+    requestTimeoutMs: parsePatrolApiRequestTimeout(
+      environment.PATROL_API_REQUEST_TIMEOUT_MS,
+    ),
     createViewerSession: createKinesisViewerSession,
   });
 }

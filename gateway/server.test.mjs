@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { GatewayError } from './patrol-integration.mjs';
-import { createGatewayRequestHandler } from './server.mjs';
+import {
+  createGatewayRequestHandler,
+  parsePatrolApiRequestTimeout,
+} from './server.mjs';
 
 function createResponseRecorder() {
   const result = { status: 0, headers: {}, body: '' };
@@ -19,6 +22,16 @@ function createResponseRecorder() {
     },
   };
 }
+
+test('Patrol API timeout 환경변수는 Node.js timer 범위의 양의 정수만 허용한다', () => {
+  assert.equal(parsePatrolApiRequestTimeout('10000'), 10_000);
+  for (const value of [undefined, '', '0', '-1', '1.5', '2147483648']) {
+    assert.throws(
+      () => parsePatrolApiRequestTimeout(value),
+      /PATROL_API_REQUEST_TIMEOUT_MS/,
+    );
+  }
+});
 
 test('게이트웨이 응답은 no-store이며 허용된 내부 계약만 반환한다', async () => {
   const integration = {

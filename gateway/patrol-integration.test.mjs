@@ -38,13 +38,18 @@ const cameraResponse = {
   awsSecretKey: 'AWS_SECRET_KEY',
 };
 
-function createIntegration(fetcher, createViewerSession = async () => ({ ok: true })) {
+function createIntegration(
+  fetcher,
+  createViewerSession = async () => ({ ok: true }),
+  requestTimeoutMs = 10_000,
+) {
   return createPatrolIntegration({
     origin: 'https://platform.example.test',
     apiKey: 'patrol-key',
     secret: 'patrol-secret',
     cameraConfigPath: '/camera-config/',
     registrations: [registration],
+    requestTimeoutMs,
     fetcher,
     createViewerSession,
   });
@@ -97,6 +102,7 @@ test('robot_status에서 FE에 필요한 필드만 Robot 카탈로그와 운영 
     assert.match(url, /robotSerialNumber=SERIAL001/);
     assert.equal(init.headers.apiKey, 'patrol-key');
     assert.equal(init.headers.secret, 'patrol-secret');
+    assert.ok(init.signal instanceof AbortSignal);
   });
 });
 
@@ -221,6 +227,28 @@ test('upstream 네트워크 장애를 503으로 정규화한다', async () => {
       && error.code === 'INTEGRATION_UNAVAILABLE'
       && !error.message.includes('socket 내부 정보'),
   );
+});
+
+test('환경변수로 받은 timeout이 지나면 upstream 요청을 중단하고 504로 정규화한다', async () => {
+  let observedSignal;
+  const integration = createIntegration(
+    async (_url, init) => new Promise((_resolve, reject) => {
+      observedSignal = init.signal;
+      init.signal.addEventListener('abort', () => {
+        reject(new DOMException('aborted', 'AbortError'));
+      }, { once: true });
+    }),
+    undefined,
+    5,
+  );
+
+  await assert.rejects(
+    () => integration.getRobotStatus('robot-a'),
+    (error) => error instanceof GatewayError
+      && error.status === 504
+      && error.code === 'UPSTREAM_TIMEOUT',
+  );
+  assert.equal(observedSignal.aborted, true);
 });
 
 test('카메라 credential은 Viewer factory까지만 전달하고 반환값에는 포함하지 않는다', async () => {

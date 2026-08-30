@@ -61,6 +61,7 @@ Real은 Patrol Robot API와 Kinesis 영상을 사용한다. `.env.local`에 다�
 - `PATROL_API_SECRET`
 - `PATROL_CAMERA_CONFIG_PATH`
 - `PATROL_ROBOTS_JSON`
+- `PATROL_API_REQUEST_TIMEOUT_MS` (필수, Patrol API 요청 제한 시간 ms)
 - `PATROL_STATUS_POLL_INTERVAL_MS` (필수, Patrol 운영 주체가 승인한 REST 조회 주기 ms)
 - `PATROL_EVENT_BATTERY_LOW_THRESHOLD` (필수, ADS-1 이벤트를 발생시킬 배터리 잔량 백분율)
 
@@ -78,7 +79,7 @@ npm run dev:real
 
 gateway는 기본적으로 `127.0.0.1:8787`에서 frontend 요청을 처리한다. 브라우저에서는 기본 `http://localhost:5173` 또는 Vite가 터미널에 출력한 주소로 접속한다.
 
-gateway는 등록된 Robot의 운영 상태를 승인된 주기로 REST API에 요청하고, 상태 화면과 이벤트 수집기가 같은 upstream 요청을 공유한다. 이벤트 수집기는 실패 후에도 같은 주기로 복구를 시도하며 `OSA-1` 온라인, `OSA-2` 오프라인, `ADS-1` 배터리 부족 상태 전이만 중복 없이 기록한다. 이벤트 조회와 변경 알림은 gateway의 JSON API와 SSE로 제공한다. 최근 10,000개 이벤트는 gateway process lifetime 동안 유지되므로 process 재시작 간 영속 보관이 필요하면 별도 저장소를 연결해야 한다. 코드에는 poll 주기나 배터리 임계치의 임의 기본값이 없다.
+gateway는 등록된 Robot의 운영 상태를 승인된 주기로 REST API에 요청하고, 상태 화면과 이벤트 수집기가 같은 upstream 요청을 공유한다. 각 Patrol API 요청은 `PATROL_API_REQUEST_TIMEOUT_MS`가 지나면 중단된다. 이벤트 수집기는 실패 후에도 같은 주기로 복구를 시도하며 `OSA-1` 온라인, `OSA-2` 오프라인, `ADS-1` 배터리 부족 상태 전이만 중복 없이 기록한다. 이벤트 조회와 변경 알림은 gateway의 JSON API와 SSE로 제공한다. 최근 10,000개 이벤트는 gateway process lifetime 동안 유지되므로 process 재시작 간 영속 보관이 필요하면 별도 저장소를 연결해야 한다. 코드에는 요청 제한 시간, poll 주기나 배터리 임계치의 임의 기본값이 없다.
 
 AI 세그멘테이션도 사용할 때는 별도 터미널에서 서비스를 실행한다.
 
