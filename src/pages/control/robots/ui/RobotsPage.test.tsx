@@ -122,10 +122,10 @@ describe('RobotsPage', () => {
       await screen.findByRole('heading', { name: '로봇 관리' }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByRole('status', { name: '운영 상태: 조회 완료' }),
+      await screen.findByRole('status', { name: '실시간 상태: 확인 미지원' }),
     ).toHaveAttribute('aria-atomic', 'true');
     expect(screen.queryByRole('button', { name: '상태 새로고침' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('온라인')).toHaveLength(8);
+    expect(screen.getAllByText('로봇 온라인')).toHaveLength(8);
     expect(screen.getAllByText('N0000001').length).toBeGreaterThan(0);
     expect(screen.queryByText('사족 보행형')).not.toBeInTheDocument();
     expect(screen.queryByText('위치 텔레메트리')).not.toBeInTheDocument();
@@ -151,25 +151,29 @@ describe('RobotsPage', () => {
       },
     };
     renderPage('/control/robots', createInMemoryRobotCatalogWithData(), status);
-    await screen.findByRole('status', { name: '실시간 상태: 연결 중' });
+    await screen.findByRole('status', { name: '실시간 연결: 확인 중' });
     const initialRequestCount = getOperationalStatus.mock.calls.length;
 
     act(() => streamListener({
       kind: 'stale',
       lastSuccessfulAtMs: 1_700_000_000_000,
-      message: '오프라인',
+      message: '게이트웨이 연결이 끊겼습니다.',
       reason: 'gateway-unreachable',
       robotId: 'robot-001',
     }));
 
     expect(await screen.findByRole('status', {
-      name: /실시간 상태: 오프라인/,
+      name: '실시간 연결: 끊김',
     })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '실시간 연결 끊김' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('상태 확인 불가')).toBeInTheDocument();
+    expect(screen.getByText('마지막 상태: 로봇 온라인')).toBeInTheDocument();
     expect(screen.queryByText(/최신 로봇 상태를 반영하지 못했습니다/)).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: '로봇 목록' })).toBeInTheDocument();
     expect(getOperationalStatus).toHaveBeenCalledTimes(initialRequestCount);
 
-    await user.click(screen.getByRole('button', { name: '다시 연결' }));
+    await user.click(screen.getByRole('button', { name: '연결 다시 확인' }));
     await waitFor(() => {
       expect(getOperationalStatus).toHaveBeenCalledTimes(initialRequestCount * 2);
     });

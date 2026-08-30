@@ -39,4 +39,4 @@ export type {
 export type { RobotDescriptor } from './model/robot';
 export { RobotInfoTable } from './ui/RobotInfoTable';
 export { RobotModelViewer } from './ui/RobotModelViewer';
-export { RobotOfflineNotice } from './ui/RobotOfflineNotice';
+export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';

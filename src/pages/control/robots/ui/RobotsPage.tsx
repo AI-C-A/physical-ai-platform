@@ -5,7 +5,7 @@ import {
   useRobotCatalogPort,
   useRobotOperationalStatuses,
   useRobotQuery,
-  RobotOfflineNotice,
+  RealtimeStatusNotice,
   type RobotQuery,
 } from '@/entities/robot';
 import {
@@ -22,11 +22,13 @@ import { appendPathSegment } from '@/shared/lib/navigation';
 import { collectAllPages } from '@/shared/lib/query';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -134,30 +136,49 @@ export function RobotsPage() {
     });
   }
 
-  const showOfflineNotice = operationalStatuses.status === 'ready'
-    && operationalStatuses.streamStatus === 'stale';
+  const streamIssue = operationalStatuses.status === 'ready'
+    ? operationalStatuses.streamIssue
+    : null;
+  const latestReceivedTimestampMs = operationalStatuses.status === 'ready'
+    ? Object.values(operationalStatuses.data).reduce<number | null>(
+        (latest, status) => status === null
+          ? latest
+          : Math.max(latest ?? status.receivedTimestampMs, status.receivedTimestampMs),
+        null,
+      )
+    : null;
   const statusIndicatorLabel = operationalStatuses.status === 'error'
-    ? '운영 상태: 조회 오류'
+    ? '로봇 상태: 조회 오류'
     : operationalStatuses.status === 'loading'
-      ? '운영 상태: 조회 중'
+      ? '로봇 상태: 조회 중'
       : operationalStatuses.streamStatus === 'online'
-        ? '실시간 상태: 온라인'
+        ? '실시간 연결: 정상'
         : operationalStatuses.streamStatus === 'connecting'
-          ? '실시간 상태: 연결 중'
-          : '운영 상태: 조회 완료';
+          ? '실시간 연결: 확인 중'
+          : operationalStatuses.streamStatus === 'stale'
+            ? streamIssue?.reason === 'gateway-unreachable'
+              ? '실시간 연결: 끊김'
+              : '로봇 상태: 일부 확인 불가'
+            : '실시간 상태: 확인 미지원';
   const statusIndicatorText = operationalStatuses.status === 'error'
     ? '조회 오류'
     : operationalStatuses.status === 'loading'
       ? '조회 중'
       : operationalStatuses.streamStatus === 'online'
-        ? '온라인'
+        ? '실시간 정상'
         : operationalStatuses.streamStatus === 'connecting'
-          ? '연결 중'
-          : '조회 완료';
+          ? '실시간 확인 중'
+          : operationalStatuses.streamStatus === 'stale'
+            ? streamIssue?.reason === 'gateway-unreachable'
+              ? '실시간 연결 끊김'
+              : '일부 상태 확인 불가'
+            : '실시간 확인 미지원';
   const statusIndicatorTone = operationalStatuses.status === 'error'
     ? 'negative'
     : operationalStatuses.streamStatus === 'online'
       ? 'positive'
+      : operationalStatuses.streamStatus === 'stale'
+        ? streamIssue?.reason === 'gateway-unreachable' ? 'negative' : 'warning'
       : operationalStatuses.streamStatus === 'unavailable'
         ? 'neutral'
         : 'warning';
@@ -169,24 +190,20 @@ export function RobotsPage() {
       <PageHeader
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {showOfflineNotice ? (
-              <RobotOfflineNotice onReconnect={operationalStatuses.retry} />
-            ) : (
-              <span
-                aria-atomic="true"
-                aria-label={statusIndicatorLabel}
-                role="status"
-              >
-                <Badge tone={statusIndicatorTone}>
-                  {statusIndicatorPending ? (
-                    <>
-                      <Spinner />
-                      {statusIndicatorText}
-                    </>
-                  ) : statusIndicatorText}
-                </Badge>
-              </span>
-            )}
+            <span
+              aria-atomic="true"
+              aria-label={statusIndicatorLabel}
+              role="status"
+            >
+              <Badge tone={statusIndicatorTone}>
+                {statusIndicatorPending ? (
+                  <>
+                    <Spinner />
+                    {statusIndicatorText}
+                  </>
+                ) : statusIndicatorText}
+              </Badge>
+            </span>
             <Dropdown
               items={[
                 {
@@ -212,6 +229,13 @@ export function RobotsPage() {
         }
         title="로봇 관리"
       />
+      {streamIssue === null ? null : (
+        <RealtimeStatusNotice
+          fallbackLastSuccessfulAtMs={latestReceivedTimestampMs}
+          issue={streamIssue}
+          onRetry={operationalStatuses.retry}
+        />
+      )}
       {robots.refreshError === null ? null : (
         <Panel title="최신 로봇 목록을 반영하지 못했습니다">
           <ErrorMessage>기존 결과를 유지했습니다. {robots.refreshError}</ErrorMessage>
@@ -226,8 +250,7 @@ export function RobotsPage() {
           onRetry={operationalStatuses.retry}
         />
       ) : null}
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-2">
+      <PageToolbar aria-label="로봇 검색 및 정렬">
           <Input
             label="로봇 검색"
             onChange={(event) => updateParam('search', event.target.value)}
@@ -243,22 +266,27 @@ export function RobotsPage() {
             ]}
             value={sort}
           />
-        </div>
-      </Panel>
-      {robots.isRefreshing ? (
-        <QueryFeedback kind="loading" />
-      ) : null}
-      {pageItems.length === 0 ? (
-        robots.isRefreshing ? null : (
-          <QueryFeedback kind="empty" message="조건에 맞는 로봇이 없습니다." />
-        )
-      ) : (
-        <>
+      </PageToolbar>
+      <DataView
+        footer={pageItems.length === 0 ? undefined : (
+          <Pagination
+            isPending={robots.isRefreshing}
+            onPageChange={(value) => updateParam('page', String(value))}
+            page={robots.data.page}
+            pageSize={robots.data.pageSize}
+            totalItems={robots.data.totalItems}
+          />
+        )}
+        message="조건에 맞는 로봇이 없습니다."
+        state={pageItems.length === 0 && !robots.isRefreshing ? 'empty' : 'ready'}
+      >
+        {robots.isRefreshing ? <QueryFeedback kind="loading" /> : null}
+        {pageItems.length === 0 ? null : (
           <Table aria-label="로봇 목록">
             <TableHeader>
               <TableRow>
                 <TableHead>로봇</TableHead>
-                <TableHead>플랫폼 연결 상태</TableHead>
+                <TableHead>로봇 연결 상태</TableHead>
                 <TableHead>일련번호</TableHead>
               </TableRow>
             </TableHeader>
@@ -267,6 +295,12 @@ export function RobotsPage() {
                 const operationalStatus = operationalStatuses.status === 'ready'
                   ? operationalStatuses.data[robot.id]
                   : undefined;
+                const robotStreamIssue = operationalStatuses.status === 'ready'
+                  ? operationalStatuses.streamIssuesByRobotId[robot.id]
+                  : undefined;
+                const lastKnownConnectionLabel = operationalStatus?.data.isConnecting
+                  ? '로봇 온라인'
+                  : '로봇 오프라인';
                 return (
                   <TableRow key={robot.id}>
                     <TableCell>
@@ -276,28 +310,39 @@ export function RobotsPage() {
                       >
                         {robot.displayName}
                       </Link>
-                      <span className="block text-xs text-neutral-500">
+                      <span className="block text-xs text-muted">
                         {robot.id}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        tone={
-                          operationalStatus === undefined || operationalStatus === null
-                            ? 'neutral'
-                            : operationalStatus.data.isConnecting
-                              ? 'positive'
-                              : 'negative'
-                        }
-                      >
-                        {operationalStatus === undefined
-                          ? <Spinner label="상태 조회 중" />
-                          : operationalStatus === null
-                            ? '상태 없음'
-                            : operationalStatus.data.isConnecting
-                              ? '온라인'
-                              : '오프라인'}
-                      </Badge>
+                      {robotStreamIssue === undefined ? (
+                        <Badge
+                          tone={
+                            operationalStatus === undefined || operationalStatus === null
+                              ? 'neutral'
+                              : operationalStatus.data.isConnecting
+                                ? 'positive'
+                                : 'negative'
+                          }
+                        >
+                          {operationalStatus === undefined
+                            ? <Spinner label="상태 조회 중" />
+                            : operationalStatus === null
+                              ? '상태 없음'
+                              : lastKnownConnectionLabel}
+                        </Badge>
+                      ) : (
+                        <div className="grid justify-items-start gap-1">
+                          <Badge tone="neutral">상태 확인 불가</Badge>
+                          {operationalStatus === undefined || operationalStatus === null
+                            ? null
+                            : (
+                                <span className="text-xs text-muted">
+                                  마지막 상태: {lastKnownConnectionLabel}
+                                </span>
+                              )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{robot.serialNumber ?? '—'}</TableCell>
                   </TableRow>
@@ -305,15 +350,8 @@ export function RobotsPage() {
               })}
             </TableBody>
           </Table>
-          <Pagination
-            isPending={robots.isRefreshing}
-            onPageChange={(value) => updateParam('page', String(value))}
-            page={robots.data.page}
-            pageSize={robots.data.pageSize}
-            totalItems={robots.data.totalItems}
-          />
-        </>
-      )}
+        )}
+      </DataView>
     </div>
   );
 }
