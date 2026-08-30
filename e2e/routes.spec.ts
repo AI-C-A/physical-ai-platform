@@ -15,6 +15,7 @@ const officialRoutes = [
   { path: '/control/coordinates', heading: '경로·좌표 관리' },
   { path: '/control/events', heading: '이벤트 로그' },
   { path: '/control/reports', heading: '리포트' },
+  { path: '/control/settings', heading: '설정' },
   { path: '/mlops/capture', heading: '데이터 수집' },
   { path: '/mlops/sessions', heading: '수집 세션' },
   { path: '/mlops/sessions/session-001', heading: '수집 세션 01' },
@@ -26,15 +27,17 @@ const officialRoutes = [
     path: '/mlops/datasets/dataset-001',
     heading: '학습 데이터셋 초안 01',
   },
+  { path: '/mlops/settings', heading: '설정' },
   { path: '/bigdata/overview', heading: '개요' },
   { path: '/bigdata/explorer', heading: '데이터 탐색' },
+  { path: '/bigdata/settings', heading: '설정' },
 ] as const;
 
 const missingDetailRoutes = [
   {
     path: '/control/monitoring/robot-not-found',
     message: '관제할 로봇을 찾을 수 없습니다.',
-    returnLink: '모니터링으로 돌아가기',
+    returnLink: '영상 관제 나가기',
   },
   {
     path: '/mlops/sessions/session-not-found',
