@@ -25,6 +25,7 @@ import {
   Radio,
   Route,
   Search,
+  Settings as SettingsIcon,
   Square,
   TableProperties,
   WifiOff,
@@ -61,6 +62,7 @@ export type IconName =
   | 'robot'
   | 'route'
   | 'search'
+  | 'settings'
   | 'stop'
   | 'table'
   | 'wifi-off';
@@ -101,6 +103,7 @@ const icons = {
   robot: Bot,
   route: Route,
   search: Search,
+  settings: SettingsIcon,
   stop: Square,
   table: TableProperties,
   'wifi-off': WifiOff,

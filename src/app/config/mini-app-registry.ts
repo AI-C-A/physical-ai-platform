@@ -8,6 +8,7 @@ export const MINI_APP_REGISTRY = [
     label: '관제',
     icon: 'radio',
     homePath: ROUTE_PATHS.controlMonitoring,
+    settingsPath: ROUTE_PATHS.controlSettings,
     items: [
       {
         label: '모니터링',
@@ -51,6 +52,7 @@ export const MINI_APP_REGISTRY = [
     label: 'MLOps',
     icon: 'mlops',
     homePath: ROUTE_PATHS.mlopsCapture,
+    settingsPath: ROUTE_PATHS.mlopsSettings,
     items: [
       {
         label: '데이터 수집',
@@ -79,6 +81,7 @@ export const MINI_APP_REGISTRY = [
     label: 'BigData',
     icon: 'analytics',
     homePath: ROUTE_PATHS.bigdataOverview,
+    settingsPath: ROUTE_PATHS.bigdataSettings,
     items: [
       {
         label: '개요',

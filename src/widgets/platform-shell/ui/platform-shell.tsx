@@ -31,6 +31,7 @@ export interface MiniAppNavigationItem {
   readonly id: string;
   readonly items: readonly MiniAppNavigationChild[];
   readonly label: string;
+  readonly settingsPath: string;
 }
 
 interface PlatformShellProps {
@@ -43,6 +44,10 @@ function getRouteLabel(
 ): string {
   if (pathname === '/') {
     return miniApps[0]?.items[0]?.label ?? '플랫폼';
+  }
+
+  if (miniApps.some((miniApp) => pathname === miniApp.settingsPath)) {
+    return '설정';
   }
 
   const matchingItems = miniApps
@@ -234,6 +239,42 @@ function InnerNavigation({
   );
 }
 
+function SettingsNavigation({
+  collapsed,
+  onNavigate,
+  path,
+}: {
+  readonly collapsed: boolean;
+  readonly onNavigate?: () => void;
+  readonly path: string;
+}) {
+  const location = useLocation();
+  const siteSelectionSearch = getSiteSelectionSearch(location.search);
+  const isActive = location.pathname === path;
+  const link = (
+    <NavLink
+      aria-label="설정"
+      className={
+        isActive
+          ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
+          : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
+      }
+      onClick={onNavigate}
+      to={{
+        pathname: path,
+        search: siteSelectionSearch,
+      }}
+    >
+      <Icon name="settings" />
+      {collapsed ? null : <span>설정</span>}
+    </NavLink>
+  );
+
+  return collapsed ? (
+    <Tooltip content="설정" trigger={link} />
+  ) : link;
+}
+
 export function PlatformShell({ miniApps }: PlatformShellProps) {
   const branding = useBranding();
   const location = useLocation();
@@ -325,18 +366,27 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                   </Button>
                 }
               >
-                <div className="grid gap-5">
+                <div className="flex h-full min-h-0 flex-col gap-5">
                   <MiniAppSwitcher
                     collapsed={false}
                     currentMiniApp={currentMiniApp}
                     miniApps={miniApps}
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
-                  <InnerNavigation
-                    collapsed={false}
-                    items={currentMiniApp.items}
-                    onNavigate={() => setMobileMenuOpen(false)}
-                  />
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <InnerNavigation
+                      collapsed={false}
+                      items={currentMiniApp.items}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                    />
+                  </div>
+                  <div className="border-t border-border pt-3">
+                    <SettingsNavigation
+                      collapsed={false}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                      path={currentMiniApp.settingsPath}
+                    />
+                  </div>
                 </div>
               </Sheet>
             </div>
@@ -381,6 +431,12 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
               <InnerNavigation
                 collapsed={sidebarCollapsed}
                 items={currentMiniApp.items}
+              />
+            </div>
+            <div className="mt-3 border-t border-border pt-2">
+              <SettingsNavigation
+                collapsed={sidebarCollapsed}
+                path={currentMiniApp.settingsPath}
               />
             </div>
           </aside>

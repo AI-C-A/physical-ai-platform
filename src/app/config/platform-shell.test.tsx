@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -63,6 +64,18 @@ function renderShell(initialPath = '/control/monitoring') {
             <Route
               element={<p>BigData 개요 화면</p>}
               path="bigdata/overview"
+            />
+            <Route
+              element={<p>공통 설정 화면</p>}
+              path="control/settings"
+            />
+            <Route
+              element={<p>공통 설정 화면</p>}
+              path="mlops/settings"
+            />
+            <Route
+              element={<p>공통 설정 화면</p>}
+              path="bigdata/settings"
             />
           </Route>
         </Routes>
@@ -181,6 +194,32 @@ describe('PlatformShell', () => {
     expect(screen.getByText('BigData 개요 화면')).toBeInTheDocument();
   });
 
+  it.each([
+    ['/control/monitoring', '/control/settings'],
+    ['/mlops/capture', '/mlops/settings'],
+    ['/bigdata/overview', '/bigdata/settings'],
+  ])('%s에서 현재 미니앱의 설정 메뉴로 이동한다', async (
+    initialPath,
+    settingsPath,
+  ) => {
+    const user = userEvent.setup();
+    renderShell(initialPath);
+
+    const aside = screen.getByRole('complementary');
+    const bottomRegion = aside.lastElementChild;
+    expect(bottomRegion).toBeInstanceOf(HTMLElement);
+    if (!(bottomRegion instanceof HTMLElement)) return;
+    const settingsLink = within(bottomRegion).getByRole('link', {
+      name: '설정',
+    });
+    expect(settingsLink).toHaveAttribute('href', settingsPath);
+
+    await user.click(settingsLink);
+    expect(screen.getByText('공통 설정 화면')).toBeInTheDocument();
+    expect(settingsLink).toHaveClass('bg-action-secondary-active');
+    expect(document.title).toBe('설정 | ROBOT Army TIGER+');
+  });
+
   it('사이드바 메뉴와 미니앱을 이동해도 선택한 사이트 ID를 유지한다', async () => {
     const user = userEvent.setup();
     renderShell('/control/monitoring?search=robot&siteId=pangyo-army-ax-hub');
@@ -280,6 +319,31 @@ describe('PlatformShell', () => {
       screen.queryByRole('dialog', { name: 'ROBOT Army TIGER+ 메뉴' }),
     ).not.toBeInTheDocument();
     expect(menuTrigger).toHaveFocus();
+  });
+
+  it('모바일 Sheet 최하단 설정 메뉴는 현재 미니앱 경로로 이동하고 메뉴를 닫는다', async () => {
+    const user = userEvent.setup();
+    renderShell('/mlops/capture');
+
+    await user.click(screen.getByRole('button', {
+      name: '업무 메뉴 열기',
+    }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'ROBOT Army TIGER+ 메뉴',
+    });
+    const settingsLink = within(dialog).getByRole('link', {
+      name: '설정',
+    });
+    expect(settingsLink).toHaveAttribute('href', '/mlops/settings');
+
+    await user.click(settingsLink);
+
+    expect(screen.queryByRole('dialog', {
+      name: 'ROBOT Army TIGER+ 메뉴',
+    })).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/mlops/settings',
+    );
   });
 
   it('유효하지 않은 저장값은 펼침 상태로 복구한다', () => {
