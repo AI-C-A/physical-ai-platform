@@ -1,6 +1,19 @@
 @import "tailwindcss";
+@import "./color-tokens.css";
+@import "./design-tokens.css";
 
 @theme inline {
+  --font-weight-semibold: 500;
+  --font-weight-bold: 600;
+  --shadow-2xs: var(--elevation-2xs);
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
+  --shadow-2xl: var(--elevation-2xl);
+  --radius-control: var(--design-radius-control);
+  --radius-surface: var(--design-radius-surface);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -11,19 +24,35 @@
   --color-positive: var(--positive);
   --color-warning: var(--warning);
   --color-negative: var(--negative);
+  --color-layer-canvas: var(--layer-canvas);
+  --color-layer-base: var(--layer-base);
+  --color-layer-raised: var(--layer-raised);
+  --color-layer-floating: var(--layer-floating);
+  --color-layer-dimmed: var(--layer-dimmed);
+  --color-action-primary: var(--action-primary);
+  --color-action-primary-hover: var(--action-primary-hover);
+  --color-action-primary-active: var(--action-primary-active);
+  --color-action-danger: var(--action-danger);
+  --color-action-danger-hover: var(--action-danger-hover);
+  --color-action-danger-active: var(--action-danger-active);
+  --color-action-on-fill: var(--action-on-fill);
+  --color-action-secondary: var(--action-secondary);
+  --color-action-secondary-hover: var(--action-secondary-hover);
+  --color-action-secondary-active: var(--action-secondary-active);
+  --color-overlay: var(--overlay);
+  --color-status-neutral-foreground: var(--status-neutral-foreground);
+  --color-status-neutral-background: var(--status-neutral-background);
+  --color-status-positive-foreground: var(--status-positive-foreground);
+  --color-status-positive-background: var(--status-positive-background);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-warning-background: var(--status-warning-background);
+  --color-status-negative-foreground: var(--status-negative-foreground);
+  --color-status-negative-background: var(--status-negative-background);
+  --color-status-info-foreground: var(--status-info-foreground);
+  --color-status-info-background: var(--status-info-background);
 }
 
 :root {
-  --background: #f3f4f6;
-  --foreground: #1f2937;
-  --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --focus: #111827;
-  --positive: #166534;
-  --warning: #92400e;
-  --negative: #991b1b;
   color: var(--foreground);
   background: var(--background);
   font-family:
@@ -52,7 +81,12 @@ body {
 
 button,
 a {
-  font: inherit;
+  font-family: inherit;
+}
+
+:where(button, a, input, select, textarea) {
+  transition-duration: var(--design-motion-fast);
+  transition-timing-function: var(--design-ease-standard);
 }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
@@ -65,8 +99,8 @@ code {
 }
 
 ::view-transition-group(*) {
-  animation-duration: 360ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: var(--design-motion-normal);
+  animation-timing-function: var(--design-ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {

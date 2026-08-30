@@ -1,0 +1,392 @@
+:root {
+  color-scheme: light dark;
+
+  /* Neutral palette */
+  --palette-white: #ffffff;
+  --palette-black: #000000;
+  --palette-gray-50: #f9fafb;
+  --palette-gray-100: #f2f4f6;
+  --palette-gray-200: #e5e8eb;
+  --palette-gray-300: #d1d6db;
+  --palette-gray-400: #b0b8c1;
+  --palette-gray-500: #8b95a1;
+  --palette-gray-600: #6b7684;
+  --palette-gray-700: #4e5968;
+  --palette-gray-800: #333d4b;
+  --palette-gray-900: #191f28;
+  --palette-dark-gray-50: #202027;
+  --palette-dark-gray-100: #2c2c35;
+  --palette-dark-gray-200: #3c3c47;
+  --palette-dark-gray-300: #4d4d59;
+  --palette-dark-gray-400: #62626d;
+  --palette-dark-gray-500: #7e7e87;
+  --palette-dark-gray-600: #9e9ea4;
+  --palette-dark-gray-700: #c3c3c6;
+  --palette-dark-gray-800: #e4e4e5;
+  --palette-dark-gray-900: #ffffff;
+
+  /* Blue palette */
+  --palette-blue-50: #e8f3ff;
+  --palette-blue-100: #c9e2ff;
+  --palette-blue-200: #90c2ff;
+  --palette-blue-300: #64a8ff;
+  --palette-blue-400: #4593fc;
+  --palette-blue-500: #3182f6;
+  --palette-blue-600: #2272eb;
+  --palette-blue-700: #1b64da;
+  --palette-blue-800: #1957c2;
+  --palette-blue-900: #194aa6;
+  --palette-dark-blue-50: #202c4d;
+  --palette-dark-blue-100: #23386a;
+  --palette-dark-blue-200: #25478c;
+  --palette-dark-blue-300: #265ab3;
+  --palette-dark-blue-400: #2970d9;
+  --palette-dark-blue-500: #3485fa;
+  --palette-dark-blue-600: #449bff;
+  --palette-dark-blue-700: #61b0ff;
+  --palette-dark-blue-800: #8fcdff;
+  --palette-dark-blue-900: #c8e7ff;
+
+  /* Red palette */
+  --palette-red-50: #ffeeee;
+  --palette-red-100: #ffd4d6;
+  --palette-red-200: #feafb4;
+  --palette-red-300: #fb8890;
+  --palette-red-400: #f66570;
+  --palette-red-500: #f04452;
+  --palette-red-600: #e42939;
+  --palette-red-700: #d22030;
+  --palette-red-800: #bc1b2a;
+  --palette-red-900: #a51926;
+  --palette-dark-red-50: #3c2020;
+  --palette-dark-red-100: #562025;
+  --palette-dark-red-200: #7a242d;
+  --palette-dark-red-300: #9e2733;
+  --palette-dark-red-400: #ca2f3d;
+  --palette-dark-red-500: #f04251;
+  --palette-dark-red-600: #fa616d;
+  --palette-dark-red-700: #fe818b;
+  --palette-dark-red-800: #ffa8ad;
+  --palette-dark-red-900: #ffd1d3;
+
+  /* Orange palette */
+  --palette-orange-50: #fff3e0;
+  --palette-orange-100: #ffe0b0;
+  --palette-orange-200: #ffcd80;
+  --palette-orange-300: #ffbd51;
+  --palette-orange-400: #ffa927;
+  --palette-orange-500: #fe9800;
+  --palette-orange-600: #fb8800;
+  --palette-orange-700: #f57800;
+  --palette-orange-800: #ed6700;
+  --palette-orange-900: #e45600;
+  --palette-dark-orange-50: #3d2500;
+  --palette-dark-orange-100: #563200;
+  --palette-dark-orange-200: #804600;
+  --palette-dark-orange-300: #a85f00;
+  --palette-dark-orange-400: #cf7200;
+  --palette-dark-orange-500: #f18600;
+  --palette-dark-orange-600: #fd9528;
+  --palette-dark-orange-700: #ffa861;
+  --palette-dark-orange-800: #ffc39e;
+  --palette-dark-orange-900: #ffe4d6;
+
+  /* Yellow palette */
+  --palette-yellow-50: #fff9e7;
+  --palette-yellow-100: #ffefbf;
+  --palette-yellow-200: #ffe69b;
+  --palette-yellow-300: #ffdd78;
+  --palette-yellow-400: #ffd158;
+  --palette-yellow-500: #ffc342;
+  --palette-yellow-600: #ffb331;
+  --palette-yellow-700: #faa131;
+  --palette-yellow-800: #ee8f11;
+  --palette-yellow-900: #dd7d02;
+  --palette-dark-yellow-50: #3d2d1a;
+  --palette-dark-yellow-100: #724c1e;
+  --palette-dark-yellow-200: #b56f1d;
+  --palette-dark-yellow-300: #eb8b1e;
+  --palette-dark-yellow-400: #ffa126;
+  --palette-dark-yellow-500: #ffb134;
+  --palette-dark-yellow-600: #ffc259;
+  --palette-dark-yellow-700: #ffd68a;
+  --palette-dark-yellow-800: #ffe5b2;
+  --palette-dark-yellow-900: #fff1d4;
+
+  /* Green palette */
+  --palette-green-50: #f0faf6;
+  --palette-green-100: #aeefd5;
+  --palette-green-200: #76e4b8;
+  --palette-green-300: #3fd599;
+  --palette-green-400: #15c47e;
+  --palette-green-500: #03b26c;
+  --palette-green-600: #02a262;
+  --palette-green-700: #029359;
+  --palette-green-800: #028450;
+  --palette-green-900: #027648;
+  --palette-dark-green-50: #153729;
+  --palette-dark-green-100: #135338;
+  --palette-dark-green-200: #136d47;
+  --palette-dark-green-300: #138a59;
+  --palette-dark-green-400: #13a065;
+  --palette-dark-green-500: #16bb76;
+  --palette-dark-green-600: #26cf88;
+  --palette-dark-green-700: #4ee4a6;
+  --palette-dark-green-800: #82f6c5;
+  --palette-dark-green-900: #ccffea;
+
+  /* Teal palette */
+  --palette-teal-50: #edf8f8;
+  --palette-teal-100: #bce9e9;
+  --palette-teal-200: #89d8d8;
+  --palette-teal-300: #58c7c7;
+  --palette-teal-400: #30b6b6;
+  --palette-teal-500: #18a5a5;
+  --palette-teal-600: #109595;
+  --palette-teal-700: #0c8585;
+  --palette-teal-800: #097575;
+  --palette-teal-900: #076565;
+  --palette-dark-teal-50: #203537;
+  --palette-dark-teal-100: #224e51;
+  --palette-dark-teal-200: #226368;
+  --palette-dark-teal-300: #247e85;
+  --palette-dark-teal-400: #26939a;
+  --palette-dark-teal-500: #2eaab2;
+  --palette-dark-teal-600: #43bec7;
+  --palette-dark-teal-700: #65d4dc;
+  --palette-dark-teal-800: #9be8ee;
+  --palette-dark-teal-900: #d6fcff;
+
+  /* Purple palette */
+  --palette-purple-50: #f9f0fc;
+  --palette-purple-100: #edccf8;
+  --palette-purple-200: #da9bef;
+  --palette-purple-300: #c770e4;
+  --palette-purple-400: #b44bd7;
+  --palette-purple-500: #a234c7;
+  --palette-purple-600: #9128b4;
+  --palette-purple-700: #8222a2;
+  --palette-purple-800: #73228e;
+  --palette-purple-900: #65237b;
+  --palette-dark-purple-50: #3f2447;
+  --palette-dark-purple-100: #522361;
+  --palette-dark-purple-200: #66247b;
+  --palette-dark-purple-300: #7b2595;
+  --palette-dark-purple-400: #962fb5;
+  --palette-dark-purple-500: #ae3dd1;
+  --palette-dark-purple-600: #c353e5;
+  --palette-dark-purple-700: #d77cf2;
+  --palette-dark-purple-800: #eaacfc;
+  --palette-dark-purple-900: #f6d9ff;
+
+  /* Transparent neutral ramps */
+  --palette-ink-opacity-50: rgba(0, 23, 51, 0.02);
+  --palette-ink-opacity-100: rgba(2, 32, 71, 0.05);
+  --palette-ink-opacity-200: rgba(0, 27, 55, 0.1);
+  --palette-ink-opacity-300: rgba(0, 29, 58, 0.18);
+  --palette-ink-opacity-400: rgba(0, 25, 54, 0.31);
+  --palette-ink-opacity-500: rgba(3, 24, 50, 0.46);
+  --palette-ink-opacity-600: rgba(0, 19, 43, 0.58);
+  --palette-ink-opacity-700: rgba(3, 18, 40, 0.7);
+  --palette-ink-opacity-800: rgba(0, 12, 30, 0.8);
+  --palette-ink-opacity-900: rgba(2, 9, 19, 0.91);
+  --palette-light-opacity-50: rgba(209, 209, 253, 0.05);
+  --palette-light-opacity-100: rgba(217, 217, 255, 0.11);
+  --palette-light-opacity-200: rgba(222, 222, 255, 0.19);
+  --palette-light-opacity-300: rgba(224, 224, 255, 0.27);
+  --palette-light-opacity-400: rgba(232, 232, 253, 0.36);
+  --palette-light-opacity-500: rgba(242, 242, 255, 0.47);
+  --palette-light-opacity-600: rgba(248, 248, 255, 0.6);
+  --palette-light-opacity-700: rgba(253, 253, 255, 0.75);
+  --palette-light-opacity-800: rgba(253, 253, 254, 0.89);
+  --palette-light-opacity-900: rgba(255, 255, 255, 1);
+
+  /* Adaptive ramps */
+  --adaptive-gray-50: light-dark(var(--palette-gray-50), var(--palette-dark-gray-50));
+  --adaptive-gray-100: light-dark(var(--palette-gray-100), var(--palette-dark-gray-100));
+  --adaptive-gray-200: light-dark(var(--palette-gray-200), var(--palette-dark-gray-200));
+  --adaptive-gray-300: light-dark(var(--palette-gray-300), var(--palette-dark-gray-300));
+  --adaptive-gray-400: light-dark(var(--palette-gray-400), var(--palette-dark-gray-400));
+  --adaptive-gray-500: light-dark(var(--palette-gray-500), var(--palette-dark-gray-500));
+  --adaptive-gray-600: light-dark(var(--palette-gray-600), var(--palette-dark-gray-600));
+  --adaptive-gray-700: light-dark(var(--palette-gray-700), var(--palette-dark-gray-700));
+  --adaptive-gray-800: light-dark(var(--palette-gray-800), var(--palette-dark-gray-800));
+  --adaptive-gray-900: light-dark(var(--palette-gray-900), var(--palette-dark-gray-900));
+  --adaptive-gray-opacity-50: light-dark(var(--palette-ink-opacity-50), var(--palette-light-opacity-50));
+  --adaptive-gray-opacity-100: light-dark(var(--palette-ink-opacity-100), var(--palette-light-opacity-100));
+  --adaptive-gray-opacity-200: light-dark(var(--palette-ink-opacity-200), var(--palette-light-opacity-200));
+  --adaptive-gray-opacity-300: light-dark(var(--palette-ink-opacity-300), var(--palette-light-opacity-300));
+  --adaptive-gray-opacity-400: light-dark(var(--palette-ink-opacity-400), var(--palette-light-opacity-400));
+  --adaptive-gray-opacity-500: light-dark(var(--palette-ink-opacity-500), var(--palette-light-opacity-500));
+  --adaptive-gray-opacity-600: light-dark(var(--palette-ink-opacity-600), var(--palette-light-opacity-600));
+  --adaptive-gray-opacity-700: light-dark(var(--palette-ink-opacity-700), var(--palette-light-opacity-700));
+  --adaptive-gray-opacity-800: light-dark(var(--palette-ink-opacity-800), var(--palette-light-opacity-800));
+  --adaptive-gray-opacity-900: light-dark(var(--palette-ink-opacity-900), var(--palette-light-opacity-900));
+  --adaptive-blue-50: light-dark(var(--palette-blue-50), var(--palette-dark-blue-50));
+  --adaptive-blue-100: light-dark(var(--palette-blue-100), var(--palette-dark-blue-100));
+  --adaptive-blue-200: light-dark(var(--palette-blue-200), var(--palette-dark-blue-200));
+  --adaptive-blue-300: light-dark(var(--palette-blue-300), var(--palette-dark-blue-300));
+  --adaptive-blue-400: light-dark(var(--palette-blue-400), var(--palette-dark-blue-400));
+  --adaptive-blue-500: light-dark(var(--palette-blue-500), var(--palette-dark-blue-500));
+  --adaptive-blue-600: light-dark(var(--palette-blue-600), var(--palette-dark-blue-600));
+  --adaptive-blue-700: light-dark(var(--palette-blue-700), var(--palette-dark-blue-700));
+  --adaptive-blue-800: light-dark(var(--palette-blue-800), var(--palette-dark-blue-800));
+  --adaptive-blue-900: light-dark(var(--palette-blue-900), var(--palette-dark-blue-900));
+  --adaptive-red-50: light-dark(var(--palette-red-50), var(--palette-dark-red-50));
+  --adaptive-red-100: light-dark(var(--palette-red-100), var(--palette-dark-red-100));
+  --adaptive-red-200: light-dark(var(--palette-red-200), var(--palette-dark-red-200));
+  --adaptive-red-300: light-dark(var(--palette-red-300), var(--palette-dark-red-300));
+  --adaptive-red-400: light-dark(var(--palette-red-400), var(--palette-dark-red-400));
+  --adaptive-red-500: light-dark(var(--palette-red-500), var(--palette-dark-red-500));
+  --adaptive-red-600: light-dark(var(--palette-red-600), var(--palette-dark-red-600));
+  --adaptive-red-700: light-dark(var(--palette-red-700), var(--palette-dark-red-700));
+  --adaptive-red-800: light-dark(var(--palette-red-800), var(--palette-dark-red-800));
+  --adaptive-red-900: light-dark(var(--palette-red-900), var(--palette-dark-red-900));
+  --adaptive-orange-50: light-dark(var(--palette-orange-50), var(--palette-dark-orange-50));
+  --adaptive-orange-100: light-dark(var(--palette-orange-100), var(--palette-dark-orange-100));
+  --adaptive-orange-200: light-dark(var(--palette-orange-200), var(--palette-dark-orange-200));
+  --adaptive-orange-300: light-dark(var(--palette-orange-300), var(--palette-dark-orange-300));
+  --adaptive-orange-400: light-dark(var(--palette-orange-400), var(--palette-dark-orange-400));
+  --adaptive-orange-500: light-dark(var(--palette-orange-500), var(--palette-dark-orange-500));
+  --adaptive-orange-600: light-dark(var(--palette-orange-600), var(--palette-dark-orange-600));
+  --adaptive-orange-700: light-dark(var(--palette-orange-700), var(--palette-dark-orange-700));
+  --adaptive-orange-800: light-dark(var(--palette-orange-800), var(--palette-dark-orange-800));
+  --adaptive-orange-900: light-dark(var(--palette-orange-900), var(--palette-dark-orange-900));
+  --adaptive-yellow-50: light-dark(var(--palette-yellow-50), var(--palette-dark-yellow-50));
+  --adaptive-yellow-100: light-dark(var(--palette-yellow-100), var(--palette-dark-yellow-100));
+  --adaptive-yellow-200: light-dark(var(--palette-yellow-200), var(--palette-dark-yellow-200));
+  --adaptive-yellow-300: light-dark(var(--palette-yellow-300), var(--palette-dark-yellow-300));
+  --adaptive-yellow-400: light-dark(var(--palette-yellow-400), var(--palette-dark-yellow-400));
+  --adaptive-yellow-500: light-dark(var(--palette-yellow-500), var(--palette-dark-yellow-500));
+  --adaptive-yellow-600: light-dark(var(--palette-yellow-600), var(--palette-dark-yellow-600));
+  --adaptive-yellow-700: light-dark(var(--palette-yellow-700), var(--palette-dark-yellow-700));
+  --adaptive-yellow-800: light-dark(var(--palette-yellow-800), var(--palette-dark-yellow-800));
+  --adaptive-yellow-900: light-dark(var(--palette-yellow-900), var(--palette-dark-yellow-900));
+  --adaptive-green-50: light-dark(var(--palette-green-50), var(--palette-dark-green-50));
+  --adaptive-green-100: light-dark(var(--palette-green-100), var(--palette-dark-green-100));
+  --adaptive-green-200: light-dark(var(--palette-green-200), var(--palette-dark-green-200));
+  --adaptive-green-300: light-dark(var(--palette-green-300), var(--palette-dark-green-300));
+  --adaptive-green-400: light-dark(var(--palette-green-400), var(--palette-dark-green-400));
+  --adaptive-green-500: light-dark(var(--palette-green-500), var(--palette-dark-green-500));
+  --adaptive-green-600: light-dark(var(--palette-green-600), var(--palette-dark-green-600));
+  --adaptive-green-700: light-dark(var(--palette-green-700), var(--palette-dark-green-700));
+  --adaptive-green-800: light-dark(var(--palette-green-800), var(--palette-dark-green-800));
+  --adaptive-green-900: light-dark(var(--palette-green-900), var(--palette-dark-green-900));
+  --adaptive-teal-50: light-dark(var(--palette-teal-50), var(--palette-dark-teal-50));
+  --adaptive-teal-100: light-dark(var(--palette-teal-100), var(--palette-dark-teal-100));
+  --adaptive-teal-200: light-dark(var(--palette-teal-200), var(--palette-dark-teal-200));
+  --adaptive-teal-300: light-dark(var(--palette-teal-300), var(--palette-dark-teal-300));
+  --adaptive-teal-400: light-dark(var(--palette-teal-400), var(--palette-dark-teal-400));
+  --adaptive-teal-500: light-dark(var(--palette-teal-500), var(--palette-dark-teal-500));
+  --adaptive-teal-600: light-dark(var(--palette-teal-600), var(--palette-dark-teal-600));
+  --adaptive-teal-700: light-dark(var(--palette-teal-700), var(--palette-dark-teal-700));
+  --adaptive-teal-800: light-dark(var(--palette-teal-800), var(--palette-dark-teal-800));
+  --adaptive-teal-900: light-dark(var(--palette-teal-900), var(--palette-dark-teal-900));
+  --adaptive-purple-50: light-dark(var(--palette-purple-50), var(--palette-dark-purple-50));
+  --adaptive-purple-100: light-dark(var(--palette-purple-100), var(--palette-dark-purple-100));
+  --adaptive-purple-200: light-dark(var(--palette-purple-200), var(--palette-dark-purple-200));
+  --adaptive-purple-300: light-dark(var(--palette-purple-300), var(--palette-dark-purple-300));
+  --adaptive-purple-400: light-dark(var(--palette-purple-400), var(--palette-dark-purple-400));
+  --adaptive-purple-500: light-dark(var(--palette-purple-500), var(--palette-dark-purple-500));
+  --adaptive-purple-600: light-dark(var(--palette-purple-600), var(--palette-dark-purple-600));
+  --adaptive-purple-700: light-dark(var(--palette-purple-700), var(--palette-dark-purple-700));
+  --adaptive-purple-800: light-dark(var(--palette-purple-800), var(--palette-dark-purple-800));
+  --adaptive-purple-900: light-dark(var(--palette-purple-900), var(--palette-dark-purple-900));
+
+  /* Adaptive surfaces */
+  --adaptive-background: light-dark(#ffffff, #17171c);
+  --adaptive-background-dimmed: light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.56));
+  --adaptive-background-sunken: light-dark(#f2f4f6, #101013);
+  --adaptive-background-raised: light-dark(#ffffff, #202027);
+  --adaptive-background-floating: light-dark(#ffffff, #2c2c35);
+  --adaptive-hairline: light-dark(#e5e8eb, #3c3c47);
+  --adaptive-gray-background: light-dark(#f2f4f6, #101013);
+  --adaptive-screen-background: light-dark(#f6f7f9, #101013);
+  --adaptive-card-subtle: light-dark(rgba(0, 23, 51, 0.02), rgba(209, 209, 253, 0.05));
+  --adaptive-card-solid: light-dark(#ffffff, rgba(209, 209, 253, 0.05));
+
+  /* Adaptive elevation */
+  --elevation-2xs: 0 1px light-dark(rgba(0, 23, 51, 0.05), rgba(0, 0, 0, 0.24));
+  --elevation-xs: 0 1px 2px 0 light-dark(rgba(0, 23, 51, 0.06), rgba(0, 0, 0, 0.28));
+  --elevation-sm:
+    0 1px 3px 0 light-dark(rgba(0, 23, 51, 0.08), rgba(0, 0, 0, 0.32)),
+    0 1px 2px -1px light-dark(rgba(0, 23, 51, 0.08), rgba(0, 0, 0, 0.32));
+  --elevation-md:
+    0 4px 6px -1px light-dark(rgba(0, 23, 51, 0.09), rgba(0, 0, 0, 0.36)),
+    0 2px 4px -2px light-dark(rgba(0, 23, 51, 0.08), rgba(0, 0, 0, 0.32));
+  --elevation-lg:
+    0 4px 18px -8px light-dark(rgba(0, 23, 51, 0.1), rgba(0, 0, 0, 0.36)),
+    0 1px 6px -3px light-dark(rgba(0, 23, 51, 0.08), rgba(0, 0, 0, 0.28));
+  --elevation-xl:
+    0 4px 28px -10px light-dark(rgba(0, 23, 51, 0.12), rgba(0, 0, 0, 0.4)),
+    0 2px 10px -5px light-dark(rgba(0, 23, 51, 0.08), rgba(0, 0, 0, 0.3));
+  --elevation-2xl:
+    0 25px 50px -12px light-dark(rgba(0, 23, 51, 0.18), rgba(0, 0, 0, 0.56));
+
+  /* Semantic aliases */
+  --background: var(--adaptive-background-sunken);
+  --foreground: var(--adaptive-gray-900);
+  --surface: var(--adaptive-background-raised);
+  --surface-muted: var(--adaptive-gray-50);
+  --muted: var(--adaptive-gray-700);
+  --border: var(--adaptive-hairline);
+  --focus: var(--adaptive-blue-500);
+  --positive: var(--adaptive-green-700);
+  --warning: var(--adaptive-yellow-800);
+  --negative: var(--adaptive-red-700);
+  --layer-canvas: var(--adaptive-screen-background);
+  --layer-base: var(--adaptive-background);
+  --layer-raised: var(--adaptive-background-raised);
+  --layer-floating: var(--adaptive-background-floating);
+  --layer-dimmed: var(--adaptive-background-dimmed);
+  --action-primary: light-dark(var(--palette-blue-700), var(--palette-dark-blue-300));
+  --action-primary-hover: light-dark(var(--palette-blue-800), var(--palette-dark-blue-200));
+  --action-primary-active: light-dark(var(--palette-blue-900), var(--palette-dark-blue-100));
+  --action-danger: var(--palette-red-700);
+  --action-danger-hover: var(--palette-red-800);
+  --action-danger-active: var(--palette-red-900);
+  --action-on-fill: var(--palette-white);
+  --action-secondary: var(--adaptive-background-raised);
+  --action-secondary-hover: var(--adaptive-gray-50);
+  --action-secondary-active: var(--adaptive-gray-100);
+  --overlay: var(--adaptive-background-dimmed);
+  --status-neutral-foreground: var(--adaptive-gray-700);
+  --status-neutral-background: light-dark(rgba(78, 89, 104, 0.16), rgba(195, 195, 198, 0.16));
+  --status-positive-foreground: light-dark(color-mix(in srgb, var(--palette-green-900) 85%, var(--palette-black)), var(--palette-green-400));
+  --status-positive-background: light-dark(rgba(2, 162, 98, 0.16), rgba(21, 196, 126, 0.16));
+  --status-warning-foreground: light-dark(color-mix(in srgb, var(--palette-orange-900) 70%, var(--palette-black)), var(--palette-yellow-700));
+  --status-warning-background: light-dark(rgba(255, 179, 49, 0.16), rgba(255, 209, 88, 0.16));
+  --status-negative-foreground: light-dark(var(--palette-red-900), var(--palette-dark-red-700));
+  --status-negative-background: light-dark(rgba(244, 67, 54, 0.16), rgba(239, 83, 80, 0.16));
+  --status-info-foreground: light-dark(var(--palette-blue-900), var(--palette-dark-blue-800));
+  --status-info-background: light-dark(rgba(49, 130, 246, 0.16), rgba(69, 147, 252, 0.16));
+}
+
+[data-color-scheme="light"] {
+  color-scheme: light;
+}
+
+[data-color-scheme="dark"] {
+  color-scheme: dark;
+}
+
+:where([data-color-layer]) {
+  background-color: var(--layer-background);
+  color: var(--foreground);
+}
+
+[data-color-layer="canvas"] {
+  --layer-background: var(--layer-canvas);
+}
+
+[data-color-layer="base"] {
+  --layer-background: var(--layer-base);
+}
+
+[data-color-layer="raised"] {
+  --layer-background: var(--layer-raised);
+}
+
+[data-color-layer="floating"] {
+  --layer-background: var(--layer-floating);
+}
