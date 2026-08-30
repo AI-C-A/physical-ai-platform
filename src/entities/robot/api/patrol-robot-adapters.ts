@@ -48,10 +48,6 @@ function requireBoolean(value: unknown, fieldName: string): boolean {
   return value;
 }
 
-function optionalBoolean(value: unknown, fieldName: string): boolean | null {
-  return value === null ? null : requireBoolean(value, fieldName);
-}
-
 function requireFiniteNumber(value: unknown, fieldName: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`${fieldName} 값은 유한한 숫자여야 합니다.`);
@@ -59,8 +55,32 @@ function requireFiniteNumber(value: unknown, fieldName: string): number {
   return value;
 }
 
+function requireNumberInRange(
+  value: unknown,
+  fieldName: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const number = requireFiniteNumber(value, fieldName);
+  if (number < minimum || number > maximum) {
+    throw new Error(`${fieldName} 값은 ${String(minimum)} 이상 ${String(maximum)} 이하여야 합니다.`);
+  }
+  return number;
+}
+
 function optionalFiniteNumber(value: unknown, fieldName: string): number | null {
   return value === null ? null : requireFiniteNumber(value, fieldName);
+}
+
+function optionalNumberInRange(
+  value: unknown,
+  fieldName: string,
+  minimum: number,
+  maximum: number,
+): number | null {
+  return value === null
+    ? null
+    : requireNumberInRange(value, fieldName, minimum, maximum);
 }
 
 function optionalString(value: unknown, fieldName: string): string | null {
@@ -118,6 +138,19 @@ function parseOperationalStatus(
     throw new Error('Robot 운영 상태의 식별자가 요청과 일치하지 않습니다.');
   }
   const data = requireRecord(record.data, 'Robot 운영 상태.data');
+  const latitude = optionalNumberInRange(
+    data.latitude,
+    'Robot 운영 상태.data.latitude',
+    -90,
+    90,
+  );
+  const longitude = optionalNumberInRange(
+    data.longitude,
+    'Robot 운영 상태.data.longitude',
+    -180,
+    180,
+  );
+  const hasNoGpsSignal = latitude === 0 && longitude === 0;
   return {
     robotId,
     integrationProfileId: requireString(
@@ -130,13 +163,16 @@ function parseOperationalStatus(
       serialNumber: optionalString(data.serialNumber, 'Robot 운영 상태.data.serialNumber'),
       name: optionalString(data.name, 'Robot 운영 상태.data.name'),
       nickname: optionalString(data.nickname, 'Robot 운영 상태.data.nickname'),
-      battery: requireFiniteNumber(data.battery, 'Robot 운영 상태.data.battery'),
+      battery: requireNumberInRange(
+        data.battery,
+        'Robot 운영 상태.data.battery',
+        0,
+        100,
+      ),
       isConnecting: requireBoolean(data.isConnecting, 'Robot 운영 상태.data.isConnecting'),
-      latitude: optionalFiniteNumber(data.latitude, 'Robot 운영 상태.data.latitude'),
-      longitude: optionalFiniteNumber(data.longitude, 'Robot 운영 상태.data.longitude'),
-      isAvailable: optionalBoolean(data.isAvailable, 'Robot 운영 상태.data.isAvailable'),
+      latitude: hasNoGpsSignal ? null : latitude,
+      longitude: hasNoGpsSignal ? null : longitude,
       isCharging: requireBoolean(data.isCharging, 'Robot 운영 상태.data.isCharging'),
-      isMovable: requireBoolean(data.isMovable, 'Robot 운영 상태.data.isMovable'),
     } satisfies PatrolRobotSnapshot,
   };
 }
@@ -189,7 +225,7 @@ export class PatrolRobotCatalogAdapter implements RobotCatalogPort {
   }
 }
 
-/** Source payload를 검증하고 Clock이 제공한 수신 시각과 함께 운영 상태로 변환한다. */
+/** 배터리·좌표 범위와 GPS 미수신 표시값을 검증하고 ClockPort 수신 시각을 부여한다. */
 export class PatrolRobotOperationalStatusQuery
 implements RobotOperationalStatusQueryPort {
   readonly #base: URL;

@@ -125,9 +125,7 @@ function createOperationalStatus(
       isConnecting: true,
       latitude: 0,
       longitude: 0,
-      isAvailable: null,
       isCharging: false,
-      isMovable: true,
     },
     ...overrides,
   };
@@ -320,15 +318,12 @@ describe('ControlMonitoringPage', () => {
       name: '수송 로봇 02 로봇 정보',
     });
     const batteryRow = (await within(infoTable).findByText('battery')).closest('tr');
-    const availableRow = within(infoTable).getByText('isAvailable').closest('tr');
     const latitudeRow = within(infoTable).getByText('latitude').closest('tr');
     const serialNumberRow = within(infoTable).getByText('serialNumber').closest('tr');
     expect(batteryRow).not.toBeNull();
-    expect(availableRow).not.toBeNull();
     expect(latitudeRow).not.toBeNull();
     expect(serialNumberRow).not.toBeNull();
     expect(within(batteryRow as HTMLElement).getByText('100')).toBeInTheDocument();
-    expect(within(availableRow as HTMLElement).getByText('null')).toBeInTheDocument();
     expect(within(latitudeRow as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(serialNumberRow as HTMLElement).getByText('MOCK00001')).toBeInTheDocument();
     expect(screen.queryByText('연결됨')).not.toBeInTheDocument();

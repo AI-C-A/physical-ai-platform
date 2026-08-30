@@ -27,6 +27,8 @@ describe('PatrolRobotCatalogAdapter', () => {
         displayName: '405',
         description: null,
         integrationProfileId: 'patrol-rest-v1',
+        isAvailable: true,
+        isMovable: true,
       }],
     })));
     const adapter = new PatrolRobotCatalogAdapter({ endpoint, fetcher });
@@ -106,7 +108,7 @@ describe('PatrolRobotOperationalStatusQuery', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('battery와 (0, 0)을 변환하지 않고 브라우저 수신 시각을 기록한다', async () => {
+  it('battery를 퍼센트로 보존하고 (0, 0)은 GPS 미수신으로 정규화한다', async () => {
     const fetcher = vi.fn<(
       input: RequestInfo | URL,
       init?: RequestInit,
@@ -123,11 +125,11 @@ describe('PatrolRobotOperationalStatusQuery', () => {
         isConnecting: true,
         latitude: 0,
         longitude: 0,
-        isAvailable: null,
         isCharging: false,
-        isMovable: true,
         isHeadLightOn: false,
         isCargoOpen: false,
+        isAvailable: true,
+        isMovable: true,
       },
     })));
     const query = new PatrolRobotOperationalStatusQuery({
@@ -147,17 +149,41 @@ describe('PatrolRobotOperationalStatusQuery', () => {
         nickname: 'Mock Robot',
         battery: 100,
         isConnecting: true,
-        latitude: 0,
-        longitude: 0,
-        isAvailable: null,
+        latitude: null,
+        longitude: null,
         isCharging: false,
-        isMovable: true,
       },
     });
     const [input] = fetcher.mock.calls[0] ?? [];
     expect(input).toBeInstanceOf(URL);
     if (!(input instanceof URL)) throw new Error('Robot 상태 요청 URL이 필요합니다.');
     expect(input.pathname).toMatch(/\/robots\/robot-01\/status$/);
+  });
+
+  it('한 축만 0인 유효한 좌표는 그대로 보존한다', async () => {
+    const query = new PatrolRobotOperationalStatusQuery({
+      clock: { nowMs: () => 1 },
+      endpoint,
+      fetcher: () => Promise.resolve(jsonResponse({
+        robotId: 'robot-01',
+        integrationProfileId: 'patrol-rest-v1',
+        data: {
+          id: 246,
+          serialNumber: 'MOCK00001',
+          name: '405',
+          nickname: 'Mock Robot',
+          battery: 100,
+          isConnecting: true,
+          latitude: 0,
+          longitude: 127,
+          isCharging: false,
+        },
+      })),
+    });
+
+    await expect(query.getOperationalStatus('robot-01')).resolves.toMatchObject({
+      data: { latitude: 0, longitude: 127 },
+    });
   });
 
   it('게이트웨이 상태의 null serialNumber를 그대로 보존한다', async () => {
@@ -177,9 +203,7 @@ describe('PatrolRobotOperationalStatusQuery', () => {
           isConnecting: true,
           latitude: 0,
           longitude: 0,
-          isAvailable: null,
           isCharging: false,
-          isMovable: true,
           isHeadLightOn: false,
           isCargoOpen: false,
         },
@@ -193,9 +217,12 @@ describe('PatrolRobotOperationalStatusQuery', () => {
 
   it.each([
     { robotId: 'other', integrationProfileId: 'p', data: {} },
-    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: '100', isConnecting: true, latitude: null, longitude: null, isAvailable: true, isCharging: false, isMovable: true, isHeadLightOn: false, isCargoOpen: false } },
-    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: 100, isConnecting: 'true', latitude: null, longitude: null, isAvailable: true, isCharging: false, isMovable: true, isHeadLightOn: false, isCargoOpen: false } },
-    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: 100, isConnecting: true, latitude: '0', longitude: 0, isAvailable: true, isCharging: false, isMovable: true, isHeadLightOn: false, isCargoOpen: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: '100', isConnecting: true, latitude: null, longitude: null, isCharging: false, isHeadLightOn: false, isCargoOpen: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: 100, isConnecting: 'true', latitude: null, longitude: null, isCharging: false, isHeadLightOn: false, isCargoOpen: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, description: null, battery: 100, isConnecting: true, latitude: '0', longitude: 0, isCharging: false, isHeadLightOn: false, isCargoOpen: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, battery: 101, isConnecting: true, latitude: null, longitude: null, isCharging: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, battery: 100, isConnecting: true, latitude: 91, longitude: 0, isCharging: false } },
+    { robotId: 'robot-01', integrationProfileId: 'p', data: { id: 1, serialNumber: 'A', name: null, nickname: null, battery: 100, isConnecting: true, latitude: 0, longitude: 181, isCharging: false } },
   ])('잘못된 운영 상태 Shape를 unknown 입력에서 거절한다', async (payload) => {
     const query = new PatrolRobotOperationalStatusQuery({
       clock: { nowMs: () => 1 },

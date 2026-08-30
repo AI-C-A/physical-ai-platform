@@ -1,4 +1,4 @@
-/** Patrol robot_status에서 FE가 사용하는 필드만 이름과 값의 변환 없이 보존한다. */
+/** 현재 제품이 소비하는 Patrol 필드만 포함하며 GPS 미수신 좌표는 null로 정규화한다. */
 export interface PatrolRobotSnapshot {
   readonly id: number;
   readonly serialNumber: string | null;
@@ -6,9 +6,7 @@ export interface PatrolRobotSnapshot {
   readonly nickname: string | null;
   readonly battery: number;
   readonly isConnecting: boolean;
-  readonly isAvailable: boolean | null;
   readonly isCharging: boolean;
-  readonly isMovable: boolean;
   readonly latitude: number | null;
   readonly longitude: number | null;
 }

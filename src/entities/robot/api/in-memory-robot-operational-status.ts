@@ -52,9 +52,7 @@ implements RobotOperationalStatusQueryPort {
         isConnecting: true,
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
-        isAvailable: true,
         isCharging: numericId % 4 === 0,
-        isMovable: true,
       },
     });
   }

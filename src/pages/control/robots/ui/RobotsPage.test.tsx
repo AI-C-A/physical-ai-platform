@@ -29,9 +29,7 @@ const operationalStatus: RobotOperationalStatusQueryPort = {
       isConnecting: true,
       latitude: 0,
       longitude: 0,
-      isAvailable: false,
       isCharging: false,
-      isMovable: true,
     },
   }),
 };

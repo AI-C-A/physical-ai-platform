@@ -39,9 +39,7 @@ function getPatrolRows(status: PatrolRobotSnapshot): readonly RobotInfoRow[] {
     { field: 'isConnecting', value: status.isConnecting },
     { field: 'latitude', value: status.latitude },
     { field: 'longitude', value: status.longitude },
-    { field: 'isAvailable', value: status.isAvailable },
     { field: 'isCharging', value: status.isCharging },
-    { field: 'isMovable', value: status.isMovable },
   ];
 }
 

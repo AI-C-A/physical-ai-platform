@@ -154,9 +154,7 @@ export function describeAdapterBundleContract(
         ).toBe(true);
         expect(Number.isFinite(status.data.battery)).toBe(true);
         expect(typeof status.data.isConnecting).toBe('boolean');
-        expect(status.data.isAvailable === null || typeof status.data.isAvailable === 'boolean').toBe(true);
         expect(typeof status.data.isCharging).toBe('boolean');
-        expect(typeof status.data.isMovable).toBe('boolean');
         expect(status.data.latitude === null || Number.isFinite(status.data.latitude)).toBe(true);
         expect(status.data.longitude === null || Number.isFinite(status.data.longitude)).toBe(true);
         expect(Number.isFinite(status.receivedTimestampMs)).toBe(true);
