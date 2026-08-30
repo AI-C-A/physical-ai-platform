@@ -35,11 +35,6 @@ function requireBoolean(value, fieldName) {
   return value;
 }
 
-function optionalBoolean(value, fieldName) {
-  if (value === null || value === undefined) return null;
-  return requireBoolean(value, fieldName);
-}
-
 function requireFiniteNumber(value, fieldName) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new GatewayError(502, 'INVALID_UPSTREAM_RESPONSE', `${fieldName} 형식이 올바르지 않습니다.`);
@@ -47,9 +42,21 @@ function requireFiniteNumber(value, fieldName) {
   return value;
 }
 
-function optionalFiniteNumber(value, fieldName) {
+function requireNumberInRange(value, fieldName, minimum, maximum) {
+  const number = requireFiniteNumber(value, fieldName);
+  if (number < minimum || number > maximum) {
+    throw new GatewayError(
+      502,
+      'INVALID_UPSTREAM_RESPONSE',
+      `${fieldName} 값이 허용 범위를 벗어났습니다.`,
+    );
+  }
+  return number;
+}
+
+function optionalNumberInRange(value, fieldName, minimum, maximum) {
   if (value === null) return null;
-  return requireFiniteNumber(value, fieldName);
+  return requireNumberInRange(value, fieldName, minimum, maximum);
 }
 
 function parseHttpsOrigin(value) {
@@ -117,18 +124,29 @@ export function parseRobotRegistrations(value) {
 
 export function parsePatrolRobotStatus(value) {
   const record = requireRecord(value, 'robot_status');
+  const latitude = optionalNumberInRange(
+    record.latitude,
+    'robot_status.latitude',
+    -90,
+    90,
+  );
+  const longitude = optionalNumberInRange(
+    record.longitude,
+    'robot_status.longitude',
+    -180,
+    180,
+  );
+  const hasNoGpsSignal = latitude === 0 && longitude === 0;
   return {
     upstreamId: requireFiniteNumber(record.id, 'robot_status.id'),
     serialNumber: optionalString(record.serialNumber, 'robot_status.serialNumber'),
     name: optionalString(record.name, 'robot_status.name'),
     nickname: optionalString(record.nickname, 'robot_status.nickname'),
-    battery: requireFiniteNumber(record.battery, 'robot_status.battery'),
+    battery: requireNumberInRange(record.battery, 'robot_status.battery', 0, 100),
     isConnecting: requireBoolean(record.isConnecting, 'robot_status.isConnecting'),
-    latitude: optionalFiniteNumber(record.latitude, 'robot_status.latitude'),
-    longitude: optionalFiniteNumber(record.longitude, 'robot_status.longitude'),
-    isAvailable: optionalBoolean(record.isAvailable, 'robot_status.isAvailable'),
+    latitude: hasNoGpsSignal ? null : latitude,
+    longitude: hasNoGpsSignal ? null : longitude,
     isCharging: requireBoolean(record.isCharging, 'robot_status.isCharging'),
-    isMovable: requireBoolean(record.isMovable, 'robot_status.isMovable'),
   };
 }
 
@@ -285,9 +303,7 @@ export function createPatrolIntegration(options) {
           isConnecting: status.isConnecting,
           latitude: status.latitude,
           longitude: status.longitude,
-          isAvailable: status.isAvailable,
           isCharging: status.isCharging,
-          isMovable: status.isMovable,
         },
       };
     },

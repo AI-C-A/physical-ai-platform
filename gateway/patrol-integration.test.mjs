@@ -23,11 +23,11 @@ const statusResponse = {
   isConnecting: true,
   latitude: 0,
   longitude: 0,
-  isAvailable: false,
   isCharging: false,
-  isMovable: true,
+  isAvailable: true,
   isHeadLightOn: false,
   isCargoOpen: false,
+  isMovable: true,
 };
 const cameraResponse = {
   wssUrl: 'wss://v-example.kinesisvideo.ap-northeast-2.amazonaws.com',
@@ -87,11 +87,9 @@ test('robot_status에서 FE에 필요한 필드만 Robot 카탈로그와 운영 
       nickname: 'Robot A',
       battery: 100,
       isConnecting: true,
-      latitude: 0,
-      longitude: 0,
-      isAvailable: false,
+      latitude: null,
+      longitude: null,
       isCharging: false,
-      isMovable: true,
     },
   });
   assert.equal(requests.length, 2);
@@ -115,9 +113,9 @@ test('robot_status의 null serialNumber를 등록값으로 대체하지 않는�
   assert.equal(status.data.serialNumber, null);
 });
 
-test('필수 boolean과 유한한 숫자가 아닌 upstream 응답을 거절한다', () => {
+test('필수 타입과 배터리·좌표 범위를 벗어난 upstream 응답을 거절한다', () => {
   assert.throws(
-    () => parsePatrolRobotStatus({ ...statusResponse, isMovable: 'true' }),
+    () => parsePatrolRobotStatus({ ...statusResponse, isCharging: 'true' }),
     (error) => error instanceof GatewayError
       && error.status === 502
       && error.code === 'INVALID_UPSTREAM_RESPONSE',
@@ -125,6 +123,32 @@ test('필수 boolean과 유한한 숫자가 아닌 upstream 응답을 거절한�
   assert.throws(
     () => parsePatrolRobotStatus({ ...statusResponse, battery: Number.NaN }),
     /battery/,
+  );
+  for (const invalidStatus of [
+    { ...statusResponse, battery: 101 },
+    { ...statusResponse, latitude: 91 },
+    { ...statusResponse, longitude: 181 },
+  ]) {
+    assert.throws(
+      () => parsePatrolRobotStatus(invalidStatus),
+      (error) => error instanceof GatewayError
+        && error.status === 502
+        && error.code === 'INVALID_UPSTREAM_RESPONSE',
+    );
+  }
+  assert.deepEqual(
+    parsePatrolRobotStatus({ ...statusResponse, longitude: 127 }),
+    {
+      upstreamId: 246,
+      serialNumber: 'SERIAL001',
+      name: '405',
+      nickname: 'Robot A',
+      battery: 100,
+      isConnecting: true,
+      latitude: 0,
+      longitude: 127,
+      isCharging: false,
+    },
   );
 });
 
