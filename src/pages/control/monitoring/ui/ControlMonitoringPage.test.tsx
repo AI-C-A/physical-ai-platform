@@ -225,12 +225,14 @@ describe('ControlMonitoringPage', () => {
   });
 
   it('내부 응답 검증 상세를 UI에 표시하지 않는다', async () => {
+    const user = userEvent.setup();
     renderPage(createInMemoryRobotCatalogWithData(), {
       listOperationalDataSources: () => Promise.resolve([]),
       getOperationalStatus: () => Promise.reject(
         new Error('Robot 운영 상태.data 응답은 객체여야 합니다.'),
       ),
     });
+    await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       '로봇 정보를 불러오지 못했습니다.',
@@ -239,9 +241,11 @@ describe('ControlMonitoringPage', () => {
   });
 
   it('3D 뷰어 기본 로딩 표시 대신 공용 스피너를 표시한다', async () => {
+    const user = userEvent.setup();
     vi.stubGlobal('WebGLRenderingContext', class {});
     vi.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
     renderPage();
+    await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
 
     const modelViewerContainer = await screen.findByRole('group', {
       name: '로봇 3D 모델',
@@ -257,7 +261,8 @@ describe('ControlMonitoringPage', () => {
     await waitFor(() => expect(spinner).not.toBeInTheDocument());
   });
 
-  it('기본 실외 사이트의 Mapbox 배경 위에 로봇 선택과 Raw 정보 패널을 표시한다', async () => {
+  it('사이트 드롭다운과 제목 없는 로봇 선택 패널을 Mapbox 배경 위에 표시한다', async () => {
+    const user = userEvent.setup();
     renderPage();
 
     const pageHeading = await screen.findByRole('heading', {
@@ -265,23 +270,117 @@ describe('ControlMonitoringPage', () => {
       name: '모니터링',
     });
     expect(pageHeading).toHaveClass('sr-only');
-    expect(screen.getByRole('heading', { name: '로봇 선택' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '사이트' })).toHaveTextContent(
+    const siteSelect = screen.getByRole('combobox', { name: '사이트' });
+    const robotSelection = screen.getByRole('region', { name: '로봇 선택' });
+    expect(siteSelect).toHaveTextContent(
       '판교',
     );
-    expect(screen.getByRole('combobox', { name: '사이트' })).not.toHaveTextContent('· 실외');
-    expect(await screen.findByRole('heading', { name: '수송 로봇 02' })).toBeInTheDocument();
-    const robotSelection = screen.getByRole('heading', { name: '로봇 선택' }).closest('section');
-    expect(robotSelection).not.toBeNull();
-    const fallbackNameButton = within(robotSelection as HTMLElement).getByRole('button', {
+    expect(siteSelect).not.toHaveTextContent('· 실외');
+    expect(siteSelect.closest('section')).toBeNull();
+    const selectionColumn = siteSelect.parentElement?.parentElement;
+    expect(selectionColumn).toHaveClass('overflow-visible');
+    expect(selectionColumn).not.toHaveClass('overflow-hidden');
+    expect(siteSelect.querySelector('.lucide-map-pin')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '사이트 선택' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '로봇 선택' })).not.toBeInTheDocument();
+    const robotSearch = screen.getByRole('searchbox', { name: '로봇 검색' });
+    expect(robotSearch.closest('label')?.querySelector('.sr-only')).toHaveTextContent('로봇 검색');
+    const robotSearchIcon = robotSearch.parentElement?.querySelector('.lucide-search');
+    expect(robotSearchIcon).toBeInTheDocument();
+    expect(robotSearchIcon?.parentElement).toHaveClass('z-10');
+    expect(robotSearch.closest('label'))
+      .toHaveClass('[&>span>span]:text-muted');
+    for (const mapOverlayControl of [siteSelect, robotSearch]) {
+      expect(mapOverlayControl).toHaveClass(
+        'min-h-12',
+        'border-0',
+        'px-4',
+        'py-2.5',
+        'text-sm',
+        'text-foreground',
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus/10',
+        'focus-visible:ring-inset',
+      );
+    }
+    expect(siteSelect).toHaveClass(
+      'rounded-lg',
+      'bg-surface-muted/[0.88]',
+      'shadow-xl',
+      'backdrop-blur-xl',
+    );
+    expect(siteSelect).not.toHaveClass('shadow-foreground/10');
+    expect(robotSearch).toHaveClass(
+      'rounded-md',
+      'bg-foreground/[0.035]',
+      'pl-10',
+      'shadow-none',
+      'placeholder:text-muted',
+    );
+    expect(robotSearch).not.toHaveClass('backdrop-blur-xl');
+    expect(screen.queryByRole('button', { name: '로봇 정보 패널 닫기' }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '로봇 3D 모델' }))
+      .not.toBeInTheDocument();
+    const fallbackNameButton = within(robotSelection).getByRole('button', {
       name: /수송 로봇 02/u,
     });
+    expect(fallbackNameButton).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(fallbackNameButton);
+
+    const robotInfoPanel = await screen.findByRole('region', {
+      name: '수송 로봇 02 로봇 패널',
+    });
+    for (const mapOverlaySurface of [
+      robotSelection,
+      robotInfoPanel,
+    ]) {
+      expect(mapOverlaySurface).toHaveClass(
+        'rounded-lg',
+        'border-0',
+        'bg-surface-muted/[0.88]',
+        'shadow-xl',
+        'backdrop-blur-xl',
+      );
+      expect(mapOverlaySurface).not.toHaveClass('shadow-foreground/10');
+      expect(mapOverlaySurface.querySelector('[data-monitoring-panel-surface]'))
+        .not.toBeInTheDocument();
+    }
+    expect(robotSearch).not.toHaveAttribute('data-direct-surface');
+    expect(within(robotInfoPanel).queryByRole('heading', { name: '수송 로봇 02' }))
+      .not.toBeInTheDocument();
     expect(within(fallbackNameButton).getByText('N0000002')).toBeInTheDocument();
+    expect(fallbackNameButton).toHaveClass(
+      'rounded-md',
+      'border-0',
+      'bg-foreground/[0.06]',
+    );
+    expect(fallbackNameButton).not.toHaveClass('backdrop-blur-xl');
+    expect(fallbackNameButton).not.toHaveAttribute('data-direct-surface');
     expect(within(fallbackNameButton).queryByText('N0000002 · 수송 로봇 02'))
       .not.toBeInTheDocument();
     const modelViewer = screen.getByRole('group', { name: '로봇 3D 모델' });
+    expect(modelViewer.parentElement).not.toHaveAttribute('data-direct-surface');
+    expect(modelViewer.parentElement).not.toHaveClass(
+      'bg-neutral-50/[0.64]',
+      'backdrop-blur-xl',
+    );
     const modelViewerElement = modelViewer.querySelector('model-viewer');
+    const nickname = within(modelViewer).getByText('Mock Robot');
+    expect(nickname.tagName).toBe('FIGCAPTION');
+    expect(nickname).toHaveClass(
+      'mt-4',
+      'text-4xl',
+      'font-light',
+      'text-left',
+    );
+    expect(nickname).not.toHaveClass('absolute');
     expect(modelViewerElement).toHaveAttribute('src', '/assets/go2_walk.glb');
+    expect(modelViewerElement).toHaveAttribute('camera-orbit', '-135deg 65deg 105%');
+    expect(modelViewerElement).toHaveAttribute('autoplay');
+    expect(modelViewerElement).not.toHaveAttribute('auto-rotate');
+    expect(modelViewerElement).not.toHaveAttribute('rotation-per-second');
     expect(modelViewerElement).toHaveAttribute(
       'interaction-prompt',
       'none',
@@ -314,24 +413,77 @@ describe('ControlMonitoringPage', () => {
       expect(createAttributionControl).toHaveBeenCalledWith({ compact: true });
     });
 
-    const infoTable = await screen.findByRole('table', {
+    const infoOverview = await screen.findByRole('region', {
       name: '수송 로봇 02 로봇 정보',
     });
-    const batteryRow = (await within(infoTable).findByText('battery')).closest('tr');
-    const latitudeRow = within(infoTable).getByText('latitude').closest('tr');
-    const serialNumberRow = within(infoTable).getByText('serialNumber').closest('tr');
-    expect(batteryRow).not.toBeNull();
-    expect(latitudeRow).not.toBeNull();
-    expect(serialNumberRow).not.toBeNull();
-    expect(within(batteryRow as HTMLElement).getByText('100')).toBeInTheDocument();
-    expect(within(latitudeRow as HTMLElement).getByText('0')).toBeInTheDocument();
-    expect(within(serialNumberRow as HTMLElement).getByText('MOCK00001')).toBeInTheDocument();
-    expect(screen.queryByText('연결됨')).not.toBeInTheDocument();
+    expect(within(infoOverview).getByRole('group', {
+      name: '배터리 100%',
+    })).toBeInTheDocument();
+    expect(within(infoOverview).queryByText('온라인')).not.toBeInTheDocument();
+    expect(within(infoOverview).getByText(
+      'GPS 신호를 수신하지 못했습니다.',
+    )).toBeInTheDocument();
+    expect(within(infoOverview).queryByText('0° N')).not.toBeInTheDocument();
+    expect(within(infoOverview).queryByText('0° E')).not.toBeInTheDocument();
+    expect(within(infoOverview).getByText('MOCK00001')).toBeInTheDocument();
+    expect(within(infoOverview).queryByText('null', { exact: true }))
+      .not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId('current-location')).toHaveTextContent(
         '/control/monitoring?siteId=pangyo-outdoor-zone',
       );
     });
+
+    const closeRobotInfo = within(robotInfoPanel).getByRole('button', {
+      name: '로봇 정보 패널 닫기',
+    });
+    expect(closeRobotInfo.querySelector('.lucide-x')).toBeInTheDocument();
+    expect(closeRobotInfo).toHaveClass(
+      'size-10',
+      'bg-transparent',
+      'shadow-none',
+    );
+    expect(closeRobotInfo).not.toHaveClass(
+      'rounded-full',
+      'bg-surface-muted/80',
+      'shadow-sm',
+      'backdrop-blur-sm',
+    );
+    await user.click(closeRobotInfo);
+
+    expect(screen.queryByRole('region', { name: '수송 로봇 02 로봇 패널' }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '로봇 3D 모델' }))
+      .not.toBeInTheDocument();
+    expect(fallbackNameButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('연결되지 않은 로봇 목록 항목을 흐리게 표시한다', async () => {
+    const status: RobotOperationalStatusQueryPort = {
+      listOperationalDataSources: () => Promise.resolve([]),
+      getOperationalStatus: (robotId) => {
+        const result = createOperationalStatus(robotId);
+        return Promise.resolve({
+          ...result,
+          data: {
+            ...result.data,
+            isConnecting: robotId !== 'robot-001',
+          },
+        });
+      },
+    };
+    renderPage(createInMemoryRobotCatalogWithData(), status);
+
+    const robotSelection = await screen.findByRole('region', { name: '로봇 선택' });
+    const disconnectedRobot = within(robotSelection).getByRole('button', {
+      name: /정찰 로봇 01/u,
+    });
+    const connectedRobot = within(robotSelection).getByRole('button', {
+      name: /수송 로봇 02/u,
+    });
+
+    await waitFor(() => expect(disconnectedRobot).toHaveClass('opacity-50'));
+    expect(connectedRobot).not.toHaveClass('opacity-50');
   });
 
   it('URL의 사이트 ID로 선택 상태와 지도를 복원한다', async () => {
@@ -363,6 +515,7 @@ describe('ControlMonitoringPage', () => {
     renderPage();
 
     await waitFor(() => expect(createMap).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole('button', { name: /수송 로봇 02/u }));
     const siteSelect = screen.getByRole('combobox', { name: '사이트' });
     siteSelect.focus();
     await user.keyboard('{Enter}');
@@ -381,7 +534,18 @@ describe('ControlMonitoringPage', () => {
     expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/control/monitoring?siteId=pangyo-army-ax-hub',
     );
-    expect(screen.getByRole('link', { name: '영상 관제' })).toHaveAttribute(
+    const videoMonitoringLink = screen.getByRole('link', { name: '영상 관제' });
+    expect(videoMonitoringLink).toHaveClass(
+      'mt-4',
+      'w-full',
+      'shrink-0',
+      'min-h-12',
+      'rounded-md',
+      'border-0',
+      'bg-action-primary',
+      'text-action-on-fill',
+    );
+    expect(videoMonitoringLink).toHaveAttribute(
       'href',
       '/control/monitoring/robot-002?siteId=pangyo-army-ax-hub',
     );
@@ -502,6 +666,7 @@ describe('ControlMonitoringPage', () => {
   });
 
   it('검증된 위치 조회 결과를 선택 로봇 마커와 지도 중심에 반영한다', async () => {
+    const user = userEvent.setup();
     const latitude = 11;
     const longitude = 21;
     renderPage(
@@ -515,10 +680,11 @@ describe('ControlMonitoringPage', () => {
         }),
       },
     );
+    await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
 
-    await screen.findByRole('table', { name: '수송 로봇 02 로봇 정보' });
+    await screen.findByRole('region', { name: '수송 로봇 02 로봇 정보' });
     await waitFor(() => {
-      expect(createMarker).toHaveBeenCalledWith({ color: '#2563eb' });
+      expect(createMarker).toHaveBeenCalledWith({ color: 'var(--action-primary)' });
       expect(setMarkerLngLat).toHaveBeenCalledWith([longitude, latitude]);
       expect(addMarkerTo).toHaveBeenCalledWith(mapInstance);
       expect(easeTo).toHaveBeenCalledWith({
@@ -558,13 +724,16 @@ describe('ControlMonitoringPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await screen.findByRole('table', { name: '수송 로봇 02 로봇 정보' });
+    expect(screen.queryByRole('button', { name: '로봇 정보 패널 닫기' }))
+      .not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
+    await screen.findByRole('region', { name: '수송 로봇 02 로봇 정보' });
     await waitFor(() => expect(createMap).toHaveBeenCalledOnce());
     await user.click(screen.getByRole('button', { name: /정찰 로봇 01/u }));
 
-    const selected = screen.getByRole('heading', { name: '정찰 로봇 01' }).closest('section');
-    expect(selected).not.toBeNull();
-    expect(await screen.findByRole('table', {
+    expect(screen.getByRole('region', { name: '정찰 로봇 01 로봇 패널' }))
+      .toBeInTheDocument();
+    expect(await screen.findByRole('region', {
       name: '정찰 로봇 01 로봇 정보',
     })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '영상 관제' })).toHaveAttribute(
@@ -572,11 +741,39 @@ describe('ControlMonitoringPage', () => {
       '/control/monitoring/robot-001?siteId=pangyo-outdoor-zone',
     );
     expect(
-      screen.getByRole('link', { name: '영상 관제' }).compareDocumentPosition(
-        screen.getByRole('group', { name: '로봇 3D 모델' }),
+      screen.getByRole('group', { name: '로봇 3D 모델' }).compareDocumentPosition(
+        screen.getByRole('link', { name: '영상 관제' }),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(createMap).toHaveBeenCalledOnce();
+  });
+
+  it('검색 결과가 없어도 입력 포커스를 유지하고 검색어를 전용 버튼으로 지운다', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const search = await screen.findByRole('searchbox', { name: '로봇 검색' });
+    expect(search).toHaveAttribute('type', 'text');
+    expect(screen.queryByRole('button', { name: '로봇 검색어 모두 지우기' }))
+      .not.toBeInTheDocument();
+
+    await user.type(search, 'ㄹ');
+
+    expect(screen.getByRole('searchbox', { name: '로봇 검색' })).toBe(search);
+    expect(search).toHaveValue('ㄹ');
+    expect(search).toHaveFocus();
+    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument();
+
+    const clearSearch = screen.getByRole('button', { name: '로봇 검색어 모두 지우기' });
+    expect(clearSearch).toHaveClass('size-9', 'rounded-full');
+    expect(clearSearch.querySelector('.lucide-x')).toBeInTheDocument();
+
+    await user.click(clearSearch);
+
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+    expect(screen.queryByRole('button', { name: '로봇 검색어 모두 지우기' }))
+      .not.toBeInTheDocument();
   });
 
   it('검색 결과에서 벗어난 선택을 남기지 않고 첫 결과로 전환한다', async () => {
@@ -586,12 +783,11 @@ describe('ControlMonitoringPage', () => {
     await user.click(await screen.findByRole('button', { name: /수송 로봇 02/u }));
     await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '정찰 로봇 01');
 
-    const selected = screen.getByRole('heading', { name: '정찰 로봇 01' }).closest('section');
-    expect(selected).not.toBeNull();
-    expect(await within(selected as HTMLElement).findByRole('table', {
+    const selected = screen.getByRole('region', { name: '정찰 로봇 01 로봇 패널' });
+    expect(await within(selected).findByRole('region', {
       name: '정찰 로봇 01 로봇 정보',
     })).toBeInTheDocument();
-    expect(within(selected as HTMLElement).queryByRole('table', {
+    expect(within(selected).queryByRole('region', {
       name: '수송 로봇 02 로봇 정보',
     })).not.toBeInTheDocument();
   });
@@ -610,7 +806,12 @@ describe('ControlMonitoringPage', () => {
     };
     renderPage(catalog);
 
-    expect(await screen.findByRole('table', {
+    const robotSelection = await screen.findByRole('region', { name: '로봇 선택' });
+    const firstRobotButton = within(robotSelection).getByRole('button', {
+      name: /로봇 01/u,
+    });
+    await user.click(firstRobotButton);
+    expect(await screen.findByRole('region', {
       name: '로봇 01 로봇 정보',
     })).toBeInTheDocument();
     expect(listRobots).toHaveBeenCalledOnce();
@@ -618,17 +819,12 @@ describe('ControlMonitoringPage', () => {
     expect(screen.queryByRole('navigation', { name: '페이지 이동' })).not.toBeInTheDocument();
     expect(screen.queryByText(/검색 결과 \d+대/u)).not.toBeInTheDocument();
 
-    const robotSelection = screen.getByRole('heading', { name: '로봇 선택' }).closest('section');
-    expect(robotSelection).not.toBeNull();
-    expect(within(robotSelection as HTMLElement).getAllByRole('button')).toHaveLength(25);
-    const firstRobotButton = within(robotSelection as HTMLElement).getByRole('button', {
-      name: /로봇 01/u,
-    });
+    expect(within(robotSelection).getAllByRole('button')).toHaveLength(25);
     expect(within(firstRobotButton).getByText('MOCK00001 · API name 01'))
       .toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '로봇 25');
-    expect(await screen.findByRole('table', {
+    expect(await screen.findByRole('region', {
       name: '로봇 25 로봇 정보',
     })).toBeInTheDocument();
     expect(screen.queryByText(/검색 결과 \d+대/u)).not.toBeInTheDocument();

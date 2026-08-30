@@ -27,7 +27,9 @@ import {
   Search,
   Square,
   TableProperties,
+  WifiOff,
   X,
+  Zap,
 } from 'lucide-react';
 
 export type IconName =
@@ -35,6 +37,7 @@ export type IconName =
   | 'analytics'
   | 'apps'
   | 'back'
+  | 'charging'
   | 'check'
   | 'chevron-down'
   | 'chevron-right'
@@ -59,9 +62,11 @@ export type IconName =
   | 'route'
   | 'search'
   | 'stop'
-  | 'table';
+  | 'table'
+  | 'wifi-off';
 
 interface IconProps {
+  readonly filled?: boolean;
   readonly label?: string;
   readonly name: IconName;
   readonly size?: 'sm' | 'md';
@@ -72,6 +77,7 @@ const icons = {
   analytics: BarChart3,
   apps: LayoutGrid,
   back: ChevronLeft,
+  charging: Zap,
   check: Check,
   'chevron-down': ChevronDown,
   'chevron-right': ChevronRight,
@@ -97,14 +103,16 @@ const icons = {
   search: Search,
   stop: Square,
   table: TableProperties,
+  'wifi-off': WifiOff,
 } as const;
 
-export function Icon({ label, name, size = 'sm' }: IconProps) {
+export function Icon({ filled = false, label, name, size = 'sm' }: IconProps) {
   const Component = icons[name];
   return (
     <Component
       aria-hidden={label === undefined}
       aria-label={label}
+      fill={filled ? 'currentColor' : 'none'}
       size={size === 'sm' ? 16 : 20}
       strokeWidth={1.8}
     />

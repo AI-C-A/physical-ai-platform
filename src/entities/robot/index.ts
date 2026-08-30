@@ -37,6 +37,6 @@ export type {
   RobotOperationalStatusSubscriptionEvent,
 } from './model/robot-operational-status';
 export type { RobotDescriptor } from './model/robot';
-export { RobotInfoTable } from './ui/RobotInfoTable';
+export { RobotInfoOverview } from './ui/RobotInfoOverview';
 export { RobotModelViewer } from './ui/RobotModelViewer';
 export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';
