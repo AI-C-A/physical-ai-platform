@@ -89,6 +89,10 @@ describe('application services composition', () => {
 
   it('같은 in-memory 위치 fixture를 운영 상태와 지도 조회에 제공한다', async () => {
     const services = createApplicationServices(runtimeConfig);
+    expect(services.patrolApiStatus.endpoint).toBeNull();
+    await expect(services.patrolApiStatus.check()).rejects.toThrow(
+      'Patrol API endpoint가 설정되지 않았습니다.',
+    );
     const robots = await services.robotCatalog.listRobots();
 
     for (const robot of robots) {

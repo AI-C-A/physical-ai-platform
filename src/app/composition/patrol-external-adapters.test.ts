@@ -36,6 +36,10 @@ describe('Patrol real Adapter 구성', () => {
     });
 
     expect(services.robotCatalog).toBeInstanceOf(PatrolRobotCatalogAdapter);
+    expect(services.patrolApiStatus).toBe(services.robotCatalog);
+    expect(services.patrolApiStatus.endpoint).toBe(
+      '/api/integrations/patrol',
+    );
     expect(services.robotOperationalStatus)
       .toBeInstanceOf(PatrolRobotOperationalStatusQuery);
     expect(services.robotVideo).toBeInstanceOf(KinesisCameraAdapter);

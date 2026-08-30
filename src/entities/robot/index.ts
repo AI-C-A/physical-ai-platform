@@ -9,6 +9,7 @@ export {
   PatrolRobotCatalogAdapter,
   PatrolRobotOperationalStatusQuery,
 } from './api/patrol-robot-adapters';
+export { createUnconfiguredPatrolApiStatus } from './api/unconfigured-patrol-api-status';
 export {
   RobotCatalogContext,
   useRobotCatalogPort,
@@ -27,6 +28,8 @@ export {
   useRobotOperationalStatuses,
 } from './model/use-robot-operational-status';
 export type { RobotCatalogPort, RobotQuery } from './model/robot-catalog';
+export { PatrolApiStatusCheckError } from './model/patrol-api-status';
+export type { PatrolApiStatusPort } from './model/patrol-api-status';
 export type {
   PatrolRobotSnapshot,
   RobotOperationalStatus,

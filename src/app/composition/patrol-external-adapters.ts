@@ -16,10 +16,12 @@ export const createPatrolExternalAdapters: ExternalAdapterFactory = (
   if (endpoint === null) {
     throw new Error('Patrol external Adapter에는 connections.patrol.endpoint가 필요합니다.');
   }
+  const robotCatalog = new PatrolRobotCatalogAdapter({ endpoint });
   const video = new KinesisCameraAdapter({ endpoint });
   const noData = createPatrolNoDataAdapters();
   return {
-    robotCatalog: new PatrolRobotCatalogAdapter({ endpoint }),
+    patrolApiStatus: robotCatalog,
+    robotCatalog,
     robotOperationalStatus: new PatrolRobotOperationalStatusQuery({
       endpoint,
       clock,

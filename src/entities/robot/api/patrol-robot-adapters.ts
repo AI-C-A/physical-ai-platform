@@ -1,8 +1,16 @@
 import type { ClockPort } from '@/shared/lib/clock';
-import { requestJson, resolveSameOriginEndpoint } from '@/shared/lib/http-json';
+import {
+  HttpJsonError,
+  requestJson,
+  resolveSameOriginEndpoint,
+} from '@/shared/lib/http-json';
 import { createPageResult } from '@/shared/lib/query';
 
 import type { RobotCatalogPort, RobotQuery } from '../model/robot-catalog';
+import {
+  PatrolApiStatusCheckError,
+  type PatrolApiStatusPort,
+} from '../model/patrol-api-status';
 import type {
   PatrolRobotSnapshot,
   RobotOperationalStatus,
@@ -94,6 +102,17 @@ function createEndpoint(base: URL, path: string): URL {
 
 function invalidResponse(message: string, cause: unknown): Error {
   return new Error(message, { cause });
+}
+
+function createAbortError(): DOMException {
+  return new DOMException(
+    'Patrol API 상태 확인이 취소되었습니다.',
+    'AbortError',
+  );
+}
+
+function isSignalAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }
 
 function parseRobotList(value: unknown): readonly RobotDescriptor[] {
@@ -193,26 +212,50 @@ function filterAndSortRobots(
   });
 }
 
-/** Same-origin gateway 응답을 검증한 뒤 UI가 사용하는 RobotDescriptor로 변환한다. */
-export class PatrolRobotCatalogAdapter implements RobotCatalogPort {
+/** 미사용 공급자 필드가 내부 모델로 퍼지지 않도록 목록 응답을 최소 DTO로 투영한다. */
+export class PatrolRobotCatalogAdapter
+implements RobotCatalogPort, PatrolApiStatusPort {
   readonly #base: URL;
   readonly #fetcher: ExternalFetcher | undefined;
+  readonly endpoint: string;
 
   constructor(options: Pick<PatrolAdapterOptions, 'endpoint' | 'fetcher'>) {
     this.#base = resolveSameOriginEndpoint(options.endpoint);
     this.#fetcher = options.fetcher;
+    this.endpoint = this.#base.pathname;
   }
 
-  async listRobots(): Promise<readonly RobotDescriptor[]> {
+  async #loadRobots(
+    signal?: AbortSignal,
+  ): Promise<readonly RobotDescriptor[]> {
     const value = await requestJson(
       createEndpoint(this.#base, 'robots'),
-      {},
+      signal === undefined ? {} : { signal },
       this.#fetcher,
     );
     try {
       return parseRobotList(value);
     } catch (error: unknown) {
       throw invalidResponse('로봇 목록을 불러오지 못했습니다.', error);
+    }
+  }
+
+  listRobots(): Promise<readonly RobotDescriptor[]> {
+    return this.#loadRobots();
+  }
+
+  async check(signal?: AbortSignal): Promise<void> {
+    if (isSignalAborted(signal)) throw createAbortError();
+    try {
+      await this.#loadRobots(signal);
+    } catch (error: unknown) {
+      if (isSignalAborted(signal)) throw createAbortError();
+      throw new PatrolApiStatusCheckError(
+        error instanceof HttpJsonError && error.code === 'UPSTREAM_TIMEOUT'
+          ? 'timeout'
+          : 'unavailable',
+        { cause: error },
+      );
     }
   }
 

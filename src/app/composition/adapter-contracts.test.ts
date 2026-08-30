@@ -55,6 +55,7 @@ function createTestVideoAdapter(): InMemoryRobotVideoAdapter {
 
 function toBundle(services: ApplicationServices): AdapterBundle {
   return {
+    patrolApiStatus: services.patrolApiStatus,
     robotCatalog: services.robotCatalog,
     robotOperationalStatus: services.robotOperationalStatus,
     sensorDeviceCatalog: services.sensorDeviceCatalog,

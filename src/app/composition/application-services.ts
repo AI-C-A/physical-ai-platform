@@ -3,6 +3,8 @@ import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
 import {
+  createUnconfiguredPatrolApiStatus,
+  type PatrolApiStatusPort,
   type RobotCatalogPort,
   type RobotOperationalStatusQueryPort,
 } from '@/entities/robot';
@@ -25,6 +27,7 @@ import { AvailableStreamCaptureOperations } from './available-stream-capture-ope
 
 export interface ApplicationServices {
   readonly clock: ClockPort;
+  readonly patrolApiStatus: PatrolApiStatusPort;
   readonly robotCatalog: RobotCatalogPort;
   readonly robotOperationalStatus: RobotOperationalStatusQueryPort;
   readonly sensorDeviceCatalog: SensorDeviceCatalogPort;
@@ -60,6 +63,7 @@ type CoreAdapterBundle = InMemoryCoreAdapterBundle;
 
 const adapterServiceNames = [
   'robotCatalog',
+  'patrolApiStatus',
   'robotOperationalStatus',
   'sensorDeviceCatalog',
   'robotTelemetry',
@@ -266,6 +270,7 @@ export function createApplicationServices(
     let disposed = false;
     return {
       clock,
+      patrolApiStatus: createUnconfiguredPatrolApiStatus(),
       ...core,
       analytics,
       dispose: () => {

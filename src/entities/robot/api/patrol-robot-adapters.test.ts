@@ -4,6 +4,7 @@ import {
   PatrolRobotCatalogAdapter,
   PatrolRobotOperationalStatusQuery,
 } from './patrol-robot-adapters';
+import { PatrolApiStatusCheckError } from '../model/patrol-api-status';
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -86,6 +87,94 @@ describe('PatrolRobotCatalogAdapter', () => {
     await expect(adapter.listRobots()).resolves.toMatchObject([
       { serialNumber: null },
     ]);
+  });
+
+  it('상태 확인도 실제 로봇 목록 응답을 끝까지 검증한다', async () => {
+    const fetcher = vi.fn<(
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => Promise<Response>>(() => Promise.resolve(jsonResponse({
+        items: [{
+          id: 'robot-01',
+          serialNumber: 'MOCK00001',
+          name: '405',
+          displayName: '405',
+          integrationProfileId: 'patrol-rest-v1',
+        }],
+      })));
+    const adapter = new PatrolRobotCatalogAdapter({ endpoint, fetcher });
+
+    const controller = new AbortController();
+    await expect(adapter.check(controller.signal)).resolves.toBeUndefined();
+    expect(adapter.endpoint).toBe(endpoint);
+    const [input, init] = fetcher.mock.calls[0] ?? [];
+    expect(input).toBeInstanceOf(URL);
+    expect(init?.signal).toBe(controller.signal);
+  });
+
+  it.each([
+    {
+      label: 'HTTP 오류',
+      fetcher: () => Promise.resolve(jsonResponse({
+        code: 'UPSTREAM_UNAVAILABLE',
+        message: 'Patrol 서비스를 사용할 수 없습니다.',
+      }, 503)),
+    },
+    {
+      label: '잘못된 JSON',
+      fetcher: () => Promise.resolve(new Response('not-json', { status: 200 })),
+    },
+    {
+      label: '네트워크 오류',
+      fetcher: () => Promise.reject(new Error('private network detail')),
+    },
+    {
+      label: '잘못된 응답 구조',
+      fetcher: () => Promise.resolve(jsonResponse({ items: 'not-array' })),
+    },
+  ])('$label이면 공개된 unavailable 원인으로 정규화한다', async ({ fetcher }) => {
+    const adapter = new PatrolRobotCatalogAdapter({ endpoint, fetcher });
+
+    await expect(adapter.check()).rejects.toMatchObject({
+      reason: 'unavailable',
+    });
+  });
+
+  it('게이트웨이 timeout code를 공개된 timeout 원인으로 정규화한다', async () => {
+    const adapter = new PatrolRobotCatalogAdapter({
+      endpoint,
+      fetcher: () => Promise.resolve(jsonResponse({
+        code: 'UPSTREAM_TIMEOUT',
+        message: 'Patrol API 응답 시간이 초과되었습니다.',
+      }, 504)),
+    });
+
+    await expect(adapter.check()).rejects.toEqual(
+      expect.objectContaining({
+        name: PatrolApiStatusCheckError.name,
+        reason: 'timeout',
+      }),
+    );
+  });
+
+  it('호출자가 상태 확인을 취소하면 timeout 오류로 바꾸지 않는다', async () => {
+    const controller = new AbortController();
+    const adapter = new PatrolRobotCatalogAdapter({
+      endpoint,
+      fetcher: (_input, init) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      }),
+    });
+
+    const check = adapter.check(controller.signal);
+    const assertion = expect(check).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    controller.abort();
+
+    await assertion;
   });
 });
 
