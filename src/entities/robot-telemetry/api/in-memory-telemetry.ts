@@ -284,11 +284,7 @@ export class InMemoryTelemetryAdapter implements RobotTelemetryPort {
       payload: {
         battery: Math.max(0, 96 - numericId * 4),
         isConnecting: true,
-        isAvailable: true,
         isCharging: numericId % 4 === 0,
-        isMovable: true,
-        isHeadLightOn: numericId % 3 === 0,
-        isCargoOpen: false,
       },
     };
   }

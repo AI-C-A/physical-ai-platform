@@ -8,21 +8,17 @@ export type TelemetryConnectionState =
   | 'reconnecting'
   | 'error';
 
-/** 현재 Patrol robot_status의 위치 필드 이름과 null 의미를 그대로 사용한다. */
+/** 위치 부재를 null로 표현하는 프로토콜 중립 Telemetry payload다. */
 export interface RobotPosePayload {
   readonly latitude: number | null;
   readonly longitude: number | null;
 }
 
-/** 현재 Patrol robot_status에서 시간에 따라 변할 수 있는 운영 필드다. */
+/** 배터리 백분율과 연결·충전 상태만 전달하는 프로토콜 중립 Telemetry payload다. */
 export interface RobotBatteryPayload {
   readonly battery: number;
   readonly isConnecting: boolean;
-  readonly isAvailable: boolean | null;
   readonly isCharging: boolean;
-  readonly isMovable: boolean;
-  readonly isHeadLightOn: boolean;
-  readonly isCargoOpen: boolean;
 }
 
 /**

@@ -57,15 +57,11 @@ describe('InMemoryTelemetryAdapter', () => {
       .toEqual({
         battery: 92,
         isConnecting: true,
-        isAvailable: true,
         isCharging: false,
-        isMovable: true,
-        isHeadLightOn: false,
-        isCargoOpen: false,
       });
   });
 
-  it('robot_status 필드 이름을 유지하고 알 수 없는 주기를 null로 표현한다', async () => {
+  it('내부 channel 이름을 유지하고 알 수 없는 주기를 null로 표현한다', async () => {
     const adapter = new InMemoryTelemetryAdapter(['robot-1']);
 
     await expect(adapter.getChannelDescriptors()).resolves.toEqual([
