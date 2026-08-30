@@ -11,6 +11,7 @@ import { useBranding } from '@/shared/config';
 import { Button } from '@/shared/ui/button';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { Icon, type IconName } from '@/shared/ui/icon';
+import { PageFrame, type PageFrameLayout } from '@/shared/ui/page-frame';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Sheet } from '@/shared/ui/sheet';
 import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
@@ -103,7 +104,7 @@ function Brand({ compact }: { readonly compact: boolean }) {
       {branding.logo === null ? (
         <span
           aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center border border-neutral-400 text-xs font-black"
+          className="grid size-9 shrink-0 place-items-center border border-border text-xs font-black"
         >
           AR
         </span>
@@ -210,8 +211,8 @@ function InnerNavigation({
             aria-label={item.label}
             className={
               isActive
-                ? `flex min-h-10 items-center rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white ${collapsed ? 'justify-center' : 'gap-3'}`
-                : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 ${collapsed ? 'justify-center' : 'gap-3'}`
+                ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
+                : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
             }
             onClick={onNavigate}
             to={{
@@ -258,6 +259,17 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
     || location.pathname.startsWith('/control/monitoring/');
   const isImmersiveMonitoringRoute =
     /^\/control\/monitoring\/[^/]+$/u.test(location.pathname);
+  const pageFrameLayout: PageFrameLayout = isImmersiveMonitoringRoute
+    ? 'immersive'
+    : isMonitoringRoute
+      ? 'full-bleed'
+      : location.pathname.endsWith('/settings')
+        || location.pathname === '/mlops/capture'
+        || location.pathname === '/mlops/datasets/new'
+        ? 'focused'
+        : location.pathname.startsWith('/bigdata/')
+          ? 'wide'
+          : 'standard';
 
   useEffect(
     () => writeSidebarCollapsed(sidebarCollapsed),
@@ -291,16 +303,16 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-neutral-100 text-neutral-900">
+      <div className="min-h-screen bg-background text-foreground">
         <a
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-neutral-900 focus:ring-2 focus:ring-neutral-900"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-layer-floating focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:ring-2 focus:ring-focus"
           href="#main-content"
           onClick={() => mainContentRef.current?.focus()}
         >
           본문으로 건너뛰기
         </a>
         {isImmersiveMonitoringRoute ? null : (
-          <header className="sticky top-0 z-30 border-b border-neutral-300 bg-white lg:hidden">
+          <header className="sticky top-0 z-30 border-b border-border bg-layer-base lg:hidden">
             <div className="flex min-h-14 items-center justify-between gap-3 px-4">
               <Brand compact={false} />
               <Sheet
@@ -333,7 +345,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
         {isImmersiveMonitoringRoute ? null : (
           <aside
-            className={`fixed inset-y-0 left-0 z-30 hidden border-r border-neutral-300 bg-white p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
+            className={`fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-layer-base p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
             <div className="flex h-12 min-w-0 items-center gap-2">
               <Button
@@ -357,7 +369,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
               )}
             </div>
             <div
-              className="mt-2 border-b border-neutral-200 pb-3"
+              className="mt-2 border-b border-border pb-3"
             >
               <MiniAppSwitcher
                 collapsed={sidebarCollapsed}
@@ -380,15 +392,18 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
             : sidebarCollapsed ? 'lg:pl-14' : 'lg:pl-60'}
         >
           <main
-            className={isMonitoringRoute
+              className={isMonitoringRoute
               ? 'min-w-0 w-full p-0'
-              : 'mx-auto min-w-0 w-full max-w-[100rem] p-4 sm:p-6 lg:p-8'}
+              : 'mx-auto min-w-0 w-full max-w-[100rem] p-[var(--layout-page-gutter)]'}
+            data-page-shell={isMonitoringRoute ? 'full-bleed' : 'standard'}
             id="main-content"
             ref={mainContentRef}
             tabIndex={-1}
           >
             <Suspense fallback={<QueryFeedback kind="loading" />}>
-              <Outlet />
+              <PageFrame layout={pageFrameLayout}>
+                <Outlet />
+              </PageFrame>
             </Suspense>
           </main>
         </div>

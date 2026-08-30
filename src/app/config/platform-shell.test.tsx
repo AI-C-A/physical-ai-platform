@@ -248,11 +248,11 @@ describe('PlatformShell', () => {
         .parentElement,
     ).toBe(sidebarControlRegion);
     expect(screen.getByRole('link', { name: '모니터링' })).toHaveClass(
-      'bg-neutral-900',
+      'bg-action-secondary-active',
     );
     expect(
       screen.getByRole('link', { name: '개입 요청' }),
-    ).not.toHaveClass('bg-neutral-900');
+    ).not.toHaveClass('bg-action-secondary-active');
 
     view.unmount();
     renderShell();
