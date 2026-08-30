@@ -71,11 +71,36 @@ describe('RobotMonitoringPage', () => {
       '/control/monitoring/robot-001?siteId=pangyo-army-ax-hub',
     );
 
-    expect(
-      await screen.findByRole('heading', { level: 1, name: robot.displayName }),
-    ).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: robot.displayName,
+    });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveClass('text-foreground');
+    expect(heading.closest('.h-dvh')).toHaveAttribute(
+      'data-color-scheme',
+      'dark',
+    );
+    expect(heading.closest('.h-dvh')).toHaveAttribute(
+      'data-color-layer',
+      'raised',
+    );
+    expect(heading.closest('header')).toHaveClass(
+      'text-foreground',
+    );
+    expect(heading.closest('header')).not.toHaveClass('border-b');
+    expect(screen.queryByText(robot.id)).not.toBeInTheDocument();
+    expect(screen.queryByText(robot.serialNumber ?? '')).not.toBeInTheDocument();
     expect(screen.queryByText('전체 화면 관제')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '모니터링으로 돌아가기' })).toHaveAttribute(
+    const exitLink = screen.getByRole('link', { name: '영상 관제 나가기' });
+    expect(exitLink).toHaveClass(
+      'bg-action-danger',
+      'text-action-on-fill',
+      'rounded-[var(--design-radius-control)]',
+      'border-0',
+    );
+    expect(exitLink).toHaveTextContent('나가기');
+    expect(exitLink).toHaveAttribute(
       'href',
       '/control/monitoring?siteId=pangyo-army-ax-hub',
     );
