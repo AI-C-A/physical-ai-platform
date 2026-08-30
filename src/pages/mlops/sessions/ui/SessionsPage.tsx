@@ -30,11 +30,13 @@ import {
 import { collectAllPages } from '@/shared/lib/query';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -333,8 +335,7 @@ export function SessionsPage() {
         </Panel>
       )}
       {recordExport.error === null ? null : <ErrorMessage>{recordExport.error}</ErrorMessage>}
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <PageToolbar aria-label="수집 세션 필터">
           <Input
             label="수집 세션 검색"
             onChange={(event) => updateParam('search', event.target.value)}
@@ -408,18 +409,23 @@ export function SessionsPage() {
             ]}
             value={sort}
           />
-        </div>
-      </Panel>
+      </PageToolbar>
 
-      {sessions.isRefreshing ? (
-        <QueryFeedback kind="loading" />
-      ) : null}
-      {sessions.data.items.length === 0 ? (
-        sessions.isRefreshing ? null : (
-          <QueryFeedback kind="empty" message="조건에 맞는 수집 세션이 없습니다." />
-        )
-      ) : (
-        <>
+      <DataView
+        footer={sessions.data.items.length === 0 ? undefined : (
+          <Pagination
+            isPending={sessions.isRefreshing}
+            onPageChange={(value) => updateParam('page', String(value))}
+            page={sessions.data.page}
+            pageSize={sessions.data.pageSize}
+            totalItems={sessions.data.totalItems}
+          />
+        )}
+        message="조건에 맞는 수집 세션이 없습니다."
+        state={sessions.data.items.length === 0 && !sessions.isRefreshing ? 'empty' : 'ready'}
+      >
+        {sessions.isRefreshing ? <QueryFeedback kind="loading" /> : null}
+        {sessions.data.items.length === 0 ? null : (
           <Table aria-label="수집 세션 목록">
             <TableHeader>
               <TableRow>
@@ -438,7 +444,7 @@ export function SessionsPage() {
                     <Link className="font-semibold underline" to={appendPathSegment('/mlops/sessions', session.id)}>
                       {session.name}
                     </Link>
-                    <span className="block text-xs text-neutral-500">{session.id}</span>
+                    <span className="block text-xs text-muted">{session.id}</span>
                   </TableCell>
                   <TableCell>{session.robotId}</TableCell>
                   <TableCell>
@@ -459,15 +465,8 @@ export function SessionsPage() {
               ))}
             </TableBody>
           </Table>
-          <Pagination
-            isPending={sessions.isRefreshing}
-            onPageChange={(value) => updateParam('page', String(value))}
-            page={sessions.data.page}
-            pageSize={sessions.data.pageSize}
-            totalItems={sessions.data.totalItems}
-          />
-        </>
-      )}
+        )}
+      </DataView>
     </div>
   );
 }

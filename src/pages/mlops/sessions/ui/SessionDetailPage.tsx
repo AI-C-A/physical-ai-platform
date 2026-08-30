@@ -21,10 +21,10 @@ import { appendPathSegment, decodePathSegment } from '@/shared/lib/navigation';
 import { Badge } from '@/shared/ui/badge';
 import { Breadcrumb } from '@/shared/ui/breadcrumb';
 import { Button } from '@/shared/ui/button';
+import { DetailPane } from '@/shared/ui/detail-pane';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { PageHeader } from '@/shared/ui/page-header';
-import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import {
   Table,
@@ -97,37 +97,37 @@ export function SessionDetailPage() {
       </Link>
 
       {result.refreshError === null ? null : (
-        <Panel title="최신 수집 세션 정보를 반영하지 못했습니다">
+        <DetailPane title="최신 수집 세션 정보를 반영하지 못했습니다">
           <ErrorMessage>기존 상세 정보를 유지했습니다. {result.refreshError}</ErrorMessage>
           <Button className="mt-4" onClick={result.retry} variant="secondary">
             다시 불러오기
           </Button>
-        </Panel>
+        </DetailPane>
       )}
 
       {session.lastError === null ? null : (
-        <Panel title="수집 실패 원인">
+        <DetailPane title="수집 실패 원인">
           <ErrorMessage>{session.lastError}</ErrorMessage>
-        </Panel>
+        </DetailPane>
       )}
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <Panel title="대상과 출처">
+        <DetailPane title="대상과 출처">
           <dl className="grid gap-3 sm:grid-cols-2">
-            <div><dt className="text-xs text-neutral-500">로봇</dt><dd>{session.robotId}</dd></div>
-            <div><dt className="text-xs text-neutral-500">센서 장치</dt><dd>{session.sensorDeviceId}</dd></div>
-            <div><dt className="text-xs text-neutral-500">실행 환경</dt><dd>{getExecutionEnvironmentLabel(session.provenance.environment)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">전달 방식</dt><dd>{getDeliveryModeLabel(session.provenance.deliveryMode)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">제어 방식</dt><dd>{getControlModeLabel(session.provenance.controlMode)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">데이터 출처</dt><dd>{getDataOriginLabel(session.provenance.dataOrigin)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">기록량</dt><dd>{formatBytes(session.bytesWritten)}</dd></div>
+            <div><dt className="text-xs text-muted">로봇</dt><dd>{session.robotId}</dd></div>
+            <div><dt className="text-xs text-muted">센서 장치</dt><dd>{session.sensorDeviceId}</dd></div>
+            <div><dt className="text-xs text-muted">실행 환경</dt><dd>{getExecutionEnvironmentLabel(session.provenance.environment)}</dd></div>
+            <div><dt className="text-xs text-muted">전달 방식</dt><dd>{getDeliveryModeLabel(session.provenance.deliveryMode)}</dd></div>
+            <div><dt className="text-xs text-muted">제어 방식</dt><dd>{getControlModeLabel(session.provenance.controlMode)}</dd></div>
+            <div><dt className="text-xs text-muted">데이터 출처</dt><dd>{getDataOriginLabel(session.provenance.dataOrigin)}</dd></div>
+            <div><dt className="text-xs text-muted">기록량</dt><dd>{formatBytes(session.bytesWritten)}</dd></div>
           </dl>
-        </Panel>
-        <Panel title="상태 이력">
+        </DetailPane>
+        <DetailPane title="상태 이력">
           <ol className="grid gap-2">
             {session.statusHistory.map((item, index) => (
               <li
-                className="flex items-center justify-between gap-3 border-b border-neutral-200 pb-2"
+                className="flex items-center justify-between gap-3 border-b border-border pb-2"
                 key={`${item.status}-${String(index)}`}
               >
                 <strong>{getCaptureSessionStatusLabel(item.status)}</strong>
@@ -135,17 +135,17 @@ export function SessionDetailPage() {
               </li>
             ))}
           </ol>
-        </Panel>
+        </DetailPane>
       </section>
 
       {session.preflight === null ? null : (
-        <Panel title="사전 점검">
+        <DetailPane title="사전 점검">
           <ul className="grid gap-2">
             {session.preflight.checks.map((check) => (
               <li className="flex items-start justify-between gap-3" key={check.id}>
                 <span>
                   <strong>{check.label}</strong>
-                  <span className="block text-sm text-neutral-600">{check.detail}</span>
+                  <span className="block text-sm text-muted">{check.detail}</span>
                 </span>
                 <Badge tone={check.state === 'passed' ? 'positive' : 'negative'}>
                   {getCapturePreflightStatusLabel(check.state)}
@@ -153,10 +153,10 @@ export function SessionDetailPage() {
               </li>
             ))}
           </ul>
-        </Panel>
+        </DetailPane>
       )}
 
-      <Panel title="스트림">
+      <DetailPane title="스트림">
         <Table aria-label="수집 세션 스트림 상태">
           <TableHeader>
             <TableRow>
@@ -181,7 +181,7 @@ export function SessionDetailPage() {
             ))}
           </TableBody>
         </Table>
-      </Panel>
+      </DetailPane>
 
       {session.episodeId === null ? null : (
         <Link className="inline-flex items-center gap-1 font-semibold underline" to={appendPathSegment('/mlops/episodes', session.episodeId)}>
