@@ -33,16 +33,16 @@ export function Dialog({
         <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger>
       )}
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-overlay" />
         <DialogPrimitive.Content
-          className="fixed top-1/2 left-1/2 z-50 max-h-[85vh] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-neutral-300 bg-white p-6 shadow-xl"
+          className="fixed top-1/2 left-1/2 z-50 max-h-[85vh] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-[var(--design-radius-surface)] border-0 bg-layer-floating p-6 text-foreground shadow-xl"
           onCloseAutoFocus={onCloseAutoFocus}
         >
-          <DialogPrimitive.Title className="text-lg font-bold text-neutral-950">
+          <DialogPrimitive.Title className="text-lg font-bold text-foreground">
             {title}
           </DialogPrimitive.Title>
           {description === undefined ? null : (
-            <DialogPrimitive.Description className="mt-2 text-sm text-neutral-600">
+            <DialogPrimitive.Description className="mt-2 text-sm text-muted">
               {description}
             </DialogPrimitive.Description>
           )}
