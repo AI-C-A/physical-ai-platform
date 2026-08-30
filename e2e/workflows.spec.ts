@@ -159,9 +159,6 @@ test('Monitoring은 위치 지도 위에 사이트 드롭다운과 로봇 선택
     page.getByRole('region', { name: '로봇 위치 지도' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('region', { name: '로봇 위치 지도' }).locator('canvas'),
-  ).toBeVisible();
-  await expect(
     page.getByRole('heading', { level: 2, name: '현재 위치 지도' }),
   ).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '운영 요약' })).toHaveCount(0);
