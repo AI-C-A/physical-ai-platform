@@ -14,10 +14,12 @@ import { Button } from '@/shared/ui/button';
 import { Chart } from '@/shared/ui/chart';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Select } from '@/shared/ui/select';
 import { Spinner } from '@/shared/ui/spinner';
+import { StatTile } from '@/shared/ui/stat-tile';
 
 const allRobotsOptionValue = 'filter:all';
 
@@ -162,10 +164,7 @@ export function BigDataOverviewPage() {
           <Button className="mt-4" onClick={overview.retry} variant="secondary">다시 불러오기</Button>
         </Panel>
       )}
-      <Panel
-        title="집계 조건"
-      >
-        <div className="grid gap-3 md:grid-cols-2">
+      <PageToolbar aria-label="집계 조건">
           <Select
             disabled={robots.status !== 'ready'}
             label="로봇"
@@ -189,26 +188,20 @@ export function BigDataOverviewPage() {
             ]}
             value={range}
           />
-        </div>
         {!hasExplicitRobotFilter && robots.status === 'loading' ? (
-          <Spinner className="mt-3" label="로봇 목록 불러오는 중" />
+          <Spinner label="로봇 목록 불러오는 중" />
         ) : null}
-      </Panel>
+      </PageToolbar>
 
       {overview.isRefreshing ? (
         <QueryFeedback kind="loading" />
       ) : null}
       <section aria-label="수집 운영 지표" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Panel><p className="text-sm text-neutral-600">수집 세션</p><strong className="mt-2 block text-2xl">{String(data.sessionCount)}</strong></Panel>
-        <Panel>
-          <p className="text-sm text-neutral-600">완료율</p>
-          <strong className="mt-2 block text-2xl">
-            {data.successRatePercent === null ? '—' : `${data.successRatePercent.toFixed(1)}%`}
-          </strong>
-        </Panel>
-        <Panel><p className="text-sm text-neutral-600">기록량</p><strong className="mt-2 block text-2xl">{formatBytes(data.bytesWritten)}</strong></Panel>
-        <Panel><p className="text-sm text-neutral-600">에피소드</p><strong className="mt-2 block text-2xl">{String(data.episodeCount)}</strong></Panel>
-        <Panel><p className="text-sm text-neutral-600">연결 데이터셋</p><strong className="mt-2 block text-2xl">{String(data.datasetCount)}</strong></Panel>
+        <StatTile emphasis="primary" label="수집 세션" value={String(data.sessionCount)} />
+        <StatTile label="완료율" value={data.successRatePercent === null ? '—' : `${data.successRatePercent.toFixed(1)}%`} />
+        <StatTile label="기록량" value={formatBytes(data.bytesWritten)} />
+        <StatTile label="에피소드" value={String(data.episodeCount)} />
+        <StatTile label="연결 데이터셋" value={String(data.datasetCount)} />
       </section>
 
       {data.sessionCount === 0 ? (

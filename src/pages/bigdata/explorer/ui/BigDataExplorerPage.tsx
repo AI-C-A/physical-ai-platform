@@ -51,6 +51,7 @@ import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -571,7 +572,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
 
   const operationsContent = (
     <div className="grid gap-4">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+      <PageToolbar aria-label="운영 기록 필터">
         <Select
           label="기록 종류"
           onValueChange={updateType}
@@ -652,7 +653,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
           </>
         ) : null}
         {rangeControls}
-      </div>
+      </PageToolbar>
       {supportsExecutionFilters
       && !operationRequiresRobotCatalog
       && robots.status === 'loading' ? (
@@ -671,11 +672,11 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
         </Panel>
       ) : null}
       {supportsExecutionFilters ? null : (
-        <p className="text-xs text-neutral-600" role="status">
+        <p className="text-xs text-muted" role="status">
           데이터셋에는 단일 로봇·실행 환경·전달 방식이 없으므로 해당 필터와 로봇별 그룹을 적용하지 않습니다.
         </p>
       )}
-      <p className="text-xs text-neutral-600">
+      <p className="text-xs text-muted">
         24시간·7일·30일은 조회 시각까지의 이동 기간입니다. 사용자 지정 날짜와 시각 표시는 브라우저 시간대({getDisplayTimeZoneLabel()})를 사용합니다.
       </p>
       {invalidRangeFeedback}
@@ -690,7 +691,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
             )
           ) : (
             <>
-          <p className="text-sm text-neutral-600" role="status">
+          <p className="text-sm text-muted" role="status">
             표시 중인 운영 기록 {String(operations.records.length)}건 전체를 내보내기에 반영하고, 표에는 현재 페이지 {String(pagedOperations.items.length)}건을 표시합니다.
           </p>
           {displayedOperationGroup === 'none' ? null : (
@@ -772,7 +773,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
     />
   ) : (
     <div className="grid gap-4">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <PageToolbar aria-label="텔레메트리 집계 필터">
         <Select
           label="로봇"
           onValueChange={(value) => updateRobot('robotId', value)}
@@ -801,8 +802,8 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
             ? '집계 결과 없음'
             : `${String(telemetry.bucketMs / 1000)}초 · ${String(telemetry.displayedPointCount)}개 표시`}
         />
-      </div>
-      <p className="text-xs text-neutral-600">날짜 기준: {getDisplayTimeZoneLabel()}</p>
+      </PageToolbar>
+      <p className="text-xs text-muted">날짜 기준: {getDisplayTimeZoneLabel()}</p>
       {invalidRangeFeedback}
       {hasInvalidRange ? null : (
         <>
@@ -823,7 +824,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
               data={chartData}
             />
           </Panel>
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-muted">
             차트와 내보내기는 집계점 {String(telemetry.points.length)}개 전체를 사용하며, 표는 최근 {String(Math.min(20, telemetry.points.length))}개를 역순으로 표시합니다.
           </p>
           <Table aria-label="텔레메트리 집계점 목록">
