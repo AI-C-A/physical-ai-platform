@@ -553,8 +553,8 @@ export function CapturePage() {
           />
         </div> : null) : (
           <dl className="grid gap-3 md:grid-cols-2">
-            <div><dt className="text-xs text-neutral-500">로봇</dt><dd>{captureRobot?.displayName ?? session.robotId}</dd></div>
-            <div><dt className="text-xs text-neutral-500">센서 장치 / 리그</dt><dd>{captureSensor?.displayName ?? session.sensorDeviceId}</dd></div>
+            <div><dt className="text-xs text-muted">로봇</dt><dd>{captureRobot?.displayName ?? session.robotId}</dd></div>
+            <div><dt className="text-xs text-muted">센서 장치 / 리그</dt><dd>{captureSensor?.displayName ?? session.sensorDeviceId}</dd></div>
           </dl>
         )}
       </Panel>
@@ -671,7 +671,7 @@ export function CapturePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold">카메라 스트림</h2>
-              <p className="text-sm text-neutral-600">
+              <p className="text-sm text-muted">
                 화면을 선택해 크게 보고 소스별 연결 상태를 확인합니다.
               </p>
             </div>
@@ -698,7 +698,7 @@ export function CapturePage() {
             >
               <div>
                 <strong>{session.name}</strong>
-                <p className="text-sm text-neutral-600">{session.id}</p>
+                <p className="text-sm text-muted">{session.id}</p>
               </div>
               <Badge tone={getStatusTone(session.status)}>
                 {getCaptureSessionStatusLabel(session.status)}
@@ -784,7 +784,7 @@ export function CapturePage() {
                     >
                       <span>
                         <strong>{check.label}</strong>
-                        <span className="block text-sm text-neutral-600">
+                        <span className="block text-sm text-muted">
                           {check.detail}
                         </span>
                       </span>
@@ -801,7 +801,7 @@ export function CapturePage() {
           </Panel>
 
           <Panel title="스트림 기록 상태">
-            <p className="mb-3 text-sm text-neutral-600">
+            <p className="mb-3 text-sm text-muted">
               누적 {formatBytes(session.bytesWritten)} ·{' '}
               {getExecutionProvenanceLabel(session.provenance)}
             </p>
