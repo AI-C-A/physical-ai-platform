@@ -21,7 +21,7 @@ export function SitesPage() {
     <div className="grid gap-6">
       <PageHeader
         actions={
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             등록 사이트 {monitoringSites.length}개
           </p>
         }
@@ -41,10 +41,10 @@ export function SitesPage() {
           {monitoringSites.map((site) => (
             <TableRow key={site.id}>
               <TableCell>
-                <strong className="block font-semibold text-neutral-950">
+                <strong className="block font-semibold text-foreground">
                   {site.displayName}
                 </strong>
-                <span className="block text-xs text-neutral-500">
+                <span className="block text-xs text-muted">
                   {site.id}
                 </span>
               </TableCell>
@@ -55,14 +55,14 @@ export function SitesPage() {
                 {site.environment === 'indoor' ? (
                   <>
                     <span className="block">3D 모델</span>
-                    <span className="block max-w-md truncate text-xs text-neutral-500">
+                    <span className="block max-w-md truncate text-xs text-muted">
                       {site.mapUrl}
                     </span>
                   </>
                 ) : (
                   <>
                     <span className="block">지도 중심 좌표</span>
-                    <span className="block text-xs text-neutral-500">
+                    <span className="block text-xs text-muted">
                       {site.mapCenter.latitude}, {site.mapCenter.longitude}
                     </span>
                   </>
