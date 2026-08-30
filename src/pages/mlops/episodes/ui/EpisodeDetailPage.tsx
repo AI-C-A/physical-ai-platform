@@ -17,10 +17,10 @@ import { appendPathSegment, decodePathSegment } from '@/shared/lib/navigation';
 import { Badge } from '@/shared/ui/badge';
 import { Breadcrumb } from '@/shared/ui/breadcrumb';
 import { Button } from '@/shared/ui/button';
+import { DetailPane } from '@/shared/ui/detail-pane';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { PageHeader } from '@/shared/ui/page-header';
-import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import {
   Table,
@@ -95,42 +95,42 @@ export function EpisodeDetailPage() {
       </Link>
 
       {result.refreshError === null ? null : (
-        <Panel title="최신 에피소드 정보를 반영하지 못했습니다">
+        <DetailPane title="최신 에피소드 정보를 반영하지 못했습니다">
           <ErrorMessage>
             기존 에피소드 정보는 유지했습니다. {result.refreshError}
           </ErrorMessage>
           <Button className="mt-4" onClick={result.retry} variant="secondary">
             다시 불러오기
           </Button>
-        </Panel>
+        </DetailPane>
       )}
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <Panel title="출처">
+        <DetailPane title="출처">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-neutral-500">수집 세션</dt>
+              <dt className="text-xs text-muted">수집 세션</dt>
               <dd><Link className="underline" to={appendPathSegment('/mlops/sessions', episode.captureSessionId)}>{episode.captureSessionId}</Link></dd>
             </div>
-            <div><dt className="text-xs text-neutral-500">로봇</dt><dd>{episode.robotId}</dd></div>
-            <div><dt className="text-xs text-neutral-500">센서 장치</dt><dd>{episode.sensorDeviceId}</dd></div>
-            <div><dt className="text-xs text-neutral-500">통합 프로필</dt><dd>{episode.integrationProfileId}</dd></div>
+            <div><dt className="text-xs text-muted">로봇</dt><dd>{episode.robotId}</dd></div>
+            <div><dt className="text-xs text-muted">센서 장치</dt><dd>{episode.sensorDeviceId}</dd></div>
+            <div><dt className="text-xs text-muted">통합 프로필</dt><dd>{episode.integrationProfileId}</dd></div>
           </dl>
-        </Panel>
-        <Panel title="요약">
+        </DetailPane>
+        <DetailPane title="요약">
           <dl className="grid gap-3 sm:grid-cols-2">
-            <div><dt className="text-xs text-neutral-500">생성 시각</dt><dd>{formatDateTime(episode.createdAtMs)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">길이</dt><dd>{formatDuration(episode.durationMs)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">기록량</dt><dd>{formatBytes(episode.bytesWritten)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">실행 환경</dt><dd>{getExecutionEnvironmentLabel(episode.provenance.environment)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">전달 방식</dt><dd>{getDeliveryModeLabel(episode.provenance.deliveryMode)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">제어 방식</dt><dd>{getControlModeLabel(episode.provenance.controlMode)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">데이터 출처</dt><dd>{getDataOriginLabel(episode.provenance.dataOrigin)}</dd></div>
+            <div><dt className="text-xs text-muted">생성 시각</dt><dd>{formatDateTime(episode.createdAtMs)}</dd></div>
+            <div><dt className="text-xs text-muted">길이</dt><dd>{formatDuration(episode.durationMs)}</dd></div>
+            <div><dt className="text-xs text-muted">기록량</dt><dd>{formatBytes(episode.bytesWritten)}</dd></div>
+            <div><dt className="text-xs text-muted">실행 환경</dt><dd>{getExecutionEnvironmentLabel(episode.provenance.environment)}</dd></div>
+            <div><dt className="text-xs text-muted">전달 방식</dt><dd>{getDeliveryModeLabel(episode.provenance.deliveryMode)}</dd></div>
+            <div><dt className="text-xs text-muted">제어 방식</dt><dd>{getControlModeLabel(episode.provenance.controlMode)}</dd></div>
+            <div><dt className="text-xs text-muted">데이터 출처</dt><dd>{getDataOriginLabel(episode.provenance.dataOrigin)}</dd></div>
           </dl>
-        </Panel>
+        </DetailPane>
       </section>
 
-      <Panel title="스트림 요약">
+      <DetailPane title="스트림 요약">
         <Table aria-label="에피소드 스트림 요약">
           <TableHeader>
             <TableRow>
@@ -149,7 +149,7 @@ export function EpisodeDetailPage() {
             ))}
           </TableBody>
         </Table>
-      </Panel>
+      </DetailPane>
     </div>
   );
 }

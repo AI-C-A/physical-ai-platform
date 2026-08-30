@@ -26,11 +26,13 @@ import {
 } from '@/shared/lib/record-export';
 import { collectAllPages } from '@/shared/lib/query';
 import { Button } from '@/shared/ui/button';
+import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -240,8 +242,7 @@ export function EpisodesPage() {
         </Panel>
       )}
       {recordExport.error === null ? null : <ErrorMessage>{recordExport.error}</ErrorMessage>}
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <PageToolbar aria-label="에피소드 필터">
           <Input
             label="에피소드 검색"
             onChange={(event) => update('search', event.target.value)}
@@ -292,18 +293,23 @@ export function EpisodesPage() {
             ]}
             value={sort}
           />
-        </div>
-      </Panel>
+      </PageToolbar>
 
-      {episodes.isRefreshing ? (
-        <QueryFeedback kind="loading" />
-      ) : null}
-      {episodes.data.items.length === 0 ? (
-        episodes.isRefreshing ? null : (
-          <QueryFeedback kind="empty" message="조건에 맞는 에피소드가 없습니다." />
-        )
-      ) : (
-        <>
+      <DataView
+        footer={episodes.data.items.length === 0 ? undefined : (
+          <Pagination
+            isPending={episodes.isRefreshing}
+            onPageChange={(value) => update('page', String(value))}
+            page={episodes.data.page}
+            pageSize={episodes.data.pageSize}
+            totalItems={episodes.data.totalItems}
+          />
+        )}
+        message="조건에 맞는 에피소드가 없습니다."
+        state={episodes.data.items.length === 0 && !episodes.isRefreshing ? 'empty' : 'ready'}
+      >
+        {episodes.isRefreshing ? <QueryFeedback kind="loading" /> : null}
+        {episodes.data.items.length === 0 ? null : (
           <Table aria-label="에피소드 목록">
             <TableHeader>
               <TableRow>
@@ -323,7 +329,7 @@ export function EpisodesPage() {
                     <Link className="font-semibold underline" to={appendPathSegment('/mlops/episodes', episode.id)}>
                       {episode.name}
                     </Link>
-                    <span className="block text-xs text-neutral-500">{episode.id}</span>
+                    <span className="block text-xs text-muted">{episode.id}</span>
                   </TableCell>
                   <TableCell>{episode.robotId}</TableCell>
                   <TableCell>{getExecutionProvenanceLabel(episode.provenance)}</TableCell>
@@ -339,15 +345,8 @@ export function EpisodesPage() {
               ))}
             </TableBody>
           </Table>
-          <Pagination
-            isPending={episodes.isRefreshing}
-            onPageChange={(value) => update('page', String(value))}
-            page={episodes.data.page}
-            pageSize={episodes.data.pageSize}
-            totalItems={episodes.data.totalItems}
-          />
-        </>
-      )}
+        )}
+      </DataView>
     </div>
   );
 }
