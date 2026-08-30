@@ -59,8 +59,8 @@ function readStatusSnapshot(event) {
 }
 
 /**
- * Gateway 상태 stream의 전이만 운영 이벤트로 축적한다.
- * 동일 상태의 반복 poll은 이벤트를 만들지 않고, process lifetime 동안 최근 항목만 유지한다.
+ * 상태 polling 결과의 전이만 운영 이벤트로 축적한다.
+ * 동일 상태의 반복 조회는 이벤트를 만들지 않고, 게이트웨이 실행 중 최근 항목만 유지한다.
  */
 export function createRobotEventLog(options) {
   if (typeof options?.statusPolling?.subscribe !== 'function') {
@@ -116,7 +116,7 @@ export function createRobotEventLog(options) {
       try {
         listener(event);
       } catch {
-        // 한 event stream client의 오류가 수집과 다른 client 전송을 막지 않게 격리한다.
+        // 한 구독자에게 전송하지 못해도 수집과 다른 구독자 전송은 계속한다.
       }
     }
   }

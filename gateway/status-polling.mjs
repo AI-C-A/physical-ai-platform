@@ -15,8 +15,8 @@ function createPublicPollingFailure(robotId, lastSuccessfulAtMs) {
 }
 
 /**
- * 같은 Robot을 보는 모든 SSE client가 하나의 upstream poll을 공유한다.
- * 마지막 client가 나가면 poll timer를 멈추고, 다시 연결되면 즉시 최신 상태를 확인한다.
+ * 같은 Robot을 구독하는 모든 SSE 연결은 Patrol API polling 하나를 공유한다.
+ * 마지막 구독이 해제되면 timer를 멈추고, 새 구독이 생기면 즉시 최신 상태를 확인한다.
  */
 export function createStatusPollingService(options) {
   const loadStatus = options.loadStatus;
@@ -63,7 +63,7 @@ export function createStatusPollingService(options) {
       try {
         listener(event);
       } catch {
-        // 한 client의 socket 오류가 다른 SSE client의 갱신을 막지 않게 격리한다.
+        // 한 SSE 응답의 쓰기 오류가 다른 구독자의 갱신을 막지 않게 격리한다.
       }
     }
   }
