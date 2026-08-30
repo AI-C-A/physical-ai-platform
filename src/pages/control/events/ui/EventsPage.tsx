@@ -17,9 +17,11 @@ import { useClock } from '@/shared/lib/clock';
 import { formatDateTime } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { DataView } from '@/shared/ui/data-view';
 import { Dialog } from '@/shared/ui/dialog';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { PageHeader } from '@/shared/ui/page-header';
+import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
@@ -208,8 +210,7 @@ export function EventsPage() {
           <Button className="mt-4" onClick={retryEvents} variant="secondary">다시 불러오기</Button>
         </Panel>
       )}
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-3">
+      <PageToolbar aria-label="이벤트 필터">
           <Select
             label="유형"
             onValueChange={(value) => updateParam('type', value)}
@@ -248,24 +249,29 @@ export function EventsPage() {
             ]}
             value={range}
           />
-        </div>
-      </Panel>
+      </PageToolbar>
       <section
         aria-label="이벤트 결과 영역"
-        className="grid gap-6 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+        className="grid gap-6 rounded-[var(--design-radius-surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         ref={resultsRegionRef}
         tabIndex={-1}
       >
-        {events.isRefreshing ? (
-          <QueryFeedback kind="loading" />
-        ) : null}
-        {events.data.items.length === 0 ? (
-          events.isRefreshing ? null : (
-            <QueryFeedback kind="empty" message="조건에 맞는 이벤트가 없습니다." />
-          )
-        ) : (
-          <>
-          <Table aria-label="로봇 이벤트 목록">
+        <DataView
+          footer={events.data.items.length === 0 ? undefined : (
+            <Pagination
+              isPending={events.isRefreshing}
+              onPageChange={(value) => updateParam('page', String(value))}
+              page={events.data.page}
+              pageSize={events.data.pageSize}
+              totalItems={events.data.totalItems}
+            />
+          )}
+          message="조건에 맞는 이벤트가 없습니다."
+          state={events.data.items.length === 0 && !events.isRefreshing ? 'empty' : 'ready'}
+        >
+          {events.isRefreshing ? <QueryFeedback kind="loading" /> : null}
+          {events.data.items.length === 0 ? null : (
+            <Table aria-label="로봇 이벤트 목록">
             <TableHeader>
               <TableRow>
                 <TableHead>시각</TableHead>
@@ -286,7 +292,7 @@ export function EventsPage() {
                   </TableCell>
                   <TableCell>
                     {robotNames.get(event.robotId) ?? event.robotId}
-                    <span className="block text-xs text-neutral-500">
+                    <span className="block text-xs text-muted">
                       {event.robotId}
                     </span>
                   </TableCell>
@@ -306,16 +312,9 @@ export function EventsPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-          <Pagination
-            isPending={events.isRefreshing}
-            onPageChange={(value) => updateParam('page', String(value))}
-            page={events.data.page}
-            pageSize={events.data.pageSize}
-            totalItems={events.data.totalItems}
-          />
-          </>
-        )}
+            </Table>
+          )}
+        </DataView>
       </section>
       {selectedEvent === null ? null : (
         <Dialog
@@ -328,15 +327,15 @@ export function EventsPage() {
         >
           <dl className="grid gap-3">
             <div>
-              <dt className="text-xs text-neutral-500">로봇</dt>
+              <dt className="text-xs text-muted">로봇</dt>
               <dd>{robotNames.get(selectedEvent.robotId) ?? selectedEvent.robotId}</dd>
             </div>
             <div>
-              <dt className="text-xs text-neutral-500">발생 시각</dt>
+              <dt className="text-xs text-muted">발생 시각</dt>
               <dd>{formatDateTime(selectedEvent.occurredAtMs)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-neutral-500">내용</dt>
+              <dt className="text-xs text-muted">내용</dt>
               <dd>{selectedEvent.detail}</dd>
             </div>
           </dl>
