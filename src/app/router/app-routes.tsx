@@ -62,6 +62,9 @@ const SessionDetailPage = lazy(async () => ({
 const SessionsPage = lazy(async () => ({
   default: (await import('@/pages/mlops/sessions')).SessionsPage,
 }));
+const SettingsPage = lazy(async () => ({
+  default: (await import('@/pages/platform/settings')).SettingsPage,
+}));
 export const APP_ROUTES: RouteObject[] = [
   {
     path: ROUTE_PATHS.root,
@@ -89,6 +92,7 @@ export const APP_ROUTES: RouteObject[] = [
       { path: ROUTE_PATHS.controlCoordinates, element: <CoordinatesPage /> },
       { path: ROUTE_PATHS.controlEvents, element: <EventsPage /> },
       { path: ROUTE_PATHS.controlReports, element: <ReportsPage /> },
+      { path: ROUTE_PATHS.controlSettings, element: <SettingsPage /> },
       { path: ROUTE_PATHS.mlopsSessions, element: <SessionsPage /> },
       {
         path: ROUTE_PATHS.mlopsSessionDetail,
@@ -106,6 +110,7 @@ export const APP_ROUTES: RouteObject[] = [
         path: ROUTE_PATHS.mlopsDatasetDetail,
         element: <DatasetDetailPage />,
       },
+      { path: ROUTE_PATHS.mlopsSettings, element: <SettingsPage /> },
       {
         path: ROUTE_PATHS.bigdataOverview,
         element: <BigDataOverviewPage />,
@@ -114,6 +119,7 @@ export const APP_ROUTES: RouteObject[] = [
         path: ROUTE_PATHS.bigdataExplorer,
         element: <BigDataExplorerPage />,
       },
+      { path: ROUTE_PATHS.bigdataSettings, element: <SettingsPage /> },
       {
         path: '*',
         element: (

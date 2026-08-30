@@ -11,6 +11,10 @@ export {
 } from './api/patrol-robot-adapters';
 export { createUnconfiguredPatrolApiStatus } from './api/unconfigured-patrol-api-status';
 export {
+  PatrolApiStatusContext,
+  usePatrolApiStatusPort,
+} from './model/patrol-api-status-context';
+export {
   RobotCatalogContext,
   useRobotCatalogPort,
 } from './model/robot-catalog-context';

@@ -5,6 +5,7 @@ import { CaptureOperationsContext } from '@/entities/capture-session';
 import { DatasetRepositoryContext } from '@/entities/dataset';
 import { EpisodeRepositoryContext } from '@/entities/episode';
 import {
+  PatrolApiStatusContext,
   RobotCatalogContext,
   RobotOperationalStatusContext,
 } from '@/entities/robot';
@@ -52,7 +53,8 @@ export function AppProviders({
   return (
     <BrandingContext.Provider value={branding}>
       <ClockContext.Provider value={services.clock}>
-      <RobotCatalogContext.Provider value={services.robotCatalog}>
+      <PatrolApiStatusContext.Provider value={services.patrolApiStatus}>
+        <RobotCatalogContext.Provider value={services.robotCatalog}>
         <RobotOperationalStatusContext.Provider value={services.robotOperationalStatus}>
         <SensorDeviceCatalogContext.Provider
           value={services.sensorDeviceCatalog}
@@ -80,7 +82,8 @@ export function AppProviders({
           </RobotTelemetryContext.Provider>
         </SensorDeviceCatalogContext.Provider>
         </RobotOperationalStatusContext.Provider>
-      </RobotCatalogContext.Provider>
+        </RobotCatalogContext.Provider>
+      </PatrolApiStatusContext.Provider>
       </ClockContext.Provider>
     </BrandingContext.Provider>
   );

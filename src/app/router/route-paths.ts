@@ -8,6 +8,7 @@ export const ROUTE_PATHS = {
   controlCoordinates: '/control/coordinates',
   controlEvents: '/control/events',
   controlReports: '/control/reports',
+  controlSettings: '/control/settings',
   mlopsCapture: '/mlops/capture',
   mlopsSessions: '/mlops/sessions',
   mlopsSessionDetail: '/mlops/sessions/:sessionId',
@@ -16,6 +17,8 @@ export const ROUTE_PATHS = {
   mlopsDatasets: '/mlops/datasets',
   mlopsNewDataset: '/mlops/datasets/new',
   mlopsDatasetDetail: '/mlops/datasets/:datasetId',
+  mlopsSettings: '/mlops/settings',
   bigdataOverview: '/bigdata/overview',
   bigdataExplorer: '/bigdata/explorer',
+  bigdataSettings: '/bigdata/settings',
 } as const;

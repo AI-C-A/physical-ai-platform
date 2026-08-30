@@ -61,6 +61,9 @@ describe('App routes', () => {
     ['/control/sites', '사이트 관리'],
     ['/control/coordinates', '경로·좌표 관리'],
     ['/control/reports', '리포트'],
+    ['/control/settings', '설정'],
+    ['/mlops/settings', '설정'],
+    ['/bigdata/settings', '설정'],
   ])('%s 경로에서 %s 화면을 렌더링한다', async (path, heading) => {
     renderRoute(path);
     expect(
