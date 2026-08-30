@@ -1,11 +1,26 @@
 import type { HTMLAttributes, TableHTMLAttributes } from 'react';
 
-export function Table(props: TableHTMLAttributes<HTMLTableElement>) {
+import { cn } from '@/shared/ui/class-names';
+
+interface TableProps extends TableHTMLAttributes<HTMLTableElement> {
+  readonly containerClassName?: string;
+  readonly density?: 'compact' | 'normal';
+}
+
+export function Table({
+  containerClassName,
+  density = 'compact',
+  ...props
+}: TableProps) {
   const ariaLabel = props['aria-label'];
   return (
     <div
       aria-label={`${ariaLabel ?? '표'} 가로 스크롤 영역`}
-      className="w-full overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+      className={cn(
+        'w-full overflow-x-auto rounded-[var(--design-radius-surface)] border-0 bg-layer-raised text-foreground shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        containerClassName,
+      )}
+      data-density={density}
       role="region"
       tabIndex={0}
     >
@@ -15,21 +30,21 @@ export function Table(props: TableHTMLAttributes<HTMLTableElement>) {
 }
 
 export function TableHeader(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="bg-neutral-50 text-neutral-700" {...props} />;
+  return <thead className="bg-surface-muted/70 text-muted" {...props} />;
 }
 
 export function TableBody(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className="divide-y divide-neutral-200" {...props} />;
+  return <tbody className="divide-y divide-border" {...props} />;
 }
 
 export function TableRow(props: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className="hover:bg-neutral-50" {...props} />;
+  return <tr className="hover:bg-surface-muted" {...props} />;
 }
 
 export function TableHead(props: HTMLAttributes<HTMLTableCellElement>) {
-  return <th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col" {...props} />;
+  return <th className="h-[var(--layout-data-row-height)] whitespace-nowrap px-4 py-2 font-semibold" scope="col" {...props} />;
 }
 
 export function TableCell(props: HTMLAttributes<HTMLTableCellElement>) {
-  return <td className="whitespace-nowrap px-4 py-3 text-neutral-800" {...props} />;
+  return <td className="h-[var(--layout-data-row-height)] whitespace-nowrap px-4 py-2 text-foreground" {...props} />;
 }
