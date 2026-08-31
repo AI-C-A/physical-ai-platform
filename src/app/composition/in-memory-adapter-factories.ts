@@ -5,6 +5,7 @@ import {
 } from '@/entities/capture-session';
 import { createInMemoryDatasetRepository, type DatasetRepositoryPort } from '@/entities/dataset';
 import { createInMemoryEpisodeRepository, type EpisodeRepositoryPort } from '@/entities/episode';
+import { createInMemoryFlywheel, type FlywheelPort } from '@/entities/flywheel';
 import {
   createInMemoryInterventionRequests,
   InMemoryInterventionQueue,
@@ -43,6 +44,7 @@ export interface InMemoryCoreAdapterBundle {
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly flywheel: FlywheelPort;
   readonly interventionQueue: InterventionQueuePort;
   readonly robotEventRepository: RobotEventRepositoryPort;
 }
@@ -88,6 +90,7 @@ export function createInMemoryAdapterFactories(
       })),
       datasetRepository: () => createInMemoryDatasetRepository(clock),
       episodeRepository: () => createInMemoryEpisodeRepository(clock),
+      flywheel: () => own(createInMemoryFlywheel(clock)),
       interventionQueue: () => new InMemoryInterventionQueue(
         createInMemoryInterventionRequests(clock),
       ),

@@ -65,6 +65,7 @@ function toBundle(services: ApplicationServices): AdapterBundle {
     captureOperations: services.captureOperations,
     datasetRepository: services.datasetRepository,
     episodeRepository: services.episodeRepository,
+    flywheel: services.flywheel,
     interventionQueue: services.interventionQueue,
     robotEventRepository: services.robotEventRepository,
     analytics: services.analytics,

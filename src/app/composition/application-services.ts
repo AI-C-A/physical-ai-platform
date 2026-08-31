@@ -2,6 +2,7 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
+import type { FlywheelPort } from '@/entities/flywheel';
 import type { InterventionQueuePort } from '@/entities/intervention';
 import {
   createUnconfiguredPatrolApiStatus,
@@ -38,6 +39,7 @@ export interface ApplicationServices {
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly flywheel: FlywheelPort;
   readonly interventionQueue: InterventionQueuePort;
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly analytics: AnalyticsPort;
@@ -74,6 +76,7 @@ const adapterServiceNames = [
   'captureOperations',
   'datasetRepository',
   'episodeRepository',
+  'flywheel',
   'interventionQueue',
   'robotEventRepository',
   'analytics',
@@ -258,6 +261,7 @@ export function createApplicationServices(
       captureOperations,
       robotEventRepository,
       episodeRepository,
+      flywheel: inMemoryAdapters.factories.flywheel(),
       interventionQueue,
       datasetRepository,
     };

@@ -1,0 +1,65 @@
+import type { FlywheelPort } from '../model/flywheel';
+
+const unavailableMessage = '이 실행 환경에서는 지원하지 않는 작업입니다.';
+const empty = <T>(): Promise<readonly T[]> => Promise.resolve([]);
+const reject = <T>(): Promise<T> => Promise.reject(new Error(unavailableMessage));
+const noOp = (): void => undefined;
+
+export function createUnavailableFlywheel(): FlywheelPort {
+  return {
+    listProjects: empty,
+    listTemplates: empty,
+    listSessions: empty,
+    getSession: () => Promise.resolve(null),
+    createHumanoidSession: reject,
+    createMobilitySession: reject,
+    validateSession: reject,
+    startSession: reject,
+    stopSession: reject,
+    startEpisode: reject,
+    completeEpisode: reject,
+    setMobilityControlMode: reject,
+    listEpisodes: empty,
+    getEpisode: () => Promise.resolve(null),
+    listDriveSessions: empty,
+    getDriveSession: () => Promise.resolve(null),
+    listInterventions: empty,
+    getIntervention: () => Promise.resolve(null),
+    updateIntervention: reject,
+    listAnnotationTasks: empty,
+    createAnnotationTask: reject,
+    updateAnnotationTask: reject,
+    listQualityRuns: empty,
+    getQualityRun: () => Promise.resolve(null),
+    runQualityCheck: reject,
+    listDatasets: empty,
+    getDataset: () => Promise.resolve(null),
+    createDataset: reject,
+    releaseDataset: reject,
+    listComputeResources: empty,
+    listTrainingRuns: empty,
+    getTrainingRun: () => Promise.resolve(null),
+    createTrainingRun: reject,
+    cancelTrainingRun: reject,
+    listEvaluationRuns: empty,
+    getEvaluationRun: () => Promise.resolve(null),
+    createEvaluationRun: reject,
+    listModelVersions: empty,
+    getModelVersion: () => Promise.resolve(null),
+    updateModelStage: reject,
+    listDeployments: empty,
+    getDeployment: () => Promise.resolve(null),
+    createDeployment: reject,
+    rollbackDeployment: reject,
+    listInferenceSessions: empty,
+    getInferenceSession: () => Promise.resolve(null),
+    getOverview: () => Promise.resolve({
+      episodeCount: 0, driveHours: 0, validDataPercent: 0, taskSuccessPercent: 0,
+      autonomyPercent: 0, interventionsPerKm: 0, releasedDatasetCount: 0, activeDeploymentCount: 0,
+    }),
+    listFailureClusters: empty,
+    getLineage: () => Promise.resolve({ nodes: [], edges: [] }),
+    subscribe: () => noOp,
+    dispose: noOp,
+  };
+}

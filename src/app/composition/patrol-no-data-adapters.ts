@@ -2,6 +2,7 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
+import { createUnavailableFlywheel, type FlywheelPort } from '@/entities/flywheel';
 import {
   createUnavailableInterventionQueue,
   type InterventionQueuePort,
@@ -24,6 +25,7 @@ interface PatrolNoDataAdapters {
   readonly captureOperations: CaptureOperationsPort;
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly flywheel: FlywheelPort;
   readonly interventionQueue: InterventionQueuePort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly analytics: AnalyticsPort;
@@ -111,7 +113,7 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     }),
     subscribe: () => noOpUnsubscribe,
   };
-
+  const flywheel = createUnavailableFlywheel();
   const interventionQueue = createUnavailableInterventionQueue();
 
   return {
@@ -121,6 +123,7 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     captureOperations,
     robotEventRepository,
     episodeRepository,
+    flywheel,
     interventionQueue,
     datasetRepository,
     analytics,

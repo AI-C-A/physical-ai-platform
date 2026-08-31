@@ -33,6 +33,11 @@ const robots: readonly RobotDescriptor[] = definitions.map(
     name: displayName,
     displayName,
     integrationProfileId,
+    robotType: integrationProfileId.startsWith('humanoid')
+      ? 'humanoid'
+      : integrationProfileId.startsWith('quadruped')
+        ? 'quadruped'
+        : 'mobile',
   }),
 );
 

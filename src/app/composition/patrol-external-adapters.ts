@@ -33,6 +33,7 @@ export const createPatrolExternalAdapters: ExternalAdapterFactory = (
     captureOperations: noData.captureOperations,
     robotEventRepository: new PatrolRobotEventRepository({ endpoint }),
     episodeRepository: noData.episodeRepository,
+    flywheel: noData.flywheel,
     interventionQueue: noData.interventionQueue,
     datasetRepository: noData.datasetRepository,
     analytics: noData.analytics,

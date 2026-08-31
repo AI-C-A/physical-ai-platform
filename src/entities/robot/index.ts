@@ -4,6 +4,7 @@ export {
   inMemoryRobotIds,
   inMemoryRobotLocations,
 } from './api/in-memory-robot-data';
+export { createInMemoryRobotCatalog } from './api/in-memory-robot-catalog';
 export { InMemoryRobotOperationalStatusQuery } from './api/in-memory-robot-operational-status';
 export {
   PatrolRobotCatalogAdapter,
@@ -40,7 +41,7 @@ export type {
   RobotOperationalStatusQueryPort,
   RobotOperationalStatusSubscriptionEvent,
 } from './model/robot-operational-status';
-export type { RobotDescriptor } from './model/robot';
+export type { RobotDescriptor, RobotType } from './model/robot';
 export { RobotInfoOverview } from './ui/RobotInfoOverview';
 export { RobotModelViewer } from './ui/RobotModelViewer';
 export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';

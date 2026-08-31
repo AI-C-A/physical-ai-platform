@@ -4,6 +4,7 @@ import { AnalyticsContext } from '@/entities/analytics';
 import { CaptureOperationsContext } from '@/entities/capture-session';
 import { DatasetRepositoryContext } from '@/entities/dataset';
 import { EpisodeRepositoryContext } from '@/entities/episode';
+import { FlywheelContext } from '@/entities/flywheel';
 import { InterventionQueueContext } from '@/entities/intervention';
 import {
   PatrolApiStatusContext,
@@ -74,6 +75,7 @@ export function AppProviders({
               value={services.captureOperations}
             >
               <EpisodeRepositoryContext.Provider value={services.episodeRepository}>
+                <FlywheelContext.Provider value={services.flywheel}>
                 <DatasetRepositoryContext.Provider value={services.datasetRepository}>
                   <InterventionQueueContext.Provider value={services.interventionQueue}>
                   <RobotEventRepositoryContext.Provider value={services.robotEventRepository}>
@@ -85,6 +87,7 @@ export function AppProviders({
                   </RobotEventRepositoryContext.Provider>
                   </InterventionQueueContext.Provider>
                 </DatasetRepositoryContext.Provider>
+                </FlywheelContext.Provider>
               </EpisodeRepositoryContext.Provider>
             </CaptureOperationsContext.Provider>
               </RobotVideoContext.Provider>
