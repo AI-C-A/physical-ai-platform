@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import {
   PatrolApiStatusCheckError,
   usePatrolApiStatusPort,
 } from '@/entities/robot';
+import { useColorSchemePreference } from '@/shared/config';
 import { formatDateTime } from '@/shared/lib/format';
 import { useClock } from '@/shared/lib/clock';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
-import { DetailPane } from '@/shared/ui/detail-pane';
 import { PageHeader } from '@/shared/ui/page-header';
 import { Panel } from '@/shared/ui/panel';
+import { Select } from '@/shared/ui/select';
 
 type CheckStatus =
   | 'unconfigured'
@@ -23,6 +24,54 @@ interface CheckState {
   readonly checkedAtMs: number | null;
   readonly message: string;
   readonly status: CheckStatus;
+}
+
+const colorSchemeOptions = [
+  { label: '라이트', value: 'light' },
+  { label: '다크', value: 'dark' },
+  { label: '시스템', value: 'system' },
+] as const;
+
+interface SettingsRowProps {
+  readonly children: ReactNode;
+  readonly description: string;
+  readonly title: string;
+}
+
+function SettingsRow({
+  children,
+  description,
+  title,
+}: SettingsRowProps) {
+  return (
+    <div className="grid min-h-[var(--layout-data-row-height)] gap-4 py-5 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)] md:items-center">
+      <div className="grid gap-1">
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        <p className="max-w-2xl text-sm text-muted">{description}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function AppearanceSettings() {
+  const { preference, selectPreference } = useColorSchemePreference();
+
+  return (
+    <SettingsRow
+      description="시스템 설정을 따르거나 라이트·다크 모드를 고정합니다."
+      title="화면 모드"
+    >
+      <Select
+        className="w-full md:w-56 md:justify-self-end"
+        label="색상 모드"
+        onValueChange={selectPreference}
+        options={colorSchemeOptions}
+        showLabel={false}
+        value={preference}
+      />
+    </SettingsRow>
+  );
 }
 
 function createInitialState(endpoint: string | null): CheckState {
@@ -122,25 +171,25 @@ export function SettingsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        description="외부 서비스의 연결 상태를 확인합니다."
+        description="표시 방식과 외부 서비스 연결을 관리합니다."
         title="설정"
       />
       <Panel
-        description="로봇 정보를 불러올 수 있는지 확인합니다."
-        title="Patrol API 연결 상태"
+        contentClassName="divide-y divide-border"
+        title="화면"
       >
-        <DetailPane
-          aria-labelledby="patrol-api-title"
-          layer="base"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3
-                className="font-bold text-foreground"
-                id="patrol-api-title"
-              >
+        <AppearanceSettings />
+      </Panel>
+      <Panel title="외부 연결">
+        <section aria-labelledby="patrol-api-title" className="grid gap-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="grid gap-1">
+              <h3 className="font-semibold text-foreground" id="patrol-api-title">
                 Patrol API
               </h3>
+              <p className="text-sm text-muted">
+                로봇 정보를 불러오는 연결을 확인합니다.
+              </p>
             </div>
             <Badge tone={presentation.tone}>{presentation.label}</Badge>
           </div>
@@ -187,7 +236,7 @@ export function SettingsPage() {
                   : '상태 확인'}
             </Button>
           </div>
-        </DetailPane>
+        </section>
       </Panel>
     </div>
   );

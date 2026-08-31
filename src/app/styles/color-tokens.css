@@ -368,6 +368,47 @@
 
 [data-color-scheme="dark"] {
   color-scheme: dark;
+  /*
+   * light-dark() values declared on :root are resolved in the root color
+   * context before they are inherited. Keep locally forced dark regions
+   * deterministic by assigning their semantic contract explicitly.
+   */
+  --background: #101013;
+  --foreground: var(--palette-dark-gray-900);
+  --surface: var(--palette-dark-gray-50);
+  --surface-muted: var(--palette-dark-gray-50);
+  --muted: var(--palette-dark-gray-700);
+  --border: var(--palette-dark-gray-200);
+  --focus: var(--palette-dark-blue-500);
+  --positive: var(--palette-dark-green-700);
+  --warning: var(--palette-dark-yellow-800);
+  --negative: var(--palette-dark-red-700);
+  --layer-canvas: #101013;
+  --layer-base: #17171c;
+  --layer-raised: var(--palette-dark-gray-50);
+  --layer-floating: var(--palette-dark-gray-100);
+  --layer-dimmed: rgba(0, 0, 0, 0.56);
+  --action-primary: var(--palette-dark-blue-300);
+  --action-primary-hover: var(--palette-dark-blue-200);
+  --action-primary-active: var(--palette-dark-blue-100);
+  --action-danger: var(--palette-red-700);
+  --action-danger-hover: var(--palette-red-800);
+  --action-danger-active: var(--palette-red-900);
+  --action-on-fill: var(--palette-white);
+  --action-secondary: var(--palette-dark-gray-50);
+  --action-secondary-hover: var(--palette-dark-gray-50);
+  --action-secondary-active: var(--palette-dark-gray-100);
+  --overlay: rgba(0, 0, 0, 0.56);
+  --status-neutral-foreground: var(--palette-dark-gray-700);
+  --status-neutral-background: rgba(195, 195, 198, 0.16);
+  --status-positive-foreground: var(--palette-green-400);
+  --status-positive-background: rgba(21, 196, 126, 0.16);
+  --status-warning-foreground: var(--palette-yellow-700);
+  --status-warning-background: rgba(255, 209, 88, 0.16);
+  --status-negative-foreground: var(--palette-dark-red-700);
+  --status-negative-background: rgba(239, 83, 80, 0.16);
+  --status-info-foreground: var(--palette-dark-blue-800);
+  --status-info-background: rgba(69, 147, 252, 0.16);
 }
 
 :where([data-color-layer]) {

@@ -1,15 +1,52 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import {
   PatrolApiStatusCheckError,
   PatrolApiStatusContext,
   type PatrolApiStatusPort,
 } from '@/entities/robot';
+import {
+  ColorSchemePreferenceProvider,
+} from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
 
 import { SettingsPage } from './SettingsPage';
+
+const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'scrollIntoView',
+);
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+    writable: true,
+  });
+});
+
+afterAll(() => {
+  if (scrollIntoViewDescriptor === undefined) {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+    return;
+  }
+  Object.defineProperty(
+    HTMLElement.prototype,
+    'scrollIntoView',
+    scrollIntoViewDescriptor,
+  );
+});
 
 function createDeferred(): {
   readonly promise: Promise<void>;
@@ -35,15 +72,73 @@ function renderPage(
   nowMs = Date.parse('2026-08-28T15:30:45+09:00'),
 ) {
   return render(
-    <ClockContext.Provider value={{ nowMs: () => nowMs }}>
-      <PatrolApiStatusContext.Provider value={patrolApiStatus}>
-        <SettingsPage />
-      </PatrolApiStatusContext.Provider>
-    </ClockContext.Provider>,
+    <ColorSchemePreferenceProvider>
+      <ClockContext.Provider value={{ nowMs: () => nowMs }}>
+        <PatrolApiStatusContext.Provider value={patrolApiStatus}>
+          <SettingsPage />
+        </PatrolApiStatusContext.Provider>
+      </ClockContext.Provider>
+    </ColorSchemePreferenceProvider>,
   );
 }
 
 describe('SettingsPage', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-color-scheme');
+  });
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-color-scheme');
+    vi.unstubAllEnvs();
+  });
+
+  it('라이트·다크·시스템 화면 모드를 선택하고 유지한다', async () => {
+    const user = userEvent.setup();
+    const patrolApiStatus: PatrolApiStatusPort = {
+      endpoint: '/api/integrations/patrol',
+      check: () => Promise.resolve(),
+    };
+    const first = renderPage(patrolApiStatus);
+    const colorScheme = screen.getByRole('combobox', { name: '색상 모드' });
+
+    expect(colorScheme).toHaveTextContent('시스템');
+    expect(document.documentElement).not.toHaveAttribute('data-color-scheme');
+
+    colorScheme.focus();
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('option', { name: '다크' }));
+
+    expect(colorScheme).toHaveTextContent('다크');
+    expect(document.documentElement).toHaveAttribute(
+      'data-color-scheme',
+      'dark',
+    );
+    expect(screen.queryByText('현재 선택: 다크')).not.toBeInTheDocument();
+    first.unmount();
+
+    renderPage(patrolApiStatus);
+    expect(screen.getByRole('combobox', { name: '색상 모드' }))
+      .toHaveTextContent('다크');
+  });
+
+  it('설정을 중첩 카드 없이 두 개의 상위 그룹으로 표시한다', () => {
+    const view = renderPage({
+      endpoint: '/api/integrations/patrol',
+      check: () => Promise.resolve(),
+    });
+    const surfaces = view.container.querySelectorAll('[data-surface-layer]');
+
+    expect(screen.getByRole('heading', { name: '화면' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '외부 연결' }))
+      .toBeInTheDocument();
+    expect(surfaces).toHaveLength(2);
+    for (const surface of surfaces) {
+      expect(surface.querySelector('[data-surface-layer]')).toBeNull();
+    }
+  });
+
   it('진입 시 요청하지 않고 수동 확인의 진행·성공 상태를 표시한다', async () => {
     const user = userEvent.setup();
     const deferred = createDeferred();

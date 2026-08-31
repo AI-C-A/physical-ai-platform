@@ -9,3 +9,10 @@ export {
   type RuntimeConnections,
 } from './runtime-config';
 export { BrandingContext, useBranding } from './branding-context';
+export {
+  ColorSchemePreferenceProvider,
+  useColorSchemePreference,
+} from './color-scheme-preference-context';
+export type {
+  ColorSchemePreference,
+} from './color-scheme-preference-context';

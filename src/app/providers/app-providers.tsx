@@ -16,7 +16,11 @@ import {
 } from '@/entities/robot-telemetry';
 import { RobotVideoContext } from '@/entities/robot-video';
 import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
-import { BrandingContext, type BrandingConfig } from '@/shared/config';
+import {
+  BrandingContext,
+  ColorSchemePreferenceProvider,
+  type BrandingConfig,
+} from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
 import { ToastProvider } from '@/shared/ui/toast';
 import { TooltipProvider } from '@/shared/ui/tooltip';
@@ -51,8 +55,9 @@ export function AppProviders({
   }, [services]);
 
   return (
-    <BrandingContext.Provider value={branding}>
-      <ClockContext.Provider value={services.clock}>
+    <ColorSchemePreferenceProvider>
+      <BrandingContext.Provider value={branding}>
+        <ClockContext.Provider value={services.clock}>
       <PatrolApiStatusContext.Provider value={services.patrolApiStatus}>
         <RobotCatalogContext.Provider value={services.robotCatalog}>
         <RobotOperationalStatusContext.Provider value={services.robotOperationalStatus}>
@@ -84,7 +89,8 @@ export function AppProviders({
         </RobotOperationalStatusContext.Provider>
         </RobotCatalogContext.Provider>
       </PatrolApiStatusContext.Provider>
-      </ClockContext.Provider>
-    </BrandingContext.Provider>
+        </ClockContext.Provider>
+      </BrandingContext.Provider>
+    </ColorSchemePreferenceProvider>
   );
 }
