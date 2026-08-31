@@ -54,6 +54,19 @@ const QualityDetailPage = lazy(async () => ({ default: (await FlywheelPages()).Q
 const DatasetsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelDatasetsPage }));
 const NewDatasetPage = lazy(async () => ({ default: (await FlywheelPages()).NewFlywheelDatasetPage }));
 const DatasetDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelDatasetDetailPage }));
+const TrainingPage = lazy(async () => ({ default: (await FlywheelPages()).TrainingPage }));
+const NewTrainingPage = lazy(async () => ({ default: (await FlywheelPages()).NewTrainingPage }));
+const TrainingDetailPage = lazy(async () => ({ default: (await FlywheelPages()).TrainingDetailPage }));
+const EvaluationsPage = lazy(async () => ({ default: (await FlywheelPages()).EvaluationsPage }));
+const NewEvaluationPage = lazy(async () => ({ default: (await FlywheelPages()).NewEvaluationPage }));
+const EvaluationDetailPage = lazy(async () => ({ default: (await FlywheelPages()).EvaluationDetailPage }));
+const ModelsPage = lazy(async () => ({ default: (await FlywheelPages()).ModelsPage }));
+const ModelDetailPage = lazy(async () => ({ default: (await FlywheelPages()).ModelDetailPage }));
+const DeploymentsPage = lazy(async () => ({ default: (await FlywheelPages()).DeploymentsPage }));
+const NewDeploymentPage = lazy(async () => ({ default: (await FlywheelPages()).NewDeploymentPage }));
+const DeploymentDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DeploymentDetailPage }));
+const InferencePage = lazy(async () => ({ default: (await FlywheelPages()).InferencePage }));
+const InferenceDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InferenceDetailPage }));
 const EpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodesPage }));
 const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
 const SessionsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionsPage }));
@@ -128,6 +141,19 @@ export const APP_ROUTES: RouteObject[] = [
         path: ROUTE_PATHS.mlopsDatasetDetail,
         element: <DatasetDetailPage />,
       },
+      { path: ROUTE_PATHS.mlopsTraining, element: <TrainingPage /> },
+      { path: ROUTE_PATHS.mlopsNewTraining, element: <NewTrainingPage /> },
+      { path: ROUTE_PATHS.mlopsTrainingDetail, element: <TrainingDetailPage /> },
+      { path: ROUTE_PATHS.mlopsEvaluations, element: <EvaluationsPage /> },
+      { path: ROUTE_PATHS.mlopsNewEvaluation, element: <NewEvaluationPage /> },
+      { path: ROUTE_PATHS.mlopsEvaluationDetail, element: <EvaluationDetailPage /> },
+      { path: ROUTE_PATHS.mlopsModels, element: <ModelsPage /> },
+      { path: ROUTE_PATHS.mlopsModelDetail, element: <ModelDetailPage /> },
+      { path: ROUTE_PATHS.mlopsDeployments, element: <DeploymentsPage /> },
+      { path: ROUTE_PATHS.mlopsNewDeployment, element: <NewDeploymentPage /> },
+      { path: ROUTE_PATHS.mlopsDeploymentDetail, element: <DeploymentDetailPage /> },
+      { path: ROUTE_PATHS.mlopsInference, element: <InferencePage /> },
+      { path: ROUTE_PATHS.mlopsInferenceDetail, element: <InferenceDetailPage /> },
       { path: ROUTE_PATHS.mlopsSettings, element: <SettingsPage /> },
       {
         path: ROUTE_PATHS.bigdataOverview,

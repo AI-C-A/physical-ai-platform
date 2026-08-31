@@ -75,6 +75,17 @@ export const MINI_APP_REGISTRY = [
           { label: '데이터셋', path: ROUTE_PATHS.mlopsDatasets, icon: 'database' },
         ],
       },
+      {
+        id: 'model',
+        label: '모델',
+        items: [
+          { label: '학습', path: ROUTE_PATHS.mlopsTraining, icon: 'mlops' },
+          { label: '평가', path: ROUTE_PATHS.mlopsEvaluations, icon: 'report' },
+          { label: '모델 레지스트리', path: ROUTE_PATHS.mlopsModels, icon: 'robot' },
+          { label: '배포', path: ROUTE_PATHS.mlopsDeployments, icon: 'download' },
+          { label: '추론 이력', path: ROUTE_PATHS.mlopsInference, icon: 'activity' },
+        ],
+      },
     ],
   },
   {
