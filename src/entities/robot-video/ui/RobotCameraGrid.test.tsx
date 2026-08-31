@@ -260,7 +260,9 @@ describe('RobotCameraGrid workspace', () => {
       'data-segmentation-status',
       'error',
     );
-    expect(screen.getByRole('status')).toHaveClass('bg-red-950/80');
+    expect(screen.getByRole('status')).toHaveClass('from-red-950/90');
+    expect(screen.getByRole('status')).not.toHaveClass('rounded-md');
+    expect(screen.getByRole('status')).not.toHaveClass('shadow-sm');
     expect(document.querySelector('[data-segmentation-loading-spinner="true"]'))
       .not.toBeInTheDocument();
   });
@@ -347,12 +349,21 @@ describe('RobotCameraGrid workspace', () => {
         ?.querySelector('[data-connection-indicator="connected"]'),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: '전방 Camera 확대 보기' }),
-    ).toHaveAttribute('aria-pressed', 'false');
-    expect(
-      screen.getByRole('button', { name: '전방 Camera 세그멘테이션 켜기' }),
-    ).toHaveAttribute('aria-pressed', 'false');
+    const focusButton = screen.getByRole('button', {
+      name: '전방 Camera 확대 보기',
+    });
+    const segmentationButton = screen.getByRole('button', {
+      name: '전방 Camera 세그멘테이션 켜기',
+    });
+    expect(focusButton).toHaveAttribute('aria-pressed', 'false');
+    expect(segmentationButton).toHaveAttribute('aria-pressed', 'false');
+    [focusButton, segmentationButton].forEach((button) => {
+      expect(button).toHaveClass(
+        'size-10',
+        'min-h-[var(--layout-control-height)]',
+      );
+      expect(button).not.toHaveClass('size-9', 'min-h-9');
+    });
     expect(frontTile?.querySelector('[data-segmentation-overlay="true"]'))
       .not.toBeInTheDocument();
     expect(frontTile?.querySelector('[data-segmentation-metrics="true"]'))

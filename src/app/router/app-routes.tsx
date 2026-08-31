@@ -26,6 +26,9 @@ const InterventionsPage = lazy(async () => ({
 const ControlMonitoringPage = lazy(async () => ({
   default: (await import('@/pages/control/monitoring')).ControlMonitoringPage,
 }));
+const MultiRobotMonitoringPage = lazy(async () => ({
+  default: (await import('@/pages/control/monitoring')).MultiRobotMonitoringPage,
+}));
 const RobotMonitoringPage = lazy(async () => ({
   default: (await import('@/pages/control/monitoring')).RobotMonitoringPage,
 }));
@@ -78,6 +81,10 @@ export const APP_ROUTES: RouteObject[] = [
       {
         path: ROUTE_PATHS.controlMonitoring,
         element: <ControlMonitoringPage />,
+      },
+      {
+        path: ROUTE_PATHS.controlMultiRobotMonitoring,
+        element: <MultiRobotMonitoringPage />,
       },
       {
         path: ROUTE_PATHS.controlRobotMonitoring,

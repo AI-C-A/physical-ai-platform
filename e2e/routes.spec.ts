@@ -8,6 +8,10 @@ import {
 
 const officialRoutes = [
   { path: '/control/monitoring', heading: '모니터링' },
+  {
+    path: '/control/monitoring/multi?mode=multi&robotId=robot-001&robotId=robot-002',
+    heading: '다중 관제',
+  },
   { path: '/control/interventions', heading: '개입 요청' },
   { path: '/control/robots', heading: '로봇 관리' },
   { path: '/control/monitoring/robot-001', heading: '정찰 로봇 01' },

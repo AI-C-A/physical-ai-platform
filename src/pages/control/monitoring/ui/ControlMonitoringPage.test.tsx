@@ -398,7 +398,7 @@ describe('ControlMonitoringPage', () => {
       .not.toBeInTheDocument();
     expect(within(fallbackNameButton).getByText('N0000002')).toBeInTheDocument();
     expect(fallbackNameButton).toHaveClass(
-      'rounded-md',
+      'rounded-[var(--design-radius-list-row)]',
       'border-0',
       'bg-foreground/[0.06]',
     );
@@ -865,7 +865,7 @@ describe('ControlMonitoringPage', () => {
     expect(screen.queryByRole('navigation', { name: '페이지 이동' })).not.toBeInTheDocument();
     expect(screen.queryByText(/검색 결과 \d+대/u)).not.toBeInTheDocument();
 
-    expect(within(robotSelection).getAllByRole('button')).toHaveLength(25);
+    expect(within(robotSelection).getAllByRole('button')).toHaveLength(26);
     expect(within(firstRobotButton).getByText('MOCK00001 · API name 01'))
       .toBeInTheDocument();
 
@@ -874,5 +874,114 @@ describe('ControlMonitoringPage', () => {
       name: '로봇 25 로봇 정보',
     })).toBeInTheDocument();
     expect(screen.queryByText(/검색 결과 \d+대/u)).not.toBeInTheDocument();
+  });
+
+  it('다중 선택 모드에서 2대 선택을 URL에 보존하고 다중 관제로 이동한다', async () => {
+    const user = userEvent.setup();
+    renderPage(
+      createInMemoryRobotCatalogWithData(),
+      operationalStatus,
+      geolocation,
+      '/control/monitoring?siteId=pangyo-army-ax-hub',
+    );
+
+    const modeAction = await screen.findByRole('button', { name: '다중 선택' });
+    expect(screen.queryByRole('heading', { name: '로봇 목록' }))
+      .not.toBeInTheDocument();
+    expect(modeAction).toHaveTextContent('선택');
+    expect(modeAction).toHaveClass('min-w-10', 'bg-transparent');
+    expect(modeAction).not.toHaveClass('w-full');
+    await user.click(modeAction);
+    const selection = screen.getByRole('list', {
+      name: '다중 관제 로봇 선택',
+    });
+    const start = screen.getByRole('button', { name: '다중 관제 시작' });
+    const cancel = screen.getByRole('button', { name: '선택 취소' });
+    const firstCheckbox = within(selection).getByRole('checkbox', {
+      name: /정찰 로봇 01/u,
+    });
+    expect(selection).toHaveClass('mt-4', 'grid', 'gap-2', 'pr-1');
+    expect(selection).not.toHaveClass('divide-y');
+    expect(firstCheckbox.closest('label')).toHaveClass(
+      'min-h-[var(--layout-control-height)]',
+      'rounded-[var(--design-radius-list-row)]',
+      'flex-row-reverse',
+    );
+    expect(cancel).toBe(modeAction);
+    expect(cancel).toHaveTextContent('취소');
+    expect(cancel).toHaveClass('min-w-10', 'bg-transparent');
+    expect(start).toHaveClass('bg-action-primary');
+    expect(start).toHaveClass('w-full');
+    expect(start).toBeDisabled();
+
+    await user.click(firstCheckbox);
+    await user.click(within(selection).getByRole('checkbox', {
+      name: /수송 로봇 02/u,
+    }));
+
+    expect(start).toHaveTextContent('2/6');
+    expect(start).toBeEnabled();
+    await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '지원 로봇');
+    expect(start).toHaveTextContent('2/6');
+
+    await user.click(start);
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring/multi?siteId=pangyo-army-ax-hub&mode=multi&robotId=robot-001&robotId=robot-002',
+    );
+  });
+
+  it('다중 선택은 최대 6대로 제한하고 취소하면 선택 URL을 제거한다', async () => {
+    const user = userEvent.setup();
+    const allRobots = Array.from({ length: 7 }, (_, index) => createRobot(index + 1));
+    const catalog = createInMemoryRobotCatalogWithData();
+    const selectedQuery = allRobots.slice(0, 6)
+      .map((robot) => `robotId=${robot.id}`)
+      .join('&');
+    renderPage(
+      {
+        getRobot: (robotId) => catalog.getRobot(robotId),
+        listRobots: () => Promise.resolve(allRobots),
+        queryRobots: (query) => catalog.queryRobots(query),
+      },
+      operationalStatus,
+      geolocation,
+      `/control/monitoring?mode=multi&${selectedQuery}`,
+    );
+
+    const selection = await screen.findByRole('list', {
+      name: '다중 관제 로봇 선택',
+    });
+    expect(within(selection).getByRole('checkbox', {
+      name: /로봇 07/u,
+    })).toBeDisabled();
+    expect(within(selection).getByRole('checkbox', {
+      name: /로봇 01/u,
+    })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: '선택 취소' }));
+    expect(screen.queryByRole('list', {
+      name: '다중 관제 로봇 선택',
+    })).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/monitoring?siteId=pangyo-outdoor-zone',
+    );
+  });
+
+  it('Escape로 다중 선택을 종료하고 상단 모드 버튼에 포커스를 복원한다', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '다중 선택' }));
+    const firstCheckbox = screen.getByRole('checkbox', {
+      name: /정찰 로봇 01/u,
+    });
+    firstCheckbox.focus();
+    await user.keyboard('{Escape}');
+
+    const modeAction = screen.getByRole('button', { name: '다중 선택' });
+    expect(modeAction).toHaveFocus();
+    expect(screen.queryByRole('list', {
+      name: '다중 관제 로봇 선택',
+    })).not.toBeInTheDocument();
   });
 });

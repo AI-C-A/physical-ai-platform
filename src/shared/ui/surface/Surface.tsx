@@ -3,7 +3,12 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/shared/ui/class-names';
 
 export type SurfaceDensity = 'compact' | 'normal';
-export type SurfaceLayer = 'base' | 'raised' | 'floating' | 'translucent';
+export type SurfaceLayer =
+  | 'base'
+  | 'raised'
+  | 'floating'
+  | 'translucent'
+  | 'soft-group';
 
 interface SurfaceProps extends HTMLAttributes<HTMLElement> {
   readonly as?: 'article' | 'aside' | 'div' | 'header' | 'section';
@@ -17,6 +22,7 @@ const layerClassNames: Record<SurfaceLayer, string> = {
   raised: 'bg-layer-raised',
   floating: 'bg-layer-floating shadow-lg',
   translucent: 'bg-surface-muted/[0.88] shadow-xl backdrop-blur-xl',
+  'soft-group': 'rounded-[var(--design-radius-soft-group)] border-0 bg-foreground/[0.04] shadow-none',
 };
 
 const densityClassNames: Record<SurfaceDensity, string> = {

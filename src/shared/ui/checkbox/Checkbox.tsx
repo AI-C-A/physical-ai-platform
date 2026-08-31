@@ -8,6 +8,7 @@ interface CheckboxProps {
   readonly checked: boolean;
   readonly className?: string;
   readonly disabled?: boolean;
+  readonly indicatorPosition?: 'start' | 'end';
   readonly label: ReactNode;
   readonly onCheckedChange: (checked: boolean) => void;
 }
@@ -16,12 +17,14 @@ export function Checkbox({
   checked,
   className,
   disabled = false,
+  indicatorPosition = 'start',
   label,
   onCheckedChange,
 }: CheckboxProps) {
   return (
     <label className={cn(
       'flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50',
+      indicatorPosition === 'end' ? 'flex-row-reverse' : undefined,
       className,
     )}>
       <CheckboxPrimitive.Root

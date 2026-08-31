@@ -8,6 +8,8 @@
   --layout-data-row-height: 3rem;
   --layout-focused-width: 64rem;
   --design-radius-control: 0.5rem;
+  --design-radius-list-row: 0.375rem;
+  --design-radius-soft-group: 0.5rem;
   --design-radius-surface: 0.75rem;
   --design-motion-fast: 120ms;
   --design-motion-normal: 180ms;

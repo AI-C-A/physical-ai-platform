@@ -11,6 +11,7 @@ import {
 
 interface BrowserWithCapturedTracks extends Window {
   __capturedVideoTracks?: readonly MediaStreamTrack[];
+  __capturedMultiVideoTracks?: readonly MediaStreamTrack[];
   __integrationSoakObservation?: {
     domMutationBatchCount: number;
     domMutationRecordCount: number;
@@ -28,6 +29,7 @@ const minimumHeapSampleCount = 5;
 const minimumSoakDurationMs = 12_000;
 const domNodeGrowthBudget = 16;
 const maxLongTaskDurationBudgetMs = 500;
+const multiMonitoringHeapGrowthBudgetBytes = 16 * 1024 * 1024;
 
 function readSoakDurationMs(): number {
   const parsed = Number(process.env.E2E_SOAK_MS ?? '15_000');
@@ -233,5 +235,91 @@ test('Camera 화면의 heap·DOM·Long Task가 제한되고 이탈 시 track을 
       }),
     )
     .toBe(true);
+  issues.assertNone();
+});
+
+test('6대 다중 관제가 장시간 연결을 유지하고 이탈 시 모든 track을 정리한다', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(readSoakDurationMs() + 45_000);
+  const issues = observeBrowserIssues(page);
+  const search = new URLSearchParams({ mode: 'multi' });
+  Array.from({ length: 6 }, (_, index) =>
+    `robot-${String(index + 1).padStart(3, '0')}`)
+    .forEach((robotId) => search.append('robotId', robotId));
+
+  await page.goto(`/control/monitoring/multi?${search.toString()}`);
+  await expectApplicationReady(page);
+  await expect(page.getByLabel(/카메라 패널$/u)).toHaveCount(6);
+
+  const videos = page.locator('video');
+  await expect(videos).toHaveCount(9);
+  await expect.poll(() => videos.evaluateAll((elements) =>
+    elements.every((element) =>
+      element instanceof HTMLVideoElement
+      && element.srcObject instanceof MediaStream
+      && element.srcObject.getTracks().length > 0
+      && element.srcObject.getTracks().every(
+        (track) => track.readyState === 'live',
+      )))).toBe(true);
+
+  const capturedTrackCount = await page.evaluate(() => {
+    const browser = window as BrowserWithCapturedTracks;
+    browser.__capturedMultiVideoTracks = Array.from(
+      document.querySelectorAll('video'),
+    ).flatMap((element) =>
+      element.srcObject instanceof MediaStream
+        ? element.srcObject.getTracks()
+        : []);
+    return browser.__capturedMultiVideoTracks.length;
+  });
+  expect(capturedTrackCount).toBeGreaterThanOrEqual(9);
+
+  const cdpSession = await page.context().newCDPSession(page);
+  await cdpSession.send('HeapProfiler.enable');
+  await cdpSession.send('HeapProfiler.collectGarbage');
+  const initialHeap = await cdpSession.send('Runtime.getHeapUsage');
+  const soakUntilMs = Date.now() + readSoakDurationMs();
+  while (Date.now() < soakUntilMs) {
+    expect(await page.evaluate(() => {
+      const tracks = (window as BrowserWithCapturedTracks)
+        .__capturedMultiVideoTracks;
+      return tracks !== undefined
+        && tracks.length > 0
+        && tracks.every((track) => track.readyState === 'live');
+    })).toBe(true);
+    await page.waitForTimeout(1_000);
+  }
+  await cdpSession.send('HeapProfiler.collectGarbage');
+  const finalHeap = await cdpSession.send('Runtime.getHeapUsage');
+  await cdpSession.detach();
+
+  const retainedHeapGrowthBytes = finalHeap.usedSize - initialHeap.usedSize;
+  await testInfo.attach('multi-monitoring-soak-metrics', {
+    body: Buffer.from(JSON.stringify({
+      capturedTrackCount,
+      finalHeapUsedBytes: finalHeap.usedSize,
+      initialHeapUsedBytes: initialHeap.usedSize,
+      retainedHeapGrowthBytes,
+      robotCount: 6,
+      soakDurationMs: readSoakDurationMs(),
+      videoCount: await videos.count(),
+    }, null, 2)),
+    contentType: 'application/json',
+  });
+  expect(retainedHeapGrowthBytes).toBeLessThanOrEqual(
+    multiMonitoringHeapGrowthBudgetBytes,
+  );
+
+  await page.getByRole('link', { name: '다중 영상 관제 나가기' }).click();
+  await expect(page).toHaveURL((url) =>
+    url.pathname === '/control/monitoring');
+  await expect.poll(() => page.evaluate(() => {
+    const tracks = (window as BrowserWithCapturedTracks)
+      .__capturedMultiVideoTracks;
+    return tracks !== undefined
+      && tracks.length > 0
+      && tracks.every((track) => track.readyState === 'ended');
+  })).toBe(true);
   issues.assertNone();
 });

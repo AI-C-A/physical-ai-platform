@@ -1,6 +1,7 @@
 export const ROUTE_PATHS = {
   root: '/',
   controlMonitoring: '/control/monitoring',
+  controlMultiRobotMonitoring: '/control/monitoring/multi',
   controlRobotMonitoring: '/control/monitoring/:robotId',
   controlInterventions: '/control/interventions',
   controlRobots: '/control/robots',

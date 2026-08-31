@@ -6,6 +6,10 @@ export {
 } from './model/camera-segmentation-sync';
 export { RobotVideoContext, useRobotVideoPort } from './model/robot-video-context';
 export { RobotCameraGrid } from './ui/RobotCameraGrid';
+export {
+  MultiRobotCameraGrid,
+  type MultiRobotCameraTarget,
+} from './ui/MultiRobotCameraGrid';
 export type {
   RobotVideoPort,
   RobotVideoRecordingArtifact,

@@ -226,8 +226,8 @@ function VideoSurface({
             aria-busy={isSegmentationLoading}
             className={
               segmentationOverlay.status === 'error'
-                ? 'pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-md border border-red-400/40 bg-red-950/80 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-red-100 shadow-sm backdrop-blur-sm'
-                : 'pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-md border border-white/15 bg-black/65 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white shadow-sm backdrop-blur-sm'
+                ? 'pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1.5 bg-gradient-to-r from-red-950/90 via-red-950/70 to-transparent px-2 py-1 pr-6 font-mono text-[11px] font-medium tabular-nums text-red-100'
+                : 'pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1.5 bg-gradient-to-r from-black/75 via-black/55 to-transparent px-2 py-1 pr-6 font-mono text-[11px] font-medium tabular-nums text-white'
             }
             data-segmentation-metrics="true"
             data-segmentation-status={segmentationOverlay.status}
@@ -254,22 +254,29 @@ function VideoSurface({
 }
 
 function CameraCard({
+  accessibleSourceName,
   canFocus,
   isFocused,
   isSelected,
   onFocusChange,
   onSelect,
+  onStatusChange,
   port,
   presentation,
   source,
 }: {
+  readonly accessibleSourceName: string;
   readonly canFocus: boolean;
   readonly isFocused: boolean;
   readonly isSelected: boolean;
   readonly onFocusChange: () => void;
   readonly onSelect: () => void;
+  readonly onStatusChange?: (
+    sourceId: string,
+    status: VideoConnectionStatus | null,
+  ) => void;
   readonly port: RobotVideoPort;
-  readonly presentation: 'grid' | 'monitoring' | 'workspace';
+  readonly presentation: 'grid' | 'monitoring' | 'multi-monitoring' | 'workspace';
   readonly source: RobotVideoSource;
 }) {
   const [retrySequence, setRetrySequence] = useState(0);
@@ -286,7 +293,7 @@ function CameraCard({
     ? getConnectionProblemMessage(status)
     : null;
 
-  const statusAnnouncement = `${source.displayName}: ${
+  const statusAnnouncement = `${accessibleSourceName}: ${
     problemMessage
       ?? (status === 'connecting' && retrySequence > 0
         ? videoStatusLabels.reconnecting
@@ -298,6 +305,14 @@ function CameraCard({
       numericValue: width / height,
     });
   }, []);
+
+  useEffect(() => {
+    onStatusChange?.(source.id, status);
+  }, [onStatusChange, source.id, status]);
+
+  useEffect(() => {
+    return () => onStatusChange?.(source.id, null);
+  }, [onStatusChange, source.id]);
 
   useEffect(() => {
     let active = true;
@@ -352,15 +367,19 @@ function CameraCard({
     };
   }, [port, retrySequence, source.id]);
 
-  if (presentation === 'monitoring') {
+  if (presentation === 'monitoring' || presentation === 'multi-monitoring') {
     const pendingLabel = status === 'reconnecting' || retrySequence > 0
       ? cameraCopy.reconnecting
       : cameraCopy.loading;
     const maxTileHeight = isFocused
-      ? '100cqh'
+      ? presentation === 'multi-monitoring'
+        ? 'calc(100dvh - 1.5rem)'
+        : '100cqh'
       : 'var(--camera-tile-max-height)';
     const maxTileWidth = isFocused
-      ? '100cqw'
+      ? presentation === 'multi-monitoring'
+        ? 'calc(100dvw - 1.5rem)'
+        : '100cqw'
       : 'var(--camera-tile-max-width)';
     const videoTileStyle: VideoTileStyle = {
       aspectRatio: videoAspectRatio.cssValue,
@@ -370,7 +389,9 @@ function CameraCard({
 
     return (
       <div
-        className="group relative max-h-full max-w-full overflow-hidden rounded-lg bg-neutral-950 ring-1 ring-white/15"
+        className={presentation === 'multi-monitoring'
+          ? 'group relative max-h-full max-w-full overflow-hidden rounded-[var(--design-radius-soft-group)] bg-neutral-950'
+          : 'group relative max-h-full max-w-full overflow-hidden rounded-lg bg-neutral-950 ring-1 ring-white/15'}
         data-camera-tile="true"
         style={videoTileStyle}
       >
@@ -381,23 +402,23 @@ function CameraCard({
         ) : null}
         {stream === null ? null : (
           <VideoSurface
-            label={`${source.displayName} 영상`}
+            label={`${accessibleSourceName} 영상`}
             onAspectRatioChange={updateVideoAspectRatio}
             presentation="monitoring"
             segmentationEnabled={segmentationEnabled}
             stream={stream}
           />
         )}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex min-w-0 items-start justify-between gap-3 bg-gradient-to-b from-black/70 to-transparent p-3 pb-8">
-          <h2 className="truncate text-sm font-semibold text-white">
+        <div className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex min-w-0 items-start justify-between gap-3 bg-gradient-to-b from-black/70 to-transparent ${presentation === 'multi-monitoring' ? 'p-2 pb-7' : 'p-3 pb-8'}`}>
+          <h2 className={`truncate font-semibold text-white ${presentation === 'multi-monitoring' ? 'text-xs' : 'text-sm'}`}>
             {source.displayName}
           </h2>
-          <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+          <div className="pointer-events-auto flex shrink-0 items-center gap-0.5 rounded-md bg-black/55 p-0.5 opacity-0 backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
             {stream !== null ? (
               <Button
-                aria-label={`${source.displayName} 세그멘테이션 ${segmentationEnabled ? '끄기' : '켜기'}`}
+                aria-label={`${accessibleSourceName} 세그멘테이션 ${segmentationEnabled ? '끄기' : '켜기'}`}
                 aria-pressed={segmentationEnabled}
-                className="size-10 min-h-10 border-white/25 bg-black/55 p-0 text-xs text-white opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] duration-200 group-hover:opacity-100 group-focus-within:opacity-100 hover:scale-105 hover:bg-black/75 active:scale-95 aria-pressed:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+                className="size-10 min-h-[var(--layout-control-height)] border-transparent bg-transparent p-0 text-xs text-white hover:bg-white/15 active:bg-white/20 aria-pressed:bg-white/15"
                 onClick={() => setSegmentationEnabled((value) => !value)}
                 title={`AI 세그멘테이션 ${segmentationEnabled ? '끄기' : '켜기'}`}
                 variant="ghost"
@@ -408,10 +429,10 @@ function CameraCard({
             {canFocus && (stream !== null || isFocused) ? (
               <Button
                 aria-label={isFocused
-                  ? `${source.displayName} 확대 보기 종료`
-                  : `${source.displayName} 확대 보기`}
+                  ? `${accessibleSourceName} 확대 보기 종료`
+                  : `${accessibleSourceName} 확대 보기`}
                 aria-pressed={isFocused}
-                className="size-10 min-h-10 border-white/25 bg-black/55 p-0 text-white opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,transform,background-color] duration-200 group-hover:opacity-100 group-focus-within:opacity-100 hover:scale-105 hover:bg-black/75 active:scale-95 aria-pressed:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+                className="size-10 min-h-[var(--layout-control-height)] border-transparent bg-transparent p-0 text-white hover:bg-white/15 active:bg-white/20 aria-pressed:bg-white/15"
                 data-camera-focus-control="true"
                 onClick={onFocusChange}
                 title={isFocused ? '전체 카메라 보기' : `${source.displayName} 확대 보기`}
@@ -437,14 +458,14 @@ function CameraCard({
               <>
                 <p>{problemMessage}</p>
                 <Button
-                  className="justify-self-center"
+                  className="justify-self-center border-white/15 bg-black/50 text-white hover:bg-black/70 active:bg-black/80"
                   onClick={() => {
                     setStatus('connecting');
                     setStream(null);
                     setVideoAspectRatio(defaultVideoAspectRatio);
                     setRetrySequence((value) => value + 1);
                   }}
-                  variant="secondary"
+                  variant="ghost"
                 >
                   다시 연결
                 </Button>
@@ -479,7 +500,7 @@ function CameraCard({
         ) : <p>{problemMessage}</p>
       ) : (
         <VideoSurface
-          label={`${source.displayName} 영상`}
+          label={`${accessibleSourceName} 영상`}
           presentation={presentation === 'workspace' && !isSelected ? 'compact' : 'default'}
           stream={stream}
         />
@@ -508,9 +529,16 @@ function CameraCard({
 }
 
 interface RobotCameraGridProps {
-  readonly presentation?: 'grid' | 'monitoring' | 'workspace';
+  readonly focusedSourceId?: string | null;
+  readonly onFocusedSourceChange?: (sourceId: string | null) => void;
+  readonly onSourceStatusChange?: (
+    sourceId: string,
+    status: VideoConnectionStatus | null,
+  ) => void;
+  readonly presentation?: 'grid' | 'monitoring' | 'multi-monitoring' | 'workspace';
   readonly recordingEnabled?: boolean;
   readonly robotId: string;
+  readonly sourceLabelPrefix?: string;
 }
 
 interface RecordingDownload {
@@ -710,7 +738,10 @@ function getTileTrackSize(
   return `calc((100${dimension} - ${String(totalGap)}px) / ${String(trackCount)})`;
 }
 
-function getMonitoringGridLayout(sourceCount: number): MonitoringGridLayout {
+function getMonitoringGridLayout(
+  sourceCount: number,
+  gap: { readonly compact: number; readonly wide: number },
+): MonitoringGridLayout {
   const compactColumns = sourceCount <= 2
     ? 1
     : Math.min(2, Math.ceil(Math.sqrt(sourceCount)));
@@ -730,18 +761,22 @@ function getMonitoringGridLayout(sourceCount: number): MonitoringGridLayout {
       '--camera-tile-max-height-compact': getTileTrackSize(
         'cqh',
         compactRows,
-        8,
+        gap.compact,
       ),
-      '--camera-tile-max-height-wide': getTileTrackSize('cqh', wideRows, 12),
+      '--camera-tile-max-height-wide': getTileTrackSize(
+        'cqh',
+        wideRows,
+        gap.wide,
+      ),
       '--camera-tile-max-width-compact': getTileTrackSize(
         'cqw',
         compactColumns,
-        8,
+        gap.compact,
       ),
       '--camera-tile-max-width-wide': getTileTrackSize(
         'cqw',
         wideLogicalColumns,
-        12,
+        gap.wide,
       ),
       containerType: 'size',
     },
@@ -763,9 +798,13 @@ function getFiveSourcePlacementClass(
 }
 
 export function RobotCameraGrid({
+  focusedSourceId: controlledFocusedSourceId,
+  onFocusedSourceChange,
+  onSourceStatusChange,
   presentation = 'grid',
   recordingEnabled = false,
   robotId,
+  sourceLabelPrefix,
 }: RobotCameraGridProps) {
   const port = useRobotVideoPort();
   const load = useCallback(async () => {
@@ -782,9 +821,12 @@ export function RobotCameraGrid({
     readonly contextKey: string;
     readonly sourceId: string;
   } | null>(null);
-  const focusedSourceId = focusedCamera?.contextKey === focusContextKey
+  const uncontrolledFocusedSourceId = focusedCamera?.contextKey === focusContextKey
     ? focusedCamera.sourceId
     : null;
+  const focusedSourceId = controlledFocusedSourceId === undefined
+    ? uncontrolledFocusedSourceId
+    : controlledFocusedSourceId;
   const sourceRegionRefs = useRef(new Map<string, HTMLDivElement>());
   const shouldFocusSelectionRef = useRef(false);
 
@@ -796,11 +838,15 @@ export function RobotCameraGrid({
 
   const changeFocusedSource = useCallback((sourceId: string | null) => {
     return updateCameraLayout(() => {
-      setFocusedCamera(sourceId === null
-        ? null
-        : { contextKey: focusContextKey, sourceId });
+      if (onFocusedSourceChange !== undefined) {
+        onFocusedSourceChange(sourceId);
+        return;
+      }
+      setFocusedCamera(
+        sourceId === null ? null : { contextKey: focusContextKey, sourceId },
+      );
     });
-  }, [focusContextKey]);
+  }, [focusContextKey, onFocusedSourceChange]);
 
   useEffect(() => {
     if (focusedSourceId === null) return;
@@ -842,10 +888,18 @@ export function RobotCameraGrid({
           ...sources.data.filter((source) => source.id !== activeSourceId),
         ]
       : sources.data;
-  const monitoringGridLayout = presentation === 'monitoring'
-    ? getMonitoringGridLayout(orderedSources.length)
+  const isMonitoringPresentation = presentation === 'monitoring'
+    || presentation === 'multi-monitoring';
+  const isMultiMonitoringPresentation = presentation === 'multi-monitoring';
+  const monitoringGridLayout = isMonitoringPresentation
+    ? getMonitoringGridLayout(
+        orderedSources.length,
+        isMultiMonitoringPresentation
+          ? { compact: 2, wide: 2 }
+          : { compact: 8, wide: 12 },
+      )
     : undefined;
-  const validFocusedSourceId = presentation === 'monitoring'
+  const validFocusedSourceId = isMonitoringPresentation
     && orderedSources.some((source) => source.id === focusedSourceId)
       ? focusedSourceId
       : null;
@@ -863,8 +917,8 @@ export function RobotCameraGrid({
       <section
       aria-label="카메라 영상"
       className={
-        presentation === 'monitoring'
-          ? 'relative grid h-full min-h-0 w-full place-content-center grid-cols-[repeat(var(--camera-columns-compact),max-content)] grid-rows-[repeat(var(--camera-rows-compact),max-content)] gap-2 overflow-hidden [--camera-tile-max-height:var(--camera-tile-max-height-compact)] [--camera-tile-max-width:var(--camera-tile-max-width-compact)] sm:grid-cols-[repeat(var(--camera-columns-wide),max-content)] sm:grid-rows-[repeat(var(--camera-rows-wide),max-content)] sm:gap-3 sm:[--camera-tile-max-height:var(--camera-tile-max-height-wide)] sm:[--camera-tile-max-width:var(--camera-tile-max-width-wide)]'
+        isMonitoringPresentation
+          ? `relative grid h-full min-h-0 w-full place-content-center grid-cols-[repeat(var(--camera-columns-compact),max-content)] grid-rows-[repeat(var(--camera-rows-compact),max-content)] overflow-hidden [--camera-tile-max-height:var(--camera-tile-max-height-compact)] [--camera-tile-max-width:var(--camera-tile-max-width-compact)] sm:grid-cols-[repeat(var(--camera-columns-wide),max-content)] sm:grid-rows-[repeat(var(--camera-rows-wide),max-content)] sm:[--camera-tile-max-height:var(--camera-tile-max-height-wide)] sm:[--camera-tile-max-width:var(--camera-tile-max-width-wide)] ${isMultiMonitoringPresentation ? 'gap-2' : 'gap-2 sm:gap-3'}`
           : presentation === 'workspace'
           ? 'grid gap-3 lg:grid-cols-3'
           : 'grid gap-4 lg:grid-cols-2'
@@ -874,10 +928,15 @@ export function RobotCameraGrid({
       style={monitoringGridLayout?.style}
     >
       {orderedSources.map((source, sourceIndex) => {
+        const accessibleSourceName = sourceLabelPrefix === undefined
+          ? source.displayName
+          : `${sourceLabelPrefix} ${source.displayName}`;
         const isFocused = source.id === validFocusedSourceId;
         const isDimmed = validFocusedSourceId !== null && !isFocused;
         const cameraTileStyle: CameraTileStyle = {
-          viewTransitionName: `camera-tile-${String(sourceIndex + 1)}`,
+          viewTransitionName: presentation === 'multi-monitoring'
+            ? `camera-tile-${`${robotId}-${source.id}`.replace(/[^a-zA-Z0-9_-]/gu, '-')}`
+            : `camera-tile-${String(sourceIndex + 1)}`,
         };
         const fiveSourcePlacementClass = getFiveSourcePlacementClass(
           sourceIndex,
@@ -888,10 +947,10 @@ export function RobotCameraGrid({
         return (
           <div
             aria-hidden={isDimmed || undefined}
-            aria-label={`${source.displayName} 영상 영역`}
+            aria-label={`${accessibleSourceName} 영상 영역`}
             className={
-            presentation === 'monitoring'
-                ? `flex min-h-0 origin-center items-center justify-center overflow-hidden transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${fiveSourcePlacementClass} ${isFocused ? 'absolute inset-0 z-20 scale-100 opacity-100' : ''} ${isDimmed ? 'pointer-events-none scale-75 opacity-0' : 'scale-100 opacity-100'}`
+            isMonitoringPresentation
+                ? `flex min-h-0 origin-center items-center justify-center overflow-hidden transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${fiveSourcePlacementClass} ${isFocused ? presentation === 'multi-monitoring' ? 'fixed inset-2 z-[70] bg-neutral-950 p-2 scale-100 opacity-100' : 'absolute inset-0 z-20 scale-100 opacity-100' : ''} ${isDimmed ? 'pointer-events-none scale-75 opacity-0' : 'scale-100 opacity-100'}`
                 : presentation === 'workspace' && source.id === activeSourceId
                 ? 'lg:col-span-3'
                 : undefined
@@ -904,10 +963,11 @@ export function RobotCameraGrid({
               else sourceRegionRefs.current.set(source.id, element);
             }}
             role="region"
-            style={presentation === 'monitoring' ? cameraTileStyle : undefined}
+            style={isMonitoringPresentation ? cameraTileStyle : undefined}
             tabIndex={-1}
           >
             <CameraCard
+              accessibleSourceName={accessibleSourceName}
               canFocus={orderedSources.length > 1}
               isFocused={isFocused}
               isSelected={source.id === activeSourceId}
@@ -918,6 +978,7 @@ export function RobotCameraGrid({
                 shouldFocusSelectionRef.current = true;
                 setSelectedSourceId(source.id);
               }}
+              {...(onSourceStatusChange === undefined ? {} : { onStatusChange: onSourceStatusChange })}
               port={port}
               presentation={presentation}
               source={source}

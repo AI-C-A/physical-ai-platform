@@ -1,9 +1,19 @@
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { Button } from './Button';
 
 describe('Button', () => {
+  it('포커스 복원이 필요한 흐름에 실제 버튼 ref를 제공한다', () => {
+    const buttonRef = createRef<HTMLButtonElement>();
+    render(<Button buttonRef={buttonRef}>선택 취소</Button>);
+
+    expect(buttonRef.current).toBe(
+      screen.getByRole('button', { name: '선택 취소' }),
+    );
+  });
+
   it('처리 중에도 원래 작업 이름과 busy 상태를 유지한다', () => {
     render(<Button isLoading>수집 세션 생성</Button>);
 

@@ -24,4 +24,18 @@ describe('Surface', () => {
       'shadow-lg',
     );
   });
+
+  it('soft group은 배경과 radius만으로 영역을 구분한다', () => {
+    render(
+      <Surface aria-label="소프트 그룹" layer="soft-group">
+        내용
+      </Surface>,
+    );
+
+    expect(screen.getByRole('region', { name: '소프트 그룹' })).toHaveClass(
+      'rounded-[var(--design-radius-soft-group)]',
+      'border-0',
+      'shadow-none',
+    );
+  });
 });
