@@ -21,10 +21,16 @@ const officialRoutes = [
   { path: '/control/reports', heading: '리포트' },
   { path: '/control/settings', heading: '설정' },
   { path: '/mlops/capture', heading: '데이터 수집' },
+  { path: '/mlops/capture/humanoid', heading: '휴머노이드 Episode 수집' },
+  { path: '/mlops/capture/mobility', heading: '사족·모바일 연속 주행 수집' },
   { path: '/mlops/sessions', heading: '수집 세션' },
-  { path: '/mlops/sessions/session-001', heading: '수집 세션 01' },
+  { path: '/mlops/sessions/capture-h-001', heading: 'Desktop sorting batch' },
   { path: '/mlops/episodes', heading: '에피소드' },
-  { path: '/mlops/episodes/episode-001', heading: '수집 에피소드 01' },
+  { path: '/mlops/episodes/episode-fw-001', heading: 'Pick and place · 01' },
+  { path: '/mlops/drives', heading: '주행 세션' },
+  { path: '/mlops/drives/drive-001', heading: 'Drive · route-a' },
+  { path: '/mlops/interventions', heading: '개입 이벤트' },
+  { path: '/mlops/interventions/intervention-001', heading: 'Intervention · intervention-001' },
   { path: '/mlops/datasets', heading: '데이터셋' },
   { path: '/mlops/datasets/new', heading: '새 데이터셋' },
   {
@@ -45,13 +51,11 @@ const missingDetailRoutes = [
   },
   {
     path: '/mlops/sessions/session-not-found',
-    message: '요청한 수집 세션을 찾을 수 없습니다.',
-    returnLink: '수집 세션으로',
+    message: '수집 세션을 찾을 수 없습니다.',
   },
   {
     path: '/mlops/episodes/episode-not-found',
-    message: '요청한 에피소드를 찾을 수 없습니다.',
-    returnLink: '에피소드로',
+    message: '에피소드를 찾을 수 없습니다.',
   },
   {
     path: '/mlops/datasets/dataset-not-found',
@@ -113,9 +117,11 @@ test('루트는 모니터링으로 이동하고 알 수 없는 경로는 404를 
     await page.goto(route.path);
     await expectApplicationReady(page);
     await expect(page.getByRole('status')).toHaveText(route.message);
-    await expect(
-      page.getByRole('link', { name: route.returnLink }),
-    ).toBeVisible();
+    if ('returnLink' in route) {
+      await expect(
+        page.getByRole('link', { name: route.returnLink }),
+      ).toBeVisible();
+    }
     issues.assertNone();
   }
 });

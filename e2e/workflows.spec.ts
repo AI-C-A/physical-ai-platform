@@ -12,7 +12,9 @@ interface ExportedRecord {
 }
 
 interface ExportTableOptions {
+  readonly directDownload?: boolean;
   readonly exportButtonName: string;
+  readonly paginated?: boolean;
   readonly pathPrefix: string;
   readonly route: string;
   readonly tableName: string;
@@ -41,6 +43,7 @@ async function collectVisibleRecordIds(
   page: Page,
   tableName: string,
   pathPrefix: string,
+  paginated: boolean,
 ): Promise<readonly string[]> {
   const ids: string[] = [];
   let expectedPage = 1;
@@ -61,6 +64,7 @@ async function collectVisibleRecordIds(
     expect(pageIds).not.toEqual([]);
     ids.push(...pageIds);
 
+    if (!paginated) break;
     const pagination = page.getByRole('navigation', { name: '페이지 이동' });
     const nextButton = pagination.getByRole('button', { name: '다음' });
     if (await nextButton.isDisabled()) break;
@@ -88,11 +92,14 @@ async function expectJsonExportMatchesTable(
     page,
     options.tableName,
     options.pathPrefix,
+    options.paginated ?? true,
   );
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: options.exportButtonName }).click();
-  await page.getByRole('menuitem', { name: 'JSON 내보내기' }).click();
+  if (options.directDownload !== true) {
+    await page.getByRole('menuitem', { name: 'JSON 내보내기' }).click();
+  }
   const download = await downloadPromise;
   const downloadPath = await download.path();
   if (downloadPath === null) throw new Error('다운로드 파일 경로가 없습니다.');
@@ -397,15 +404,19 @@ test('MLOps 목록과 JSON 내보내기가 페이지를 포함한 같은 레코�
   const issues = observeBrowserIssues(page);
 
   await expectJsonExportMatchesTable(page, {
-    exportButtonName: '수집 세션 내보내기',
+    directDownload: true,
+    exportButtonName: '수집 세션 JSON 내보내기',
+    paginated: false,
     pathPrefix: '/mlops/sessions',
-    route: '/mlops/sessions?range=all&sort=oldest',
+    route: '/mlops/sessions',
     tableName: '수집 세션 목록',
   });
   await expectJsonExportMatchesTable(page, {
-    exportButtonName: '에피소드 내보내기',
+    directDownload: true,
+    exportButtonName: '에피소드 JSON 내보내기',
+    paginated: false,
     pathPrefix: '/mlops/episodes',
-    route: '/mlops/episodes?sort=oldest',
+    route: '/mlops/episodes',
     tableName: '에피소드 목록',
   });
   await expectJsonExportMatchesTable(page, {
@@ -455,13 +466,11 @@ test('수집 계획의 DOM·시각 순서가 viewport별 키보드 읽기 순서
   page,
 }, testInfo) => {
   const issues = observeBrowserIssues(page);
-  await page.goto('/mlops/capture');
+  await page.goto('/mlops/capture/humanoid');
   await expectApplicationReady(page);
 
-  const planInput = page.getByRole('textbox', { name: '수집 세션 이름' });
-  const cameraRegion = page.getByRole('region', {
-    name: '전방 카메라 영상 영역',
-  });
+  const planInput = page.getByRole('textbox', { name: '세션 이름' });
+  const cameraRegion = page.getByRole('region', { name: '동기화 멀티뷰' });
   await expect(planInput).toBeVisible();
   await expect(cameraRegion).toBeVisible();
   const cameraElement = await cameraRegion.elementHandle();
@@ -495,113 +504,37 @@ test('수집 계획의 DOM·시각 순서가 viewport별 키보드 읽기 순서
   issues.assertNone();
 });
 
-test('수집부터 에피소드와 초안 데이터셋까지 앱 범위 업무를 완료한다', async ({
+test('수집부터 성공·실패 Episode 생성까지 앱 범위 업무를 완료한다', async ({
   page,
 }, testInfo) => {
   const issues = observeBrowserIssues(page);
   const captureName = `브라우저 수집 ${testInfo.project.name}`;
-  const datasetName = `브라우저 데이터셋 ${testInfo.project.name}`;
 
-  await page.goto('/mlops/capture');
+  await page.goto('/mlops/capture/humanoid');
   await expectApplicationReady(page);
-  const prepareNewCapture = page.getByRole('button', {
-    name: '새 수집 구성',
-  });
-  if (await prepareNewCapture.isVisible()) {
-    await prepareNewCapture.click();
-  }
-  await expect(
-    page.getByRole('textbox', { name: '수집 세션 이름' }),
-  ).toBeEnabled();
-  await page.getByRole('textbox', { name: '수집 세션 이름' }).fill(captureName);
+  await page.getByRole('textbox', { name: '세션 이름' }).fill(captureName);
+  await page.getByRole('button', { name: '세션 생성' }).click();
+  await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible();
 
-  const createButton = page.getByRole('button', { name: '수집 세션 생성' });
-  await createButton.dblclick();
-  const captureStatus = page
-    .getByRole('status')
-    .filter({ hasText: captureName });
-  await expect(
-    page.getByRole('button', { name: '사전 점검 실행' }),
-  ).toBeVisible();
-  await expect(captureStatus).toBeFocused();
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByRole('button', { name: 'Session 시작' })).toBeVisible();
+  await page.getByRole('button', { name: 'Session 시작' }).click();
 
-  await page.getByRole('button', { name: '사전 점검 실행' }).click();
-  await expect(page.getByRole('button', { name: '수집 시작' })).toBeVisible();
-  await expect(captureStatus).toBeFocused();
-  await page.getByRole('button', { name: '수집 시작' }).click();
-  await expect(
-    page.getByRole('button', { name: '수집 중지 및 기록 마감' }),
-  ).toBeVisible();
-  await expect(captureStatus).toBeFocused();
+  const episodeNameInput = page.getByRole('textbox', { name: '다음 Episode 이름' });
+  await episodeNameInput.fill('성공 Episode');
+  await page.getByRole('button', { name: 'Episode 시작' }).click();
+  await page.getByRole('button', { name: '성공 종료' }).click();
 
-  await page.getByRole('link', { name: '수집 세션 상세 보기' }).click();
-  await expect(page).toHaveURL(/\/mlops\/sessions\/session-\d+$/u);
-  await expect(
-    page.getByRole('heading', { level: 1, name: captureName }),
-  ).toBeVisible();
+  await episodeNameInput.fill('실패 Episode');
+  await page.getByRole('button', { name: 'Episode 시작' }).click();
+  await page.getByRole('button', { name: '실패 종료' }).click();
+  await page.getByRole('button', { name: 'Session 종료' }).click();
 
-  await page.goBack();
-  await expect(
-    page.getByRole('heading', { level: 2, name: '진행·준비 중인 수집' }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: '수집 중지 및 기록 마감' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: '수집 중지 및 기록 마감' }).click();
-
-  const createdEpisode = page.getByText('생성된 에피소드:').locator('..');
-  await expect(createdEpisode).toBeVisible();
-  await createdEpisode.getByRole('link').click();
-  await expect(page).toHaveURL(/\/mlops\/episodes\/episode-\d+$/u);
-  await expect(
-    page.getByRole('heading', { level: 1, name: `${captureName} 에피소드` }),
-  ).toBeVisible();
-
-  await page.getByRole('button', { name: '초안 데이터셋 만들기' }).click();
-  await expect(
-    page.getByRole('heading', { level: 1, name: '새 데이터셋' }),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/mlops\/datasets\/new\?episodeId=episode-/u);
-  await expect(
-    page.getByRole('checkbox', { name: new RegExp(captureName, 'u') }),
-  ).toBeChecked();
-
-  const datasetNameInput = page.getByRole('textbox', {
-    name: '데이터셋 이름',
-  });
-  await page.getByRole('button', { name: '초안 저장' }).click();
-  await expect(datasetNameInput).toHaveAttribute('aria-invalid', 'true');
-  await expect(datasetNameInput).toHaveAccessibleDescription(
-    '데이터셋 이름을 입력해야 합니다.',
-  );
-  await expect(datasetNameInput).toBeFocused();
-
-  await datasetNameInput.fill(datasetName);
-  await page.getByRole('button', { name: '초안 저장' }).click();
-  await expect(page).toHaveURL(/\/mlops\/datasets\/dataset-\d+$/u);
-  await expect(
-    page.getByRole('heading', { level: 1, name: datasetName }),
-  ).toBeVisible();
-  await expect(page.getByText('초안 데이터셋을 생성했습니다.')).toBeVisible();
-
-  const updatedDatasetName = `${datasetName} 수정`;
-  await page.getByRole('textbox', { name: '데이터셋 이름' }).fill(
-    updatedDatasetName,
-  );
-  await page.getByRole('textbox', { name: '태그' }).fill('브라우저, 회귀');
-  await page.getByRole('button', { name: '초안 저장' }).click();
-  await expect(
-    page.getByRole('heading', { level: 1, name: updatedDatasetName }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('textbox', { name: '데이터셋 이름' }),
-  ).toHaveValue(updatedDatasetName);
-  await expect(page.getByText('초안 데이터셋을 저장했습니다.')).toBeVisible();
-
-  await page.getByRole('link', { name: '데이터셋으로' }).click();
-  await expect(page).toHaveURL(/\/mlops\/datasets$/u);
-  await expect(
-    page.getByRole('link', { name: updatedDatasetName }),
-  ).toBeVisible();
+  await page.getByRole('link', { name: '전체 세션' }).click();
+  await expect(page).toHaveURL(/\/mlops\/sessions$/u);
+  await page.getByRole('link', { name: captureName }).click();
+  await expect(page).toHaveURL(/\/mlops\/sessions\/capture-h-/u);
+  await expect(page.getByRole('link', { name: /^Episode \d+ · episode-/u }))
+    .toHaveCount(2);
   issues.assertNone();
 });

@@ -61,6 +61,8 @@ export const MINI_APP_REGISTRY = [
           { label: '데이터 수집', path: ROUTE_PATHS.mlopsCapture, icon: 'radio' },
           { label: '수집 세션', path: ROUTE_PATHS.mlopsSessions, icon: 'table' },
           { label: '에피소드', path: ROUTE_PATHS.mlopsEpisodes, icon: 'play' },
+          { label: '주행 세션', path: ROUTE_PATHS.mlopsDrives, icon: 'route' },
+          { label: '개입 이벤트', path: ROUTE_PATHS.mlopsInterventions, icon: 'intervention' },
         ],
       },
       {

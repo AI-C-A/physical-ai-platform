@@ -15,8 +15,8 @@ interface PageFrameProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const layoutClassNames: Record<PageFrameLayout, string> = {
-  standard: 'grid w-full gap-[var(--layout-section-gap)]',
-  wide: 'grid w-full gap-[var(--layout-section-gap)]',
+  standard: 'grid min-w-0 w-full gap-[var(--layout-section-gap)] [&>*]:min-w-0 [&>*>*]:min-w-0',
+  wide: 'grid min-w-0 w-full gap-[var(--layout-section-gap)] [&>*]:min-w-0 [&>*>*]:min-w-0',
   focused:
     'mx-auto grid w-full max-w-[var(--layout-focused-width)] gap-[var(--layout-section-gap)]',
   'full-bleed': 'min-h-0 w-full',
