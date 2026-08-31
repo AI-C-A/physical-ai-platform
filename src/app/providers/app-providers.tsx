@@ -19,6 +19,7 @@ import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
 import {
   BrandingContext,
   ColorSchemePreferenceProvider,
+  MapStylePreferenceProvider,
   type BrandingConfig,
 } from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
@@ -56,8 +57,9 @@ export function AppProviders({
 
   return (
     <ColorSchemePreferenceProvider>
-      <BrandingContext.Provider value={branding}>
-        <ClockContext.Provider value={services.clock}>
+      <MapStylePreferenceProvider>
+        <BrandingContext.Provider value={branding}>
+          <ClockContext.Provider value={services.clock}>
       <PatrolApiStatusContext.Provider value={services.patrolApiStatus}>
         <RobotCatalogContext.Provider value={services.robotCatalog}>
         <RobotOperationalStatusContext.Provider value={services.robotOperationalStatus}>
@@ -89,8 +91,9 @@ export function AppProviders({
         </RobotOperationalStatusContext.Provider>
         </RobotCatalogContext.Provider>
       </PatrolApiStatusContext.Provider>
-        </ClockContext.Provider>
-      </BrandingContext.Provider>
+          </ClockContext.Provider>
+        </BrandingContext.Provider>
+      </MapStylePreferenceProvider>
     </ColorSchemePreferenceProvider>
   );
 }

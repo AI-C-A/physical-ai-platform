@@ -18,6 +18,7 @@ import {
 } from '@/entities/robot';
 import {
   ColorSchemePreferenceProvider,
+  MapStylePreferenceProvider,
 } from '@/shared/config';
 import { ClockContext } from '@/shared/lib/clock';
 
@@ -70,14 +71,17 @@ function createDeferred(): {
 function renderPage(
   patrolApiStatus: PatrolApiStatusPort,
   nowMs = Date.parse('2026-08-28T15:30:45+09:00'),
+  showMapStyleSettings = false,
 ) {
   return render(
     <ColorSchemePreferenceProvider>
-      <ClockContext.Provider value={{ nowMs: () => nowMs }}>
-        <PatrolApiStatusContext.Provider value={patrolApiStatus}>
-          <SettingsPage />
-        </PatrolApiStatusContext.Provider>
-      </ClockContext.Provider>
+      <MapStylePreferenceProvider>
+        <ClockContext.Provider value={{ nowMs: () => nowMs }}>
+          <PatrolApiStatusContext.Provider value={patrolApiStatus}>
+            <SettingsPage showMapStyleSettings={showMapStyleSettings} />
+          </PatrolApiStatusContext.Provider>
+        </ClockContext.Provider>
+      </MapStylePreferenceProvider>
     </ColorSchemePreferenceProvider>,
   );
 }
@@ -120,6 +124,31 @@ describe('SettingsPage', () => {
     renderPage(patrolApiStatus);
     expect(screen.getByRole('combobox', { name: '색상 모드' }))
       .toHaveTextContent('다크');
+  });
+
+  it('Control 설정에서만 배포 환경의 지도 스타일 선택을 표시한다', () => {
+    const patrolApiStatus: PatrolApiStatusPort = {
+      endpoint: '/api/integrations/patrol',
+      check: () => Promise.resolve(),
+    };
+    vi.stubEnv('VITE_MAPBOX_STYLE_URL', 'mapbox://styles/test/primary');
+    vi.stubEnv(
+      'VITE_MAPBOX_SECONDARY_STYLE_URL',
+      'mapbox://styles/test/secondary',
+    );
+    const controlSettings = renderPage(patrolApiStatus, undefined, true);
+
+    expect(screen.getByRole('heading', { name: '지도 스타일' }))
+      .toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '지도 스타일' }))
+      .toHaveTextContent('기본 스타일');
+    expect(screen.queryByText('추가 지도 스타일이 설정되지 않았습니다.'))
+      .not.toBeInTheDocument();
+    controlSettings.unmount();
+
+    renderPage(patrolApiStatus);
+    expect(screen.queryByRole('heading', { name: '지도 스타일' }))
+      .not.toBeInTheDocument();
   });
 
   it('설정을 중첩 카드 없이 두 개의 상위 그룹으로 표시한다', () => {

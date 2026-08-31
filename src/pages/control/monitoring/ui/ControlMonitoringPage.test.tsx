@@ -1,3 +1,4 @@
+import { type PropsWithChildren, useEffect } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -26,6 +27,11 @@ import {
   type RobotGeolocationObservation,
   type RobotGeolocationQueryPort,
 } from '@/entities/robot-telemetry';
+import {
+  MapStylePreferenceProvider,
+  useMapStylePreference,
+  type MapStyleId,
+} from '@/shared/config';
 import { ControlMonitoringPage } from './ControlMonitoringPage';
 
 const {
@@ -156,19 +162,37 @@ function renderPage(
   status: RobotOperationalStatusQueryPort = operationalStatus,
   location: RobotGeolocationQueryPort = geolocation,
   initialEntry = '/control/monitoring',
+  mapStyleId: MapStyleId = 'primary',
 ) {
   return render(
-    <RobotCatalogContext.Provider value={catalog}>
-      <RobotOperationalStatusContext.Provider value={status}>
-        <RobotGeolocationContext.Provider value={location}>
-          <MemoryRouter initialEntries={[initialEntry]}>
-            <ControlMonitoringPage />
-            <CurrentLocation />
-          </MemoryRouter>
-        </RobotGeolocationContext.Provider>
-      </RobotOperationalStatusContext.Provider>
-    </RobotCatalogContext.Provider>,
+    <MapStylePreferenceProvider>
+      <MapStyleSelectionGate styleId={mapStyleId}>
+        <RobotCatalogContext.Provider value={catalog}>
+          <RobotOperationalStatusContext.Provider value={status}>
+            <RobotGeolocationContext.Provider value={location}>
+              <MemoryRouter initialEntries={[initialEntry]}>
+                <ControlMonitoringPage />
+                <CurrentLocation />
+              </MemoryRouter>
+            </RobotGeolocationContext.Provider>
+          </RobotOperationalStatusContext.Provider>
+        </RobotCatalogContext.Provider>
+      </MapStyleSelectionGate>
+    </MapStylePreferenceProvider>,
   );
+}
+
+function MapStyleSelectionGate({
+  children,
+  styleId,
+}: PropsWithChildren<{ readonly styleId: MapStyleId }>) {
+  const { selectedStyle, selectMapStyle } = useMapStylePreference();
+
+  useEffect(() => {
+    if (selectedStyle.id !== styleId) selectMapStyle(styleId);
+  }, [selectMapStyle, selectedStyle.id, styleId]);
+
+  return selectedStyle.id === styleId ? children : null;
 }
 
 function CurrentLocation() {
@@ -194,14 +218,36 @@ function createRobot(index: number): RobotDescriptor {
 describe('ControlMonitoringPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     vi.stubEnv('VITE_MAPBOX_ACCESS_TOKEN', 'test-mapbox-access-token');
     vi.stubEnv('VITE_MAPBOX_STYLE_URL', 'mapbox://styles/test/style');
+    vi.stubEnv(
+      'VITE_MAPBOX_SECONDARY_STYLE_URL',
+      'mapbox://styles/test/secondary-style',
+    );
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('설정에서 선택한 추가 스타일 URL로 Mapbox 지도를 생성한다', async () => {
+    renderPage(
+      undefined,
+      undefined,
+      undefined,
+      '/control/monitoring',
+      'secondary',
+    );
+
+    await waitFor(() => {
+      expect(createMap).toHaveBeenCalledWith(expect.objectContaining({
+        style: 'mapbox://styles/test/secondary-style',
+      }));
+    });
   });
 
   it('Mapbox 토큰 환경변수가 없으면 명확한 설정 오류를 표시한다', async () => {

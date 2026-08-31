@@ -4,7 +4,10 @@ import {
   PatrolApiStatusCheckError,
   usePatrolApiStatusPort,
 } from '@/entities/robot';
-import { useColorSchemePreference } from '@/shared/config';
+import {
+  useColorSchemePreference,
+  useMapStylePreference,
+} from '@/shared/config';
 import { formatDateTime } from '@/shared/lib/format';
 import { useClock } from '@/shared/lib/clock';
 import { Badge } from '@/shared/ui/badge';
@@ -24,6 +27,10 @@ interface CheckState {
   readonly checkedAtMs: number | null;
   readonly message: string;
   readonly status: CheckStatus;
+}
+
+interface SettingsPageProps {
+  readonly showMapStyleSettings?: boolean;
 }
 
 const colorSchemeOptions = [
@@ -74,6 +81,34 @@ function AppearanceSettings() {
   );
 }
 
+function MapStyleSettings() {
+  const {
+    availableStyles,
+    selectedStyle,
+    selectMapStyle,
+  } = useMapStylePreference();
+  const options = availableStyles.map((style) => ({
+    label: style.label,
+    value: style.id,
+  }));
+
+  return (
+    <SettingsRow
+      description="실외 모니터링 지도에 적용하며 실내 3D 지도에는 영향을 주지 않습니다."
+      title="지도 스타일"
+    >
+      <Select
+        className="w-full md:w-56 md:justify-self-end"
+        label="지도 스타일"
+        onValueChange={selectMapStyle}
+        options={options}
+        showLabel={false}
+        value={selectedStyle.id}
+      />
+    </SettingsRow>
+  );
+}
+
 function createInitialState(endpoint: string | null): CheckState {
   return endpoint === null
     ? {
@@ -112,7 +147,9 @@ function getStatusPresentation(status: CheckStatus): {
   return { label: '확인 전', tone: 'neutral' };
 }
 
-export function SettingsPage() {
+export function SettingsPage({
+  showMapStyleSettings = false,
+}: SettingsPageProps) {
   const clock = useClock();
   const patrolApiStatus = usePatrolApiStatusPort();
   const activeControllerRef = useRef<AbortController | null>(null);
@@ -179,6 +216,7 @@ export function SettingsPage() {
         title="화면"
       >
         <AppearanceSettings />
+        {showMapStyleSettings ? <MapStyleSettings /> : null}
       </Panel>
       <Panel title="외부 연결">
         <section aria-labelledby="patrol-api-title" className="grid gap-5">

@@ -71,6 +71,22 @@ describe('App routes', () => {
     ).toBeInTheDocument();
   });
 
+  it('지도 스타일 설정은 Control 설정 경로에만 노출한다', async () => {
+    const controlSettings = renderRoute('/control/settings');
+    expect(
+      await screen.findByRole('heading', { name: '지도 스타일' }),
+    ).toBeInTheDocument();
+    controlSettings.unmount();
+
+    renderRoute('/mlops/settings');
+    expect(
+      await screen.findByRole('heading', { name: '설정' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '지도 스타일' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('루트에서 모니터링으로 이동한다', async () => {
     renderRoute('/');
     expect(

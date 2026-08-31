@@ -16,3 +16,8 @@ export {
 export type {
   ColorSchemePreference,
 } from './color-scheme-preference-context';
+export {
+  MapStylePreferenceProvider,
+  useMapStylePreference,
+} from './map-style-preference-context';
+export type { MapStyleId, MapStyleOption } from './map-style';

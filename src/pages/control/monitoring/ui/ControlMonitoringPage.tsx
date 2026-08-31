@@ -31,6 +31,7 @@ import {
   type RobotGeolocationLoadState,
   type RobotGeolocationObservation,
 } from '@/entities/robot-telemetry';
+import { useMapStylePreference } from '@/shared/config';
 import { appendPathSegment } from '@/shared/lib/navigation';
 import { Button, getButtonClassName } from '@/shared/ui/button';
 import { ErrorMessage } from '@/shared/ui/error-message';
@@ -94,10 +95,11 @@ function MonitoringMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialLocationRef = useRef(location);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? '';
-  const styleUrl = import.meta.env.VITE_MAPBOX_STYLE_URL?.trim() ?? '';
+    const mapRef = useRef<mapboxgl.Map | null>(null);
+    const markerRef = useRef<mapboxgl.Marker | null>(null);
+    const { selectedStyle } = useMapStylePreference();
+    const accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? '';
+    const styleUrl = selectedStyle.styleUrl;
   const mapCenterLatitude = site.mapCenter.latitude;
   const mapCenterLongitude = site.mapCenter.longitude;
 

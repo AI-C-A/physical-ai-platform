@@ -92,7 +92,10 @@ export const APP_ROUTES: RouteObject[] = [
       { path: ROUTE_PATHS.controlCoordinates, element: <CoordinatesPage /> },
       { path: ROUTE_PATHS.controlEvents, element: <EventsPage /> },
       { path: ROUTE_PATHS.controlReports, element: <ReportsPage /> },
-      { path: ROUTE_PATHS.controlSettings, element: <SettingsPage /> },
+      {
+        path: ROUTE_PATHS.controlSettings,
+        element: <SettingsPage showMapStyleSettings />,
+      },
       { path: ROUTE_PATHS.mlopsSessions, element: <SessionsPage /> },
       {
         path: ROUTE_PATHS.mlopsSessionDetail,
