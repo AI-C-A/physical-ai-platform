@@ -4,6 +4,7 @@ import { AnalyticsContext } from '@/entities/analytics';
 import { CaptureOperationsContext } from '@/entities/capture-session';
 import { DatasetRepositoryContext } from '@/entities/dataset';
 import { EpisodeRepositoryContext } from '@/entities/episode';
+import { InterventionQueueContext } from '@/entities/intervention';
 import {
   PatrolApiStatusContext,
   RobotCatalogContext,
@@ -74,6 +75,7 @@ export function AppProviders({
             >
               <EpisodeRepositoryContext.Provider value={services.episodeRepository}>
                 <DatasetRepositoryContext.Provider value={services.datasetRepository}>
+                  <InterventionQueueContext.Provider value={services.interventionQueue}>
                   <RobotEventRepositoryContext.Provider value={services.robotEventRepository}>
                     <AnalyticsContext.Provider value={services.analytics}>
                       <TooltipProvider>
@@ -81,6 +83,7 @@ export function AppProviders({
                       </TooltipProvider>
                     </AnalyticsContext.Provider>
                   </RobotEventRepositoryContext.Provider>
+                  </InterventionQueueContext.Provider>
                 </DatasetRepositoryContext.Provider>
               </EpisodeRepositoryContext.Provider>
             </CaptureOperationsContext.Provider>

@@ -50,6 +50,7 @@ describe('Patrol real Adapter 구성', () => {
     expect(services.robotEventRepository).toBeInstanceOf(PatrolRobotEventRepository);
     await expect(services.episodeRepository.listEpisodes()).resolves.toEqual([]);
     await expect(services.datasetRepository.listDatasets()).resolves.toEqual([]);
+    await expect(services.interventionQueue.listActiveRequests()).resolves.toEqual([]);
     await expect(services.analytics.getOverview({
       startMs: 0,
       endMs: 1,
@@ -79,6 +80,8 @@ describe('Patrol real Adapter 구성', () => {
       episodeIds: [],
     })).rejects.toThrow('이 실행 환경에서는 지원하지 않는 작업입니다');
     await expect(services.captureOperations.startSession('session-1'))
+      .rejects.toThrow('이 실행 환경에서는 지원하지 않는 작업입니다');
+    await expect(services.interventionQueue.accept('intervention-1'))
       .rejects.toThrow('이 실행 환경에서는 지원하지 않는 작업입니다');
     services.dispose();
   });

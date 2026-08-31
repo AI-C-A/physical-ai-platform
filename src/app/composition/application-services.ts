@@ -2,6 +2,7 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
+import type { InterventionQueuePort } from '@/entities/intervention';
 import {
   createUnconfiguredPatrolApiStatus,
   type PatrolApiStatusPort,
@@ -37,6 +38,7 @@ export interface ApplicationServices {
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly interventionQueue: InterventionQueuePort;
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly analytics: AnalyticsPort;
   /** Composition이 소유한 app scope 구독과 선택 Adapter bundle의 자원을 멱등적으로 해제한다. */
@@ -72,6 +74,7 @@ const adapterServiceNames = [
   'captureOperations',
   'datasetRepository',
   'episodeRepository',
+  'interventionQueue',
   'robotEventRepository',
   'analytics',
 ] as const satisfies readonly (keyof AdapterBundle)[];
@@ -242,6 +245,7 @@ export function createApplicationServices(
     );
     const robotEventRepository =
       inMemoryAdapters.factories.robotEventRepository();
+    const interventionQueue = inMemoryAdapters.factories.interventionQueue();
     const episodeRepository = inMemoryAdapters.factories.episodeRepository();
     const datasetRepository = inMemoryAdapters.factories.datasetRepository();
     const core: CoreAdapterBundle = {
@@ -254,6 +258,7 @@ export function createApplicationServices(
       captureOperations,
       robotEventRepository,
       episodeRepository,
+      interventionQueue,
       datasetRepository,
     };
     const analytics = new InMemoryAnalyticsAdapter({

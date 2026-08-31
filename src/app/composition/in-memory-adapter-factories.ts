@@ -6,6 +6,11 @@ import {
 import { createInMemoryDatasetRepository, type DatasetRepositoryPort } from '@/entities/dataset';
 import { createInMemoryEpisodeRepository, type EpisodeRepositoryPort } from '@/entities/episode';
 import {
+  createInMemoryInterventionRequests,
+  InMemoryInterventionQueue,
+  type InterventionQueuePort,
+} from '@/entities/intervention';
+import {
   createInMemoryRobotCatalogWithData,
   createInMemoryRobotOperationalStatusWithData,
   inMemoryRobotIds,
@@ -38,6 +43,7 @@ export interface InMemoryCoreAdapterBundle {
   readonly captureOperations: CaptureOperationsPort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly interventionQueue: InterventionQueuePort;
   readonly robotEventRepository: RobotEventRepositoryPort;
 }
 
@@ -82,6 +88,9 @@ export function createInMemoryAdapterFactories(
       })),
       datasetRepository: () => createInMemoryDatasetRepository(clock),
       episodeRepository: () => createInMemoryEpisodeRepository(clock),
+      interventionQueue: () => new InMemoryInterventionQueue(
+        createInMemoryInterventionRequests(clock),
+      ),
       robotEventRepository: () => createInMemoryRobotEventRepository(clock),
     },
     dispose: () => {

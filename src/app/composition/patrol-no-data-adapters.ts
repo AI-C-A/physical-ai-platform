@@ -2,6 +2,10 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
+import {
+  createUnavailableInterventionQueue,
+  type InterventionQueuePort,
+} from '@/entities/intervention';
 import type { RobotEventRepositoryPort } from '@/entities/robot-event';
 import type {
   RobotGeolocationQueryPort,
@@ -20,6 +24,7 @@ interface PatrolNoDataAdapters {
   readonly captureOperations: CaptureOperationsPort;
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
+  readonly interventionQueue: InterventionQueuePort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly analytics: AnalyticsPort;
 }
@@ -107,6 +112,8 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     subscribe: () => noOpUnsubscribe,
   };
 
+  const interventionQueue = createUnavailableInterventionQueue();
+
   return {
     sensorDeviceCatalog,
     robotTelemetry,
@@ -114,6 +121,7 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     captureOperations,
     robotEventRepository,
     episodeRepository,
+    interventionQueue,
     datasetRepository,
     analytics,
   };
