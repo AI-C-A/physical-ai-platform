@@ -420,10 +420,12 @@ test('MLOps 목록과 JSON 내보내기가 페이지를 포함한 같은 레코�
     tableName: '에피소드 목록',
   });
   await expectJsonExportMatchesTable(page, {
-    exportButtonName: '데이터셋 내보내기',
+    directDownload: true,
+    exportButtonName: 'Dataset JSON 내보내기',
+    paginated: false,
     pathPrefix: '/mlops/datasets',
-    route: '/mlops/datasets?sort=name-asc',
-    tableName: '데이터셋 목록',
+    route: '/mlops/datasets',
+    tableName: 'Dataset 버전 목록',
   });
 
   issues.assertNone();
@@ -504,11 +506,12 @@ test('수집 계획의 DOM·시각 순서가 viewport별 키보드 읽기 순서
   issues.assertNone();
 });
 
-test('수집부터 성공·실패 Episode 생성까지 앱 범위 업무를 완료한다', async ({
+test('수집부터 에피소드와 초안 데이터셋까지 앱 범위 업무를 완료한다', async ({
   page,
 }, testInfo) => {
   const issues = observeBrowserIssues(page);
   const captureName = `브라우저 수집 ${testInfo.project.name}`;
+  const datasetName = `브라우저 데이터셋 ${testInfo.project.name}`;
 
   await page.goto('/mlops/capture/humanoid');
   await expectApplicationReady(page);
@@ -534,7 +537,30 @@ test('수집부터 성공·실패 Episode 생성까지 앱 범위 업무를 완�
   await expect(page).toHaveURL(/\/mlops\/sessions$/u);
   await page.getByRole('link', { name: captureName }).click();
   await expect(page).toHaveURL(/\/mlops\/sessions\/capture-h-/u);
-  await expect(page.getByRole('link', { name: /^Episode \d+ · episode-/u }))
-    .toHaveCount(2);
+  const episodeLinks = page.getByRole('link', { name: /^Episode \d+ · episode-/u });
+  await expect(episodeLinks).toHaveCount(2);
+  const firstEpisodeHref = await episodeLinks.first().getAttribute('href');
+  const episodeId = firstEpisodeHref?.split('/').at(-1);
+  if (episodeId === undefined || episodeId.length === 0) {
+    throw new Error('생성된 Episode ID를 찾지 못했습니다.');
+  }
+
+  await page.goto(`/mlops/datasets/new?kind=humanoid-episode&episode=${encodeURIComponent(episodeId)}`);
+  await expectApplicationReady(page);
+  await expect(
+    page.getByRole('heading', { level: 1, name: '새 Dataset Version' }),
+  ).toBeVisible();
+  await page.getByRole('textbox', { name: '이름' }).fill(datasetName);
+  await page.getByRole('button', { name: '초안 생성' }).click();
+  await expect(page).toHaveURL(/\/mlops\/datasets\/dataset-/u);
+  await expect(
+    page.getByRole('heading', { level: 1, name: `${datasetName} v1` }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Release' }).click();
+  await expect(page.getByRole('status')).toContainText(
+    'Dataset Version을 Release했습니다.',
+  );
+  await expect(page.getByText('released', { exact: true })).toBeVisible();
   issues.assertNone();
 });

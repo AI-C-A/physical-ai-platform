@@ -69,6 +69,9 @@ export const MINI_APP_REGISTRY = [
         id: 'data',
         label: '데이터',
         items: [
+          { label: '데이터 카탈로그', path: ROUTE_PATHS.mlopsCatalog, icon: 'search' },
+          { label: '어노테이션', path: ROUTE_PATHS.mlopsAnnotations, icon: 'table' },
+          { label: '품질관리', path: ROUTE_PATHS.mlopsQuality, icon: 'check' },
           { label: '데이터셋', path: ROUTE_PATHS.mlopsDatasets, icon: 'database' },
         ],
       },

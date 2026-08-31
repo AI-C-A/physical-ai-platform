@@ -31,12 +31,14 @@ const officialRoutes = [
   { path: '/mlops/drives/drive-001', heading: 'Drive · route-a' },
   { path: '/mlops/interventions', heading: '개입 이벤트' },
   { path: '/mlops/interventions/intervention-001', heading: 'Intervention · intervention-001' },
-  { path: '/mlops/datasets', heading: '데이터셋' },
-  { path: '/mlops/datasets/new', heading: '새 데이터셋' },
-  {
-    path: '/mlops/datasets/dataset-001',
-    heading: '학습 데이터셋 초안 01',
-  },
+  { path: '/mlops/catalog', heading: '데이터 카탈로그' },
+  { path: '/mlops/annotations', heading: 'Annotation 작업' },
+  { path: '/mlops/annotations/annotation-001', heading: 'Sorting task outcome review' },
+  { path: '/mlops/quality', heading: '품질 관리' },
+  { path: '/mlops/quality/quality-001', heading: 'Episode synchronization QC' },
+  { path: '/mlops/datasets', heading: 'Dataset 버전' },
+  { path: '/mlops/datasets/new', heading: '새 Dataset Version' },
+  { path: '/mlops/datasets/dataset-h-v3', heading: 'Sorting Generalist v3' },
   { path: '/mlops/settings', heading: '설정' },
   { path: '/bigdata/overview', heading: '개요' },
   { path: '/bigdata/explorer', heading: '데이터 탐색' },
@@ -59,8 +61,7 @@ const missingDetailRoutes = [
   },
   {
     path: '/mlops/datasets/dataset-not-found',
-    message: '요청한 데이터셋을 찾을 수 없습니다.',
-    returnLink: '데이터셋으로',
+    message: 'Dataset 버전을 찾을 수 없습니다.',
   },
 ] as const;
 

@@ -46,15 +46,14 @@ const SitesPage = lazy(async () => ({
 const CapturePage = lazy(async () => ({ default: (await FlywheelPages()).CaptureHubPage }));
 const HumanoidCapturePage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCapturePage }));
 const MobilityCapturePage = lazy(async () => ({ default: (await FlywheelPages()).MobilityCapturePage }));
-const DatasetDetailPage = lazy(async () => ({
-  default: (await import('@/pages/mlops/datasets')).DatasetDetailPage,
-}));
-const DatasetsPage = lazy(async () => ({
-  default: (await import('@/pages/mlops/datasets')).DatasetsPage,
-}));
-const NewDatasetPage = lazy(async () => ({
-  default: (await import('@/pages/mlops/datasets')).NewDatasetPage,
-}));
+const CatalogPage = lazy(async () => ({ default: (await FlywheelPages()).CatalogPage }));
+const AnnotationsPage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationsPage }));
+const AnnotationWorkspacePage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationWorkspacePage }));
+const QualityPage = lazy(async () => ({ default: (await FlywheelPages()).QualityPage }));
+const QualityDetailPage = lazy(async () => ({ default: (await FlywheelPages()).QualityDetailPage }));
+const DatasetsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelDatasetsPage }));
+const NewDatasetPage = lazy(async () => ({ default: (await FlywheelPages()).NewFlywheelDatasetPage }));
+const DatasetDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelDatasetDetailPage }));
 const EpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodesPage }));
 const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
 const SessionsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionsPage }));
@@ -118,6 +117,11 @@ export const APP_ROUTES: RouteObject[] = [
       { path: ROUTE_PATHS.mlopsDriveDetail, element: <DriveDetailPage /> },
       { path: ROUTE_PATHS.mlopsInterventions, element: <InterventionEventsPage /> },
       { path: ROUTE_PATHS.mlopsInterventionDetail, element: <InterventionDetailPage /> },
+      { path: ROUTE_PATHS.mlopsCatalog, element: <CatalogPage /> },
+      { path: ROUTE_PATHS.mlopsAnnotations, element: <AnnotationsPage /> },
+      { path: ROUTE_PATHS.mlopsAnnotationDetail, element: <AnnotationWorkspacePage /> },
+      { path: ROUTE_PATHS.mlopsQuality, element: <QualityPage /> },
+      { path: ROUTE_PATHS.mlopsQualityDetail, element: <QualityDetailPage /> },
       { path: ROUTE_PATHS.mlopsDatasets, element: <DatasetsPage /> },
       { path: ROUTE_PATHS.mlopsNewDataset, element: <NewDatasetPage /> },
       {
