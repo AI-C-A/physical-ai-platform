@@ -105,6 +105,16 @@ export const MINI_APP_REGISTRY = [
         path: ROUTE_PATHS.bigdataExplorer,
         icon: 'search',
       },
+      {
+        label: '실패·데이터 갭',
+        path: ROUTE_PATHS.bigdataFailures,
+        icon: 'events',
+      },
+      {
+        label: '계보',
+        path: ROUTE_PATHS.bigdataLineage,
+        icon: 'mlops',
+      },
     ],
   },
 ] as const satisfies readonly MiniAppNavigationItem[];

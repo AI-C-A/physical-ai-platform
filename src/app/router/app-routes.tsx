@@ -9,13 +9,10 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { ROUTE_PATHS } from './route-paths';
 
 const FlywheelPages = () => import('@/pages/mlops/flywheel');
-
-const BigDataExplorerPage = lazy(async () => ({
-  default: (await import('@/pages/bigdata/explorer')).BigDataExplorerPage,
-}));
-const BigDataOverviewPage = lazy(async () => ({
-  default: (await import('@/pages/bigdata/overview')).BigDataOverviewPage,
-}));
+const BigDataExplorerPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelExplorerPage }));
+const FlywheelOverviewPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelOverviewPage }));
+const FailuresPage = lazy(async () => ({ default: (await FlywheelPages()).FailuresPage }));
+const LineagePage = lazy(async () => ({ default: (await FlywheelPages()).LineagePage }));
 const CoordinatesPage = lazy(async () => ({
   default: (await import('@/pages/control/coordinates')).CoordinatesPage,
 }));
@@ -46,6 +43,14 @@ const SitesPage = lazy(async () => ({
 const CapturePage = lazy(async () => ({ default: (await FlywheelPages()).CaptureHubPage }));
 const HumanoidCapturePage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCapturePage }));
 const MobilityCapturePage = lazy(async () => ({ default: (await FlywheelPages()).MobilityCapturePage }));
+const SessionsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionsPage }));
+const SessionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionDetailPage }));
+const EpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodesPage }));
+const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
+const DrivesPage = lazy(async () => ({ default: (await FlywheelPages()).DrivesPage }));
+const DriveDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DriveDetailPage }));
+const InterventionEventsPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionEventsPage }));
+const InterventionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionDetailPage }));
 const CatalogPage = lazy(async () => ({ default: (await FlywheelPages()).CatalogPage }));
 const AnnotationsPage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationsPage }));
 const AnnotationWorkspacePage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationWorkspacePage }));
@@ -67,14 +72,6 @@ const NewDeploymentPage = lazy(async () => ({ default: (await FlywheelPages()).N
 const DeploymentDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DeploymentDetailPage }));
 const InferencePage = lazy(async () => ({ default: (await FlywheelPages()).InferencePage }));
 const InferenceDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InferenceDetailPage }));
-const EpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodesPage }));
-const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
-const SessionsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionsPage }));
-const SessionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionDetailPage }));
-const DrivesPage = lazy(async () => ({ default: (await FlywheelPages()).DrivesPage }));
-const DriveDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DriveDetailPage }));
-const InterventionEventsPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionEventsPage }));
-const InterventionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionDetailPage }));
 const SettingsPage = lazy(async () => ({
   default: (await import('@/pages/platform/settings')).SettingsPage,
 }));
@@ -157,12 +154,14 @@ export const APP_ROUTES: RouteObject[] = [
       { path: ROUTE_PATHS.mlopsSettings, element: <SettingsPage /> },
       {
         path: ROUTE_PATHS.bigdataOverview,
-        element: <BigDataOverviewPage />,
+        element: <FlywheelOverviewPage />,
       },
       {
         path: ROUTE_PATHS.bigdataExplorer,
         element: <BigDataExplorerPage />,
       },
+      { path: ROUTE_PATHS.bigdataFailures, element: <FailuresPage /> },
+      { path: ROUTE_PATHS.bigdataLineage, element: <LineagePage /> },
       { path: ROUTE_PATHS.bigdataSettings, element: <SettingsPage /> },
       {
         path: '*',

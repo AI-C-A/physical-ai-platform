@@ -45,5 +45,7 @@ export const ROUTE_PATHS = {
   mlopsSettings: '/mlops/settings',
   bigdataOverview: '/bigdata/overview',
   bigdataExplorer: '/bigdata/explorer',
+  bigdataFailures: '/bigdata/failures',
+  bigdataLineage: '/bigdata/lineage',
   bigdataSettings: '/bigdata/settings',
 } as const;

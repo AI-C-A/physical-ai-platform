@@ -53,8 +53,10 @@ const officialRoutes = [
   { path: '/mlops/inference', heading: '추론 세션' },
   { path: '/mlops/inference/inference-001', heading: 'Sort the fruit into matching trays' },
   { path: '/mlops/settings', heading: '설정' },
-  { path: '/bigdata/overview', heading: '개요' },
-  { path: '/bigdata/explorer', heading: '데이터 탐색' },
+  { path: '/bigdata/overview', heading: 'Physical AI 플라이휠' },
+  { path: '/bigdata/explorer', heading: 'BigData 탐색기' },
+  { path: '/bigdata/failures', heading: '실패 및 데이터 공백' },
+  { path: '/bigdata/lineage', heading: '전체 계보' },
   { path: '/bigdata/settings', heading: '설정' },
 ] as const;
 
@@ -86,14 +88,16 @@ test('모든 공식 경로가 오류 없이 업무 화면을 렌더링한다', a
   const issues = observeBrowserIssues(page);
 
   for (const route of officialRoutes) {
-    issues.reset();
-    await page.goto(route.path);
-    await expectApplicationReady(page);
-    await expect(
-      page.getByRole('heading', { level: 1, name: route.heading }),
-    ).toBeVisible();
-    await expectAccessiblePageStructure(page);
-    issues.assertNone();
+    await test.step(route.path, async () => {
+      issues.reset();
+      await page.goto(route.path);
+      await expectApplicationReady(page);
+      await expect(
+        page.getByRole('heading', { level: 1, name: route.heading }),
+      ).toBeVisible();
+      await expectAccessiblePageStructure(page);
+      issues.assertNone();
+    });
   }
 });
 
