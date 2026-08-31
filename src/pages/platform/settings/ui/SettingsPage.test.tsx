@@ -155,10 +155,10 @@ describe('SettingsPage', () => {
     const view = renderPage({
       endpoint: '/api/integrations/patrol',
       check: () => Promise.resolve(),
-    });
+    }, undefined, true);
     const surfaces = view.container.querySelectorAll('[data-surface-layer]');
 
-    expect(screen.getByRole('heading', { name: '화면' }))
+    expect(screen.getByRole('heading', { name: '화면 및 카메라' }))
       .toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '외부 연결' }))
       .toBeInTheDocument();
@@ -166,6 +166,35 @@ describe('SettingsPage', () => {
     for (const surface of surfaces) {
       expect(surface.querySelector('[data-surface-layer]')).toBeNull();
     }
+  });
+
+  it('카메라 동기화 옵션을 안내하고 변경 값을 유지한다', async () => {
+    const user = userEvent.setup();
+    const patrolApiStatus: PatrolApiStatusPort = {
+      endpoint: '/api/integrations/patrol',
+      check: () => Promise.resolve(),
+    };
+    const first = renderPage(patrolApiStatus);
+
+    const syncOption = screen.getByRole('checkbox', {
+      name: '카메라와 세그멘테이션 동기화',
+    });
+    expect(syncOption).not.toBeChecked();
+    expect(screen.queryByText('실시간', { exact: true }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText(/화면이 AI 분석 시간만큼/)).toBeInTheDocument();
+
+    await user.click(syncOption);
+
+    expect(syncOption).toBeChecked();
+    expect(screen.queryByText('동기화', { exact: true }))
+      .not.toBeInTheDocument();
+    first.unmount();
+
+    renderPage(patrolApiStatus);
+    expect(screen.getByRole('checkbox', {
+      name: '카메라와 세그멘테이션 동기화',
+    })).toBeChecked();
   });
 
   it('진입 시 요청하지 않고 수동 확인의 진행·성공 상태를 표시한다', async () => {

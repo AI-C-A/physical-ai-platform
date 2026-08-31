@@ -21,6 +21,7 @@ type SegmentationStatus = 'idle' | 'loading' | 'ready' | 'error';
 interface SegmentationOverlayState {
   readonly labels: readonly SegmentationLabel[];
   readonly metrics: SegmentationMetrics | null;
+  readonly synchronizedFrameReady: boolean;
   readonly status: SegmentationStatus;
 }
 
@@ -44,26 +45,38 @@ function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
 export function useSegmentationOverlay({
   enabled,
   overlayRef,
+  synchronizedFrameRef,
+  synchronizeVideo,
   videoRef,
 }: {
   readonly enabled: boolean;
   readonly overlayRef: RefObject<HTMLImageElement | null>;
+  readonly synchronizedFrameRef: RefObject<HTMLCanvasElement | null>;
+  readonly synchronizeVideo: boolean;
   readonly videoRef: RefObject<HTMLVideoElement | null>;
 }): SegmentationOverlayState {
   const [labels, setLabels] = useState<readonly SegmentationLabel[]>([]);
   const [metrics, setMetrics] = useState<SegmentationMetrics | null>(null);
+  const [synchronizedFrameReady, setSynchronizedFrameReady] = useState(false);
   const [status, setStatus] = useState<SegmentationStatus>('idle');
 
   useEffect(() => {
     const overlay = overlayRef.current;
+    const synchronizedFrame = synchronizedFrameRef.current;
     if (!enabled || overlay === null) {
       if (overlay !== null) overlay.removeAttribute('src');
+      if (synchronizedFrame !== null) {
+        synchronizedFrame.width = 0;
+        synchronizedFrame.height = 0;
+      }
       setLabels([]);
       setMetrics(null);
+      setSynchronizedFrameReady(false);
       setStatus('idle');
       return;
     }
 
+    setSynchronizedFrameReady(false);
     setStatus('loading');
 
     const canvas = document.createElement('canvas');
@@ -82,6 +95,23 @@ export function useSegmentationOverlay({
       overlay.removeAttribute('src');
       if (currentOverlayUrl !== null) URL.revokeObjectURL(currentOverlayUrl);
       currentOverlayUrl = null;
+    };
+    const clearSynchronizedFrame = (): void => {
+      if (synchronizedFrame !== null) {
+        synchronizedFrame.width = 0;
+        synchronizedFrame.height = 0;
+      }
+    };
+    const drawSynchronizedFrame = (): boolean => {
+      if (!synchronizeVideo || synchronizedFrame === null) return false;
+      synchronizedFrame.width = canvas.width;
+      synchronizedFrame.height = canvas.height;
+      const synchronizedContext = synchronizedFrame.getContext('2d', {
+        alpha: false,
+      });
+      if (synchronizedContext === null) return false;
+      synchronizedContext.drawImage(canvas, 0, 0);
+      return true;
     };
     const schedule = (delayMs: number): void => {
       if (!active) return;
@@ -130,13 +160,18 @@ export function useSegmentationOverlay({
         overlay.src = nextOverlayUrl;
         if (previousOverlayUrl !== null) URL.revokeObjectURL(previousOverlayUrl);
         setLabels(result.labels);
+        setSynchronizedFrameReady(drawSynchronizedFrame());
         setStatus('ready');
         retryCount = 0;
 
         if (staleTimer !== null) clearTimeout(staleTimer);
         staleTimer = setTimeout(() => {
           clearOverlay();
-          if (active) setLabels([]);
+          clearSynchronizedFrame();
+          if (active) {
+            setLabels([]);
+            setSynchronizedFrameReady(false);
+          }
         }, maximumOverlayAgeMs);
         const completedAt = performance.now();
         const cycleElapsedMs = completedAt - cycleStartedAt;
@@ -180,8 +215,9 @@ export function useSegmentationOverlay({
       if (timer !== null) clearTimeout(timer);
       if (staleTimer !== null) clearTimeout(staleTimer);
       clearOverlay();
+      clearSynchronizedFrame();
     };
-  }, [enabled, overlayRef, videoRef]);
+  }, [enabled, overlayRef, synchronizedFrameRef, synchronizeVideo, videoRef]);
 
-  return { labels, metrics, status };
+  return { labels, metrics, status, synchronizedFrameReady };
 }

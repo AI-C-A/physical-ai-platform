@@ -5,6 +5,10 @@ import {
   usePatrolApiStatusPort,
 } from '@/entities/robot';
 import {
+  setCameraSegmentationSync,
+  useCameraSegmentationSync,
+} from '@/entities/robot-video';
+import {
   useColorSchemePreference,
   useMapStylePreference,
 } from '@/shared/config';
@@ -12,6 +16,7 @@ import { formatDateTime } from '@/shared/lib/format';
 import { useClock } from '@/shared/lib/clock';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { Checkbox } from '@/shared/ui/checkbox';
 import { PageHeader } from '@/shared/ui/page-header';
 import { Panel } from '@/shared/ui/panel';
 import { Select } from '@/shared/ui/select';
@@ -152,6 +157,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const clock = useClock();
   const patrolApiStatus = usePatrolApiStatusPort();
+  const cameraSegmentationSync = useCameraSegmentationSync();
   const activeControllerRef = useRef<AbortController | null>(null);
   const [checkState, setCheckState] = useState<CheckState>(
     () => createInitialState(patrolApiStatus.endpoint),
@@ -213,10 +219,28 @@ export function SettingsPage({
       />
       <Panel
         contentClassName="divide-y divide-border"
-        title="화면"
+        title="화면 및 카메라"
       >
         <AppearanceSettings />
         {showMapStyleSettings ? <MapStyleSettings /> : null}
+        <SettingsRow
+          description="분석에 사용된 프레임을 표시해 마스크 위치를 맞춥니다. 켜면 화면이 AI 분석 시간만큼 지연됩니다."
+          title="세그멘테이션 동기화"
+        >
+          <Checkbox
+            checked={cameraSegmentationSync}
+            className="justify-self-start md:justify-self-end"
+            label={(
+              <>
+                <span aria-hidden="true">사용</span>
+                <span className="sr-only">
+                  카메라와 세그멘테이션 동기화
+                </span>
+              </>
+            )}
+            onCheckedChange={setCameraSegmentationSync}
+          />
+        </SettingsRow>
       </Panel>
       <Panel title="외부 연결">
         <section aria-labelledby="patrol-api-title" className="grid gap-5">

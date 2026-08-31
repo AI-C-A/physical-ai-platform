@@ -1,22 +1,29 @@
+import type { ReactNode } from 'react';
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 
+import { cn } from '@/shared/ui/class-names';
 import { Icon } from '@/shared/ui/icon';
 
 interface CheckboxProps {
   readonly checked: boolean;
+  readonly className?: string;
   readonly disabled?: boolean;
-  readonly label: string;
+  readonly label: ReactNode;
   readonly onCheckedChange: (checked: boolean) => void;
 }
 
 export function Checkbox({
   checked,
+  className,
   disabled = false,
   label,
   onCheckedChange,
 }: CheckboxProps) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+    <label className={cn(
+      'flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50',
+      className,
+    )}>
       <CheckboxPrimitive.Root
         checked={checked}
         className="grid size-5 place-items-center rounded border border-border bg-surface data-[state=checked]:border-action-primary data-[state=checked]:bg-action-primary data-[state=checked]:text-action-on-fill"

@@ -9,20 +9,37 @@ vi.mock('../api/segmentation-batch-queue', () => ({
   requestQueuedSegmentationOverlay: vi.fn(),
 }));
 
-function SegmentationHarness({ enabled = true }: { readonly enabled?: boolean }) {
+function SegmentationHarness({
+  enabled = true,
+  synchronizeVideo = false,
+}: {
+  readonly enabled?: boolean;
+  readonly synchronizeVideo?: boolean;
+}) {
   const overlayRef = useRef<HTMLImageElement>(null);
+  const synchronizedFrameRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const state = useSegmentationOverlay({ enabled, overlayRef, videoRef });
+  const state = useSegmentationOverlay({
+    enabled,
+    overlayRef,
+    synchronizedFrameRef,
+    synchronizeVideo,
+    videoRef,
+  });
 
   return (
     <>
       <video data-testid="video" ref={videoRef} />
+      <canvas data-testid="synchronized-frame" ref={synchronizedFrameRef} />
       <img alt="" data-testid="overlay" ref={overlayRef} />
       <output data-testid="labels">
         {state.labels.map((label) => label.className).join(',')}
       </output>
       <output data-testid="metrics">
         {state.metrics === null ? '' : String(state.metrics.latencyMs)}
+      </output>
+      <output data-testid="synchronized-frame-ready">
+        {String(state.synchronizedFrameReady)}
       </output>
       <output data-testid="status">{state.status}</output>
     </>
@@ -42,11 +59,14 @@ function makeVideoReady(): void {
 }
 
 describe('useSegmentationOverlay', () => {
+  let drawImage: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(requestQueuedSegmentationOverlay).mockReset();
+    drawImage = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      drawImage: vi.fn(),
+      drawImage,
     } as unknown as CanvasRenderingContext2D);
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
       (callback) => callback(new Blob(['frame'], { type: 'image/jpeg' })),
@@ -92,6 +112,37 @@ describe('useSegmentationOverlay', () => {
     view.unmount();
 
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:segmentation-overlay');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('동기화 모드에서는 응답 overlay와 요청에 사용한 카메라 프레임을 함께 적용한다', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:synchronized-overlay');
+    vi.spyOn(URL, 'revokeObjectURL');
+    vi.mocked(requestQueuedSegmentationOverlay).mockResolvedValue({
+      labels: [],
+      overlay: new Blob(['overlay'], { type: 'image/png' }),
+    });
+
+    const view = render(<SegmentationHarness synchronizeVideo />);
+    makeVideoReady();
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    const synchronizedFrame = screen.getByTestId('synchronized-frame');
+    expect(synchronizedFrame).toHaveAttribute('width', '512');
+    expect(synchronizedFrame).toHaveAttribute('height', '288');
+    expect(drawImage).toHaveBeenCalledTimes(2);
+    expect(drawImage).toHaveBeenNthCalledWith(
+      2,
+      expect.any(HTMLCanvasElement),
+      0,
+      0,
+    );
+    expect(screen.getByTestId('synchronized-frame-ready'))
+      .toHaveTextContent('true');
+
+    view.unmount();
+    expect(synchronizedFrame).toHaveAttribute('width', '0');
+    expect(synchronizedFrame).toHaveAttribute('height', '0');
     expect(vi.getTimerCount()).toBe(0);
   });
 

@@ -18,6 +18,7 @@ import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Spinner } from '@/shared/ui/spinner';
 
 import type { SegmentationLabel } from '../api/segmentation-client';
+import { useCameraSegmentationSync } from '../model/camera-segmentation-sync';
 import { useRobotVideoPort } from '../model/robot-video-context';
 import type {
   RobotVideoPort,
@@ -150,10 +151,16 @@ function VideoSurface({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLImageElement>(null);
+  const synchronizedFrameRef = useRef<HTMLCanvasElement>(null);
+  const cameraSegmentationSync = useCameraSegmentationSync();
+  const synchronizeVideo = (segmentationEnabled ?? false)
+    && cameraSegmentationSync;
 
   const segmentationOverlay = useSegmentationOverlay({
     enabled: segmentationEnabled ?? false,
     overlayRef,
+    synchronizedFrameRef,
+    synchronizeVideo,
     videoRef,
   });
   const isSegmentationLoading = segmentationOverlay.status === 'idle'
@@ -196,6 +203,16 @@ function VideoSurface({
       />
       {segmentationEnabled === true ? (
         <>
+          {synchronizeVideo ? (
+            <canvas
+              aria-hidden="true"
+              className={`pointer-events-none absolute inset-0 h-full w-full object-contain ${
+                segmentationOverlay.synchronizedFrameReady ? '' : 'invisible'
+              }`}
+              data-segmentation-synchronized-frame="true"
+              ref={synchronizedFrameRef}
+            />
+          ) : null}
           <img
             alt=""
             aria-hidden="true"
@@ -227,7 +244,7 @@ function VideoSurface({
                 ? 'AI 분석 실패 · 다시 시도 중'
                 : segmentationOverlay.metrics === null
                   ? 'AI 분석 중'
-                  : `지연 ${String(Math.round(segmentationOverlay.metrics.latencyMs))} ms · 처리 ${segmentationOverlay.metrics.framesPerSecond.toFixed(1)} FPS`}
+                  : `${synchronizeVideo ? '동기화 · ' : ''}지연 ${String(Math.round(segmentationOverlay.metrics.latencyMs))} ms · 처리 ${segmentationOverlay.metrics.framesPerSecond.toFixed(1)} FPS`}
             </span>
           </div>
         </>
