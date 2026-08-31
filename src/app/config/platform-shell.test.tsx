@@ -194,6 +194,16 @@ describe('PlatformShell', () => {
     expect(screen.getByText('BigData 개요 화면')).toBeInTheDocument();
   });
 
+  it('한글 MLOps 그룹 라벨은 대문자 변환과 확장 자간을 사용하지 않는다', () => {
+    renderShell('/mlops/capture');
+
+    for (const label of ['수집', '데이터']) {
+      const groupButton = screen.getByRole('button', { name: label });
+      expect(groupButton).toHaveClass('normal-case', 'tracking-normal');
+      expect(groupButton).not.toHaveClass('uppercase', 'tracking-[0.08em]');
+    }
+  });
+
   it.each([
     ['/control/monitoring', '/control/settings'],
     ['/mlops/capture', '/mlops/settings'],

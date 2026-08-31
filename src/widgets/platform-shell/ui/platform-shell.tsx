@@ -19,17 +19,25 @@ import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
 
-interface MiniAppNavigationChild {
+export interface MiniAppNavigationChild {
   readonly icon: IconName;
   readonly label: string;
   readonly path: string;
 }
 
+export interface MiniAppNavigationGroup {
+  readonly id: string;
+  readonly items: readonly MiniAppNavigationChild[];
+  readonly label: string;
+}
+
+type MiniAppNavigationEntry = MiniAppNavigationChild | MiniAppNavigationGroup;
+
 export interface MiniAppNavigationItem {
   readonly homePath: string;
   readonly icon: IconName;
   readonly id: string;
-  readonly items: readonly MiniAppNavigationChild[];
+  readonly items: readonly MiniAppNavigationEntry[];
   readonly label: string;
   readonly settingsPath: string;
 }
@@ -43,7 +51,12 @@ function getRouteLabel(
   miniApps: readonly MiniAppNavigationItem[],
 ): string {
   if (pathname === '/') {
-    return miniApps[0]?.items[0]?.label ?? '플랫폼';
+    const firstEntry = miniApps[0]?.items[0];
+    return firstEntry === undefined
+      ? '플랫폼'
+      : 'path' in firstEntry
+        ? firstEntry.label
+        : firstEntry.items[0]?.label ?? firstEntry.label;
   }
 
   if (miniApps.some((miniApp) => pathname === miniApp.settingsPath)) {
@@ -51,7 +64,9 @@ function getRouteLabel(
   }
 
   const matchingItems = miniApps
-    .flatMap((miniApp) => miniApp.items)
+    .flatMap((miniApp) => miniApp.items.flatMap((entry) => (
+      'path' in entry ? [entry] : entry.items
+    )))
     .filter(
       (item) =>
         pathname === item.path || pathname.startsWith(`${item.path}/`),
@@ -207,7 +222,18 @@ function InnerNavigation({
       aria-label="미니앱 업무 메뉴"
       className="grid min-w-0 gap-1"
     >
-      {items.map((item) => {
+      {items.map((entry) => {
+        if (!('path' in entry)) {
+          return (
+            <NavigationGroup
+              collapsed={collapsed}
+              group={entry}
+              key={entry.id}
+              {...(onNavigate === undefined ? {} : { onNavigate })}
+            />
+          );
+        }
+        const item = entry;
         const isActive =
           location.pathname === item.path ||
           location.pathname.startsWith(`${item.path}/`);
@@ -237,6 +263,98 @@ function InnerNavigation({
       })}
     </nav>
   );
+}
+
+function NavigationGroup({
+  collapsed,
+  group,
+  onNavigate,
+}: {
+  readonly collapsed: boolean;
+  readonly group: MiniAppNavigationGroup;
+  readonly onNavigate?: () => void;
+}) {
+  const location = useLocation();
+  const hasActiveItem = group.items.some(
+    (item) => location.pathname === item.path
+      || location.pathname.startsWith(`${item.path}/`),
+  );
+  const [expanded, setExpanded] = useState(hasActiveItem);
+  const effectiveExpanded = expanded || hasActiveItem;
+
+  if (collapsed) {
+    return (
+      <div className="grid gap-1 border-b border-border pb-2 last:border-b-0">
+        {group.items.map((item) => (
+          <NavigationLink
+            collapsed
+            item={item}
+            key={item.path}
+            {...(onNavigate === undefined ? {} : { onNavigate })}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className="border-b border-border pb-2 last:border-b-0">
+      <button
+        aria-expanded={effectiveExpanded}
+        className="flex min-h-9 w-full items-center justify-between rounded-md px-3 text-xs font-bold normal-case tracking-normal text-muted hover:bg-action-secondary-hover hover:text-foreground"
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        <span>{group.label}</span>
+        <Icon name={effectiveExpanded ? 'chevron-down' : 'chevron-right'} />
+      </button>
+      {effectiveExpanded ? (
+        <div className="grid gap-1 pt-1">
+          {group.items.map((item) => (
+            <NavigationLink
+              collapsed={false}
+              item={item}
+              key={item.path}
+              {...(onNavigate === undefined ? {} : { onNavigate })}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function NavigationLink({
+  collapsed,
+  item,
+  onNavigate,
+}: {
+  readonly collapsed: boolean;
+  readonly item: MiniAppNavigationChild;
+  readonly onNavigate?: () => void;
+}) {
+  const location = useLocation();
+  const siteSelectionSearch = getSiteSelectionSearch(location.search);
+  const isActive = location.pathname === item.path
+    || location.pathname.startsWith(`${item.path}/`);
+  const link = (
+    <NavLink
+      aria-label={item.label}
+      className={
+        isActive
+          ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
+          : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
+      }
+      onClick={onNavigate}
+      to={{ pathname: item.path, search: siteSelectionSearch }}
+    >
+      <Icon name={item.icon} />
+      {collapsed ? null : <span>{item.label}</span>}
+    </NavLink>
+  );
+  return collapsed ? (
+    <Tooltip content={item.label} trigger={link} />
+  ) : <div>{link}</div>;
 }
 
 function SettingsNavigation({
