@@ -250,6 +250,21 @@ e2e/          # Playwright 회귀
 
 의존 방향은 `app → pages → widgets → entities → shared`다. 상위 레이어는 필요한 하위 레이어만 사용하고, Slice 외부에서는 각 Slice의 Public API를 import한다.
 
+## Physical AI Flywheel 범위
+
+MLOps Mock 모드는 다음 순환 흐름을 상태형 in-memory Port로 제공한다.
+
+`Capture → Episode/Drive/Intervention → Annotation/QC → Dataset Version → Training → Evaluation → Model Registry → Deployment → Inference → Failure/Data Gap`
+
+- 휴머노이드 수집은 한 Capture Session에서 여러 Episode를 순차 기록한다. 동시에 두 Episode를 기록할 수 없다.
+- 사족·모바일 수집은 연속 Drive와 Recording Chunk를 만들며, `autonomous → teleop/manual` 전환 시 Intervention을 자동 생성한다.
+- Dataset Version은 `humanoid-episode`, `drive-window`, `intervention-window` 중 한 종류만 포함한다.
+- Released Dataset만 Training에 사용할 수 있고, 통과한 Evaluation이 없는 Model은 Production 승격과 Deployment가 차단된다.
+- Training, Evaluation, Deployment는 입력과 Fixture에 의해 결정되는 단계별 상태와 구독 이벤트를 제공한다.
+- 앱 실행 중 변경한 Mock 상태는 유지되며, 새로고침하면 결정적인 초기 Fixture로 초기화된다.
+
+Real 모드는 동일한 Route와 Port 계약을 유지하지만 신규 Backend endpoint가 정의되지 않은 기능은 빈 조회 결과를 표시한다. Command는 `이 실행 환경에서는 지원하지 않는 작업입니다` 오류로 종료하며 Mock Fixture로 자동 전환하지 않는다. 실제 ROS ingestion, Object Storage, GPU scheduler, 학습 실행과 Robot deployment는 Port 외부 책임이다.
+
 ## 추가 문서
 
 - [기여 및 검증 규칙](CONTRIBUTING.md)
