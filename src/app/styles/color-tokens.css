@@ -4,6 +4,20 @@
   /* Neutral palette */
   --palette-white: #ffffff;
   --palette-black: #000000;
+  /* 미디어 위의 밝은 문구와 고정된 암부는 전역 테마와 독립적이다. */
+  --media-background: var(--palette-black);
+  --media-foreground: var(--palette-white);
+  --media-foreground-muted: rgba(255, 255, 255, 0.8);
+  --media-scrim: rgba(0, 0, 0, 0.75);
+  --media-outline: rgba(255, 255, 255, 0.1);
+  --visual-pose-left: #38bdf8;
+  --visual-pose-right: #fb923c;
+  --visual-pose-shell: #c4d0dc;
+  --visual-pose-joint: #435369;
+  --visual-pose-grid-major: #3b4e62;
+  --visual-pose-grid-minor: #243142;
+  --visual-pose-light: var(--palette-white);
+  --visual-pose-ground-light: #24334a;
   --palette-gray-50: #f9fafb;
   --palette-gray-100: #f2f4f6;
   --palette-gray-200: #e5e8eb;
@@ -298,7 +312,7 @@
   --adaptive-background-dimmed: light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.56));
   --adaptive-background-sunken: light-dark(#f2f4f6, #101013);
   --adaptive-background-raised: light-dark(#ffffff, #202027);
-  --adaptive-background-floating: light-dark(#ffffff, #2c2c35);
+  --adaptive-background-floating: light-dark(rgba(255, 255, 255, 0.88), rgba(44, 44, 53, 0.88));
   --adaptive-hairline: light-dark(#e5e8eb, #3c3c47);
   --adaptive-gray-background: light-dark(#f2f4f6, #101013);
   --adaptive-screen-background: light-dark(#f6f7f9, #101013);
@@ -331,8 +345,8 @@
   --muted: var(--adaptive-gray-700);
   --border: var(--adaptive-hairline);
   --focus: var(--adaptive-blue-500);
-  --positive: var(--adaptive-green-700);
-  --warning: var(--adaptive-yellow-800);
+  --positive: light-dark(var(--palette-green-900), var(--palette-dark-green-700));
+  --warning: light-dark(color-mix(in srgb, var(--palette-orange-900) 70%, var(--palette-black)), var(--palette-dark-yellow-800));
   --negative: var(--adaptive-red-700);
   --layer-canvas: var(--adaptive-screen-background);
   --layer-base: var(--adaptive-background);
@@ -369,9 +383,8 @@
 [data-color-scheme="dark"] {
   color-scheme: dark;
   /*
-   * light-dark() values declared on :root are resolved in the root color
-   * context before they are inherited. Keep locally forced dark regions
-   * deterministic by assigning their semantic contract explicitly.
+   * :root의 light-dark()는 상속 전에 루트의 색상 모드로 결정된다.
+   * 부분적으로 적용한 다크 영역도 같은 대비를 유지하도록 의미 토큰을 고정한다.
    */
   --background: #101013;
   --foreground: var(--palette-dark-gray-900);
@@ -386,7 +399,7 @@
   --layer-canvas: #101013;
   --layer-base: #17171c;
   --layer-raised: var(--palette-dark-gray-50);
-  --layer-floating: var(--palette-dark-gray-100);
+  --layer-floating: rgba(44, 44, 53, 0.88);
   --layer-dimmed: rgba(0, 0, 0, 0.56);
   --action-primary: var(--palette-dark-blue-300);
   --action-primary-hover: var(--palette-dark-blue-200);

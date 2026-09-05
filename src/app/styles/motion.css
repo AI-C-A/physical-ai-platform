@@ -1,0 +1,176 @@
+@keyframes design-motion-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes design-motion-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes design-motion-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes design-motion-dialog-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.98);
+  }
+}
+
+@keyframes design-motion-sheet-in {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes design-motion-sheet-out {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes design-motion-tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes design-motion-tooltip-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes design-motion-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes design-motion-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+}
+
+.design-motion-overlay[data-state="open"] {
+  animation: design-motion-fade-in var(--design-motion-normal) var(--design-ease-enter) both;
+}
+
+.design-motion-overlay[data-state="closed"] {
+  animation: design-motion-fade-out var(--design-motion-fast) var(--design-ease-exit) both;
+}
+
+.design-motion-dialog[data-state="open"] {
+  animation: design-motion-dialog-in var(--design-motion-normal) var(--design-ease-enter) both;
+}
+
+.design-motion-dialog[data-state="closed"] {
+  animation: design-motion-dialog-out var(--design-motion-fast) var(--design-ease-exit) both;
+}
+
+.design-motion-sheet[data-state="open"] {
+  animation: design-motion-sheet-in var(--design-motion-slow) var(--design-ease-enter) both;
+}
+
+.design-motion-sheet[data-state="closed"] {
+  animation: design-motion-sheet-out var(--design-motion-normal) var(--design-ease-exit) both;
+}
+
+.design-motion-tooltip {
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+
+.design-motion-tooltip:is([data-state="delayed-open"], [data-state="instant-open"]) {
+  animation: design-motion-tooltip-in var(--design-motion-fast) var(--design-ease-enter) both;
+}
+
+.design-motion-tooltip[data-state="closed"] {
+  animation: design-motion-tooltip-out var(--design-motion-fast) var(--design-ease-exit) both;
+}
+
+.design-motion-toast[data-toast-state="open"] {
+  animation: design-motion-toast-in var(--design-motion-normal) var(--design-ease-enter) both;
+}
+
+[data-toast-layout-id] {
+  will-change: transform;
+}
+
+.design-motion-toast[data-toast-state="exiting"] {
+  animation: design-motion-toast-out var(--design-motion-fast) var(--design-ease-exit) both;
+  pointer-events: none;
+}
+
+.design-motion-button-loader {
+  animation: design-motion-fade-in var(--design-motion-fast) var(--design-ease-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .design-motion-dialog[data-state],
+  .design-motion-sheet[data-state],
+  .design-motion-tooltip[data-state],
+  .design-motion-toast[data-toast-state] {
+    animation-name: design-motion-fade-in;
+  }
+
+  [data-toast-layout-id] {
+    will-change: auto;
+  }
+
+  .design-motion-dialog[data-state="closed"],
+  .design-motion-sheet[data-state="closed"],
+  .design-motion-tooltip[data-state="closed"],
+  .design-motion-toast[data-toast-state="exiting"] {
+    animation-name: design-motion-fade-out;
+  }
+}

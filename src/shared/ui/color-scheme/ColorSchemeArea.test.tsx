@@ -14,7 +14,12 @@ describe('ColorSchemeArea', () => {
     const area = screen.getByText('내용').parentElement;
     expect(area).toHaveAttribute('data-color-scheme', 'dark');
     expect(area).toHaveAttribute('data-color-layer', 'floating');
-    expect(area).toHaveClass('text-foreground');
+    expect(area).toHaveClass(
+      'text-foreground',
+      'bg-layer-floating',
+      'shadow-lg',
+      'backdrop-blur-[var(--design-backdrop-blur-floating)]',
+    );
   });
 
   it('모드를 지정하지 않으면 시스템 또는 상위 영역 설정을 상속한다', () => {

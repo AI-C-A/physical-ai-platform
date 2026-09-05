@@ -14,7 +14,11 @@ describe('Surface', () => {
 
   it('실제로 떠 있는 표면에만 elevation을 적용한다', () => {
     render(
-      <Surface aria-label="떠 있는 표면" layer="floating">
+      <Surface
+        aria-label="떠 있는 표면"
+        className="bg-layer-base shadow-none backdrop-blur-none"
+        layer="floating"
+      >
         내용
       </Surface>,
     );
@@ -22,6 +26,7 @@ describe('Surface', () => {
     expect(screen.getByRole('region', { name: '떠 있는 표면' })).toHaveClass(
       'bg-layer-floating',
       'shadow-lg',
+      'backdrop-blur-[var(--design-backdrop-blur-floating)]',
     );
   });
 

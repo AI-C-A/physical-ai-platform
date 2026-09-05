@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./color-tokens.css";
 @import "./design-tokens.css";
+@import "./motion.css";
 
 @theme inline {
   --font-weight-semibold: 500;
@@ -40,6 +41,11 @@
   --color-action-secondary-hover: var(--action-secondary-hover);
   --color-action-secondary-active: var(--action-secondary-active);
   --color-overlay: var(--overlay);
+  --color-media-background: var(--media-background);
+  --color-media-foreground: var(--media-foreground);
+  --color-media-foreground-muted: var(--media-foreground-muted);
+  --color-media-scrim: var(--media-scrim);
+  --color-media-outline: var(--media-outline);
   --color-status-neutral-foreground: var(--status-neutral-foreground);
   --color-status-neutral-background: var(--status-neutral-background);
   --color-status-positive-foreground: var(--status-positive-foreground);

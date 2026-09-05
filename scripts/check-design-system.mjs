@@ -25,12 +25,14 @@ const visualizationAllowlist = new Set([
 
 const elevationAllowlist = new Set([
   'src/pages/control/monitoring/ui/ControlMonitoringPage.tsx',
+  'src/pages/control/monitoring/ui/MonitoringMap.tsx',
   'src/shared/ui/dialog/Dialog.tsx',
   'src/shared/ui/dropdown/Dropdown.tsx',
   'src/shared/ui/select/Select.tsx',
   'src/shared/ui/sheet/Sheet.tsx',
+  'src/shared/ui/surface/floating-surface.ts',
   'src/shared/ui/surface/Surface.tsx',
-  'src/shared/ui/toast/Toast.tsx',
+  'src/shared/ui/toast/ToastItem.tsx',
   'src/shared/ui/tooltip/Tooltip.tsx',
 ]);
 
@@ -38,7 +40,33 @@ const radiusAllowlist = new Set([
   'src/pages/control/monitoring/ui/ControlMonitoringPage.tsx',
 ]);
 
+const collectionMediaPanels = new Set([
+  'src/entities/flywheel/ui/CollectionPerceptionViewer.tsx',
+  'src/entities/flywheel/ui/CollectionBodyPoseViewer.tsx',
+  'src/entities/flywheel/ui/QuestHandPoseViewer.tsx',
+]);
+
 const rules = [
+  {
+    id: 'collection-media-panel',
+    message: '수집 시각화 카드는 공통 MediaPanel의 곡률·헤더·clipping 계약을 사용해야 합니다.',
+    pattern: /^(?![\s\S]*<MediaPanel\b)/gu,
+    appliesTo: (path) => collectionMediaPanels.has(path),
+  },
+  {
+    id: 'media-semantic-color',
+    message: '미디어와 3D 색상은 media/visual-pose 의미 토큰을 사용해야 합니다.',
+    pattern: /\b(?:bg|text|stroke|fill|outline)-(?:black|white)\b|\b0x[0-9a-f]{6}\b/giu,
+    appliesTo: (path) => collectionMediaPanels.has(path)
+      || path === 'src/shared/ui/synchronized-player/SynchronizedPlayer.tsx',
+  },
+  {
+    id: 'input-radius-token',
+    message: '공통 입력 곡률은 design-radius-control 토큰을 사용해야 합니다.',
+    pattern: /\brounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/gu,
+    appliesTo: (path) => path === 'src/shared/ui/input/Input.tsx'
+      || path === 'src/shared/ui/textarea/Textarea.tsx',
+  },
   {
     id: 'raw-color',
     message: '색상 값은 color-tokens.css의 semantic token으로 정의해야 합니다.',
@@ -61,6 +89,12 @@ const rules = [
     ),
   },
   {
+    id: 'floating-contract',
+    message: '플로팅 표면은 반투명 배경·blur·elevation을 묶은 getFloatingSurfaceClassName()을 사용해야 합니다.',
+    pattern: /\bbg-layer-floating(?:\/[0-9]+)?\b/gu,
+    appliesTo: (path) => path !== 'src/shared/ui/surface/floating-surface.ts',
+  },
+  {
     id: 'page-radius',
     message: '페이지 로컬 radius 대신 design radius token 또는 공통 surface를 사용해야 합니다.',
     pattern: /\brounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/gu,
@@ -74,27 +108,29 @@ const rules = [
   },
 ];
 
-export function inspectDesignSystem() {
+export function inspectDesignSystemSource(path, source) {
   const violations = [];
-  for (const absolutePath of collectFiles(sourceRoot)) {
-    const path = normalizePath(absolutePath);
-    const source = readFileSync(absolutePath, 'utf8');
-    for (const rule of rules) {
-      if (!rule.appliesTo(path)) continue;
-      for (const match of source.matchAll(rule.pattern)) {
-        const index = match.index ?? 0;
-        const line = source.slice(0, index).split('\n').length;
-        violations.push({
-          id: rule.id,
-          line,
-          message: rule.message,
-          path,
-          value: match[0],
-        });
-      }
+  for (const rule of rules) {
+    if (!rule.appliesTo(path)) continue;
+    for (const match of source.matchAll(rule.pattern)) {
+      const index = match.index ?? 0;
+      const line = source.slice(0, index).split('\n').length;
+      violations.push({
+        id: rule.id,
+        line,
+        message: rule.message,
+        path,
+        value: match[0],
+      });
     }
   }
   return violations;
+}
+
+export function inspectDesignSystem() {
+  return collectFiles(sourceRoot).flatMap((absolutePath) => inspectDesignSystemSource(
+    normalizePath(absolutePath), readFileSync(absolutePath, 'utf8'),
+  ));
 }
 
 const isMainModule = process.argv[1] !== undefined
