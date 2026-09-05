@@ -67,7 +67,7 @@ describe('useSegmentationOverlay', () => {
     drawImage = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       drawImage,
-    } as unknown as CanvasRenderingContext2D);
+    } as unknown as ReturnType<HTMLCanvasElement['getContext']>);
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
       (callback) => callback(new Blob(['frame'], { type: 'image/jpeg' })),
     );
