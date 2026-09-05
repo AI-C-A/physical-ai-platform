@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   useFlywheelPort,
   useFlywheelQuery,
   type DataUnitKind,
-  type DatasetUnitRef,
   type ReviewStatus,
 } from "@/entities/flywheel";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
+import { Button, getButtonClassName } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { Dialog } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Panel } from "@/shared/ui/panel";
@@ -29,6 +30,7 @@ import { Timeline } from "@/shared/ui/timeline";
 
 import {
   loadAnnotations,
+  loadCatalogCollections,
   loadDatasets,
   loadDrives,
   loadEpisodes,
@@ -44,18 +46,254 @@ import {
   StatusBadge,
 } from "./flywheel-page-shared";
 import { formatDateTime } from "./flywheel-page-utils";
+import { getStatusLabel } from "./flywheel-status";
+import { DatasetDraftForm } from './DatasetDraftForm';
+import { createCatalogExportRecord, createEpisodeExportRecord } from './flywheel-export-records';
 
 function actionFailureMessage(): string {
   return "작업을 완료하지 못했습니다. 다시 시도해 주세요.";
 }
 
 const kindOptions = [
-  { label: "Humanoid Episode", value: "humanoid-episode" },
-  { label: "Drive Window", value: "drive-window" },
-  { label: "Intervention Window", value: "intervention-window" },
+  { label: "휴머노이드 에피소드", value: "humanoid-episode" },
+  { label: "주행 구간", value: "drive-window" },
+  { label: "개입 구간", value: "intervention-window" },
 ];
 
+function DeleteCatalogCollectionButton({
+  collectionId,
+  collectionName,
+  onDeleted,
+}: {
+  readonly collectionId: string;
+  readonly collectionName: string;
+  readonly onDeleted?: () => void;
+}) {
+  const port = useFlywheelPort();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const removeCollection = async (): Promise<void> => {
+    setPending(true);
+    setError(null);
+    try {
+      await port.deleteCatalogCollection(collectionId);
+      setOpen(false);
+      onDeleted?.();
+    } catch {
+      setError(actionFailureMessage());
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Dialog
+      actions={(
+        <Button
+          isLoading={pending}
+          onClick={() => void removeCollection()}
+          variant="danger"
+        >
+          카탈로그 삭제
+        </Button>
+      )}
+      description="카탈로그에서 수집 결과를 제거합니다. 기존 데이터셋이 참조하는 에피소드는 보존됩니다."
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) setError(null);
+      }}
+      open={open}
+      title={`${collectionName} 카탈로그를 삭제하시겠습니까?`}
+      trigger={<Button disabled={pending} variant="ghost">삭제</Button>}
+    >
+      {error === null ? null : <p className="text-sm text-negative" role="alert">{error}</p>}
+    </Dialog>
+  );
+}
+
 export function CatalogPage() {
+  const query = useFlywheelQuery(loadCatalogCollections);
+  return (
+    <div className="grid gap-6">
+      <PageHeader
+        title="데이터 카탈로그"
+        description="수집 결과를 열어 데이터셋에 사용할 에피소드를 선택하세요."
+      />
+      <AsyncState query={query} emptyMessage="카탈로그에 등록된 수집 결과가 없습니다.">
+        {(collections) => (
+          <div className="grid gap-4">
+            <div className="justify-self-end">
+              <JsonExportButton fileName="catalog-collections.json" label="카탈로그 JSON 내보내기" records={collections.map(createCatalogExportRecord)} />
+            </div>
+            <Table aria-label="휴머노이드 데이터 카탈로그">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>수집 이름</TableHead>
+                  <TableHead>로봇</TableHead>
+                  <TableHead>작업 ID</TableHead>
+                  <TableHead>완료 시각</TableHead>
+                  <TableHead>에피소드</TableHead>
+                  <TableHead>품질</TableHead>
+                  <TableHead><span className="sr-only">관리</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {collections.map((collection) => (
+                  <TableRow key={collection.id}>
+                    <TableCell>
+                      <DetailLink to={`/mlops/catalog/${collection.id}`}>
+                        {collection.name}
+                      </DetailLink>
+                    </TableCell>
+                    <TableCell>{collection.robotId ?? collection.participantId ?? '미지정'}</TableCell>
+                    <TableCell>{collection.taskId}</TableCell>
+                    <TableCell>{formatDateTime(collection.completedAtMs)}</TableCell>
+                    <TableCell>{String(collection.episodeIds.length)}</TableCell>
+                    <TableCell><StatusBadge status={collection.qualityStatus} /></TableCell>
+                    <TableCell>
+                      <DeleteCatalogCollectionButton
+                        collectionId={collection.id}
+                        collectionName={collection.name}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </AsyncState>
+    </div>
+  );
+}
+
+export function CatalogDetailPage() {
+  const { collectionId = '' } = useParams();
+  const navigate = useNavigate();
+  const loadCollection = useCallback(
+    (port: ReturnType<typeof useFlywheelPort>) => port.getCatalogCollection(collectionId),
+    [collectionId],
+  );
+  const collectionQuery = useFlywheelQuery(loadCollection);
+  const episodesQuery = useFlywheelQuery(loadEpisodes);
+  const [selected, setSelected] = useState<readonly string[]>([]);
+
+  return (
+    <AsyncState query={collectionQuery} emptyMessage="카탈로그 수집 결과를 찾을 수 없습니다.">
+      {(collection) => {
+        const episodes = episodesQuery.status === 'ready'
+          ? collection.episodeIds
+            .map((id) => episodesQuery.data.find((episode) => episode.id === id))
+            .filter((episode) => episode !== undefined)
+          : [];
+        const selectedEpisodes = selected.filter((id) => episodes.some((episode) => episode.id === id));
+        return (
+          <div className="grid gap-6">
+            <nav aria-label="카탈로그 경로">
+              <Link className={getButtonClassName('ghost')} to="/mlops/catalog">데이터 카탈로그로 돌아가기</Link>
+            </nav>
+            <PageHeader
+              title={collection.name}
+              description={`${collection.taskId} · ${collection.instruction}`}
+              actions={(
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={collection.qualityStatus} />
+                  <DeleteCatalogCollectionButton
+                    collectionId={collection.id}
+                    collectionName={collection.name}
+                    onDeleted={() => void navigate('/mlops/catalog')}
+                  />
+                </div>
+              )}
+            />
+            <Panel title="수집 정보">
+              <DefinitionGrid items={[
+                { label: '수집 ID', value: collection.id },
+                { label: '수집 대상', value: collection.robotId ?? collection.participantId ?? '미지정' },
+                { label: '완료 시각', value: formatDateTime(collection.completedAtMs) },
+                { label: '에피소드', value: `${String(collection.episodeIds.length)}개` },
+              ]} />
+            </Panel>
+            <Panel
+              title="에피소드 선택"
+              description="데이터셋에 포함할 녹화본을 선택하세요."
+            >
+              {episodesQuery.status === 'loading' ? (
+                <p className="text-sm text-muted" role="status">에피소드를 불러오는 중입니다.</p>
+              ) : episodesQuery.status === 'error' ? (
+                <div className="grid justify-items-start gap-3">
+                  <p className="text-sm text-negative" role="alert">수집 정보는 불러왔지만 에피소드를 불러오지 못했습니다.</p>
+                  <Button onClick={episodesQuery.retry} variant="secondary">에피소드 다시 불러오기</Button>
+                </div>
+              ) : episodes.length === 0 ? (
+                <p className="text-sm text-muted" role="status">이 수집에 저장된 에피소드가 없습니다.</p>
+              ) : (
+                <div className="grid gap-4">
+                  <div className="justify-self-end">
+                    <JsonExportButton fileName={`${collection.id}-episodes.json`} label="에피소드 JSON 내보내기" records={episodes.map(createEpisodeExportRecord)} />
+                  </div>
+                  <Table aria-label="카탈로그 에피소드 선택">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>선택</TableHead>
+                        <TableHead>에피소드</TableHead>
+                        <TableHead>길이</TableHead>
+                        <TableHead>저장 상태</TableHead>
+                        <TableHead>품질</TableHead>
+                        <TableHead>상세</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {episodes.map((episode, index) => (
+                        <TableRow key={episode.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selected.includes(episode.id)}
+                              label={<span className="sr-only">{episode.name} 선택</span>}
+                              onCheckedChange={(checked) => setSelected((current) => (
+                                checked
+                                  ? [...current, episode.id]
+                                  : current.filter((id) => id !== episode.id)
+                              ))}
+                            />
+                          </TableCell>
+                          <TableCell>{episode.name || `Episode ${String(index + 1).padStart(2, '0')}`}</TableCell>
+                          <TableCell>
+                            {episode.endedAtMs === null ? '—' : `${String(Math.round((episode.endedAtMs - episode.startedAtMs) / 1_000))}초`}
+                          </TableCell>
+                          <TableCell><StatusBadge status="저장됨" /></TableCell>
+                          <TableCell><StatusBadge status={episode.qualityStatus} /></TableCell>
+                          <TableCell><DetailLink to={`/mlops/episodes/${episode.id}`}>상세 보기</DetailLink></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div>
+                    <Button
+                      className="max-w-full whitespace-normal text-left"
+                      disabled={selectedEpisodes.length === 0}
+                      onClick={() => {
+                        const params = new URLSearchParams({ kind: 'humanoid-episode' });
+                        selectedEpisodes.forEach((episodeId) => params.append('episode', episodeId));
+                        void navigate(`/mlops/datasets/new?${params.toString()}`);
+                      }}
+                    >
+                      선택한 에피소드 {String(selectedEpisodes.length)}개로 데이터셋 구성
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+        );
+      }}
+    </AsyncState>
+  );
+}
+
+export function LegacyCatalogPage() {
   const episodes = useFlywheelQuery(loadEpisodes);
   const drives = useFlywheelQuery(loadDrives);
   const interventions = useFlywheelQuery(loadInterventions);
@@ -78,7 +316,7 @@ export function CatalogPage() {
           id: item.id,
           type: "episode",
           name: item.name,
-          robot: item.robotId,
+          robot: item.robotId ?? item.humanDemonstration?.participantId ?? '미지정',
           quality: item.qualityStatus,
           annotation: item.annotationStatus,
           path: `/mlops/episodes/${item.id}`,
@@ -259,7 +497,7 @@ export function CatalogPage() {
 export function AnnotationsPage() {
   const port = useFlywheelPort();
   const query = useFlywheelQuery(loadAnnotations);
-  const [name, setName] = useState("New annotation task");
+  const [name, setName] = useState("새 검수 작업");
   const [assignee, setAssignee] = useState("collector1");
   const [reviewer, setReviewer] = useState("auditor1");
   const [kind, setKind] = useState<DataUnitKind>("humanoid-episode");
@@ -267,10 +505,10 @@ export function AnnotationsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Annotation 작업"
-        description="대상 Query, Schema, 담당자 이름, 검수 진행률을 관리합니다."
+        title="데이터 검수"
+        description="담당자를 지정하고 에피소드와 주행 구간의 검수 진행률을 확인하세요."
       />
-      <Panel title="Annotation 작업 생성">
+      <Panel title="검수 작업 만들기">
         <form
           className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"
           onSubmit={(event) => {
@@ -284,9 +522,9 @@ export function AnnotationsPage() {
                 assignee,
                 reviewer,
                 totalItems: 48,
-                description: "Task 결과와 구간을 검수합니다.",
+                description: "작업 결과와 구간을 검수합니다.",
               })
-              .then(() => setMessage("Annotation Task를 생성했습니다."))
+              .then(() => setMessage("검수 작업을 만들었습니다."))
               .catch(() => setMessage(actionFailureMessage()));
           }}
         >
@@ -314,7 +552,7 @@ export function AnnotationsPage() {
           />
           <div className="flex items-end">
             <Button className="w-full" type="submit">
-              Task 생성
+              검수 작업 만들기
             </Button>
           </div>
           {message === null ? null : (
@@ -330,7 +568,7 @@ export function AnnotationsPage() {
       <AsyncState query={query}>
         {(items) => (
           <Panel>
-            <Table aria-label="Annotation 작업 목록">
+            <Table aria-label="검수 작업 목록">
               <TableHeader>
                 <TableRow>
                   <TableHead>작업</TableHead>
@@ -349,7 +587,7 @@ export function AnnotationsPage() {
                       </DetailLink>
                     </TableCell>
                     <TableCell>
-                      {item.dataKind}
+                      {kindOptions.find((option) => option.value === item.dataKind)?.label ?? item.dataKind}
                       <br />
                       <span className="text-xs text-muted">
                         {item.schemaName}
@@ -391,7 +629,7 @@ export function AnnotationWorkspacePage() {
   if (task === null)
     return (
       <Panel>
-        <p>Annotation 작업을 찾을 수 없습니다.</p>
+        <p>검수 작업을 찾을 수 없습니다.</p>
       </Panel>
     );
   return (
@@ -402,7 +640,7 @@ export function AnnotationWorkspacePage() {
         actions={<StatusBadge status={task.status} />}
       />
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_24rem]">
-        <Panel title="Annotation 작업 공간">
+        <Panel title="검수 작업 공간">
           <div className="grid gap-5">
             <div className="aspect-video overflow-hidden rounded-[var(--design-radius-surface)] bg-black">
               <video
@@ -438,7 +676,7 @@ export function AnnotationWorkspacePage() {
               ]}
             />
             <Textarea
-              label="자연어 설명 / Review 의견"
+              label="작업 설명 및 검수 의견"
               value={description || task.description}
               onChange={(event) => setDescription(event.target.value)}
             />
@@ -459,7 +697,7 @@ export function AnnotationWorkspacePage() {
                       : Math.min(task.totalItems, task.completedItems + 1),
                 })
                 .then(() =>
-                  setMessage("Annotation과 검수 상태를 저장했습니다."),
+                  setMessage("설명과 검수 상태를 저장했습니다."),
                 )
                 .catch(() => setMessage(actionFailureMessage()));
             }}
@@ -479,7 +717,7 @@ export function AnnotationWorkspacePage() {
               label="검수 상태"
               value={status}
               options={["in-progress", "review", "approved", "rejected"].map(
-                (value) => ({ label: value, value }),
+                (value) => ({ label: getStatusLabel(value), value }),
               )}
               onValueChange={(value) => setStatus(value as ReviewStatus)}
             />
@@ -703,124 +941,13 @@ export function FlywheelDatasetsPage() {
 }
 
 export function NewFlywheelDatasetPage() {
-  const port = useFlywheelPort();
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const initialKind =
-    (params.get("kind") as DataUnitKind | null) ?? "humanoid-episode";
-  const [kind, setKind] = useState<DataUnitKind>(initialKind);
-  const [name, setName] = useState("Flywheel dataset");
-  const [description, setDescription] = useState(
-    "QC 통과 데이터로 구성한 학습 Dataset Version",
-  );
-  const [message, setMessage] = useState<string | null>(null);
-  async function create(): Promise<void> {
-    const unitRefs: DatasetUnitRef[] =
-      kind === "humanoid-episode"
-        ? [
-            {
-              kind: "episode",
-              episodeId: params.get("episode") ?? "episode-fw-001",
-            },
-          ]
-        : kind === "drive-window"
-          ? [
-              {
-                kind: "drive-window",
-                driveSessionId: params.get("drive") ?? "drive-001",
-                startMs: 0,
-                endMs: 60_000,
-              },
-            ]
-          : [
-              {
-                kind: "intervention-window",
-                interventionId:
-                  params.get("intervention") ?? "intervention-001",
-                preMs: 10_000,
-                postMs: 20_000,
-              },
-            ];
-    try {
-      const created = await port.createDataset({
-        projectId: "project-tiger",
-        name,
-        description,
-        kind,
-        tags: [kind, "flywheel"],
-        unitRefs,
-      });
-      void navigate(`/mlops/datasets/${created.id}`);
-    } catch {
-      setMessage(actionFailureMessage());
-    }
-  }
-  return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="새 Dataset Version"
-        description="유형을 먼저 고정하면 다른 단위 유형을 혼합할 수 없습니다."
-      />
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <Panel title="Dataset 구성">
-          <div className="grid gap-4">
-            <Select
-              label="Dataset 유형"
-              value={kind}
-              options={kindOptions}
-              onValueChange={(value) => setKind(value as DataUnitKind)}
-            />
-            <Input
-              label="이름"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-            <Textarea
-              label="설명"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-            <DefinitionGrid
-              items={[
-                { label: "선택 가능 단위", value: kind },
-                { label: "QC 기준", value: "passed / approved" },
-                { label: "Split", value: "80 / 10 / 10" },
-                {
-                  label: "예상 용량",
-                  value: kind === "humanoid-episode" ? "1.62 GB" : "720 MB",
-                },
-              ]}
-            />
-            <Panel layer="base" title="선택 Query">
-              <p className="text-sm text-muted">
-                Robot=all · Site=all · QC=passed · Annotation=approved
-              </p>
-            </Panel>
-            {message === null ? null : (
-              <p className="text-sm text-negative" role="alert">
-                {message}
-              </p>
-            )}
-            <Button onClick={() => void create()}>초안 생성</Button>
-          </div>
-        </Panel>
-        <Panel title="검증 미리보기">
-          <div className="grid gap-3">
-            <Badge tone="positive">유형 호환성 · 통과</Badge>
-            <Badge tone="positive">QC 정책 · 통과</Badge>
-            <Badge tone="info">중복 검사 · 0건</Badge>
-            <Badge tone="info">로봇 호환성 · TIGER 계열</Badge>
-          </div>
-        </Panel>
-      </section>
-    </div>
-  );
+  return <DatasetDraftForm />;
 }
 
 export function FlywheelDatasetDetailPage() {
   const { datasetVersionId = "" } = useParams();
   const port = useFlywheelPort();
+  const navigate = useNavigate();
   const load = useCallback(
     (value: ReturnType<typeof useFlywheelPort>) =>
       value.getDataset(datasetVersionId),
@@ -828,11 +955,12 @@ export function FlywheelDatasetDetailPage() {
   );
   const query = useFlywheelQuery(load);
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   return (
     <div className="grid gap-6">
       <AsyncState
         query={query}
-        emptyMessage="Dataset 버전을 찾을 수 없습니다."
+        emptyMessage="데이터셋 버전을 찾을 수 없습니다."
       >
         {(dataset) => (
           <>
@@ -844,21 +972,35 @@ export function FlywheelDatasetDetailPage() {
                   <StatusBadge status={dataset.status} />
                   {dataset.status !== "released" ? (
                     <Button
-                      onClick={() =>
+                      isLoading={pending}
+                      onClick={() => {
+                        setPending(true);
+                        setMessage(null);
                         void port
                           .releaseDataset(dataset.id)
                           .then(() =>
-                            setMessage("Dataset Version을 Release했습니다."),
+                            setMessage('데이터셋을 릴리스했습니다.'),
                           )
                           .catch(() =>
                             setMessage(actionFailureMessage()),
                           )
-                      }
+                          .finally(() => setPending(false));
+                      }}
                     >
-                      Release
+                      릴리스
                     </Button>
                   ) : (
-                    <Button variant="secondary">새 Version으로 복제</Button>
+                    <Button isLoading={pending} variant="secondary" onClick={() => {
+                      setPending(true);
+                      setMessage(null);
+                      void port.createDataset({
+                        projectId: dataset.projectId, name: `${dataset.name} 복사본`, description: dataset.description,
+                        kind: dataset.kind, tags: dataset.tags, unitRefs: dataset.unitRefs,
+                      })
+                        .then((copy) => navigate(`/mlops/datasets/${copy.id}`))
+                        .catch(() => setMessage('데이터셋을 복사하지 못했습니다. 원본 데이터의 저장 상태를 확인한 뒤 다시 시도하세요.'))
+                        .finally(() => setPending(false));
+                    }}>복사해서 새 데이터셋 만들기</Button>
                   )}
                 </div>
               }
@@ -899,20 +1041,20 @@ export function FlywheelDatasetDetailPage() {
               </div>
             </Panel>
             <section className="grid gap-6 lg:grid-cols-2">
-              <Panel title="분포와 균형">
+              <Panel title="데이터셋 정보">
                 <DefinitionGrid
                   items={[
-                    { label: "Success / Failure", value: "72 / 28" },
-                    { label: "Sites", value: "2" },
-                    { label: "Robots", value: "2" },
-                    { label: "Duplicate", value: "0" },
+                    { label: '데이터 유형', value: kindOptions.find((option) => option.value === dataset.kind)?.label ?? dataset.kind },
+                    { label: '생성 시각', value: formatDateTime(dataset.createdAtMs) },
+                    { label: '수정 시각', value: formatDateTime(dataset.updatedAtMs) },
+                    { label: '태그', value: dataset.tags.join(', ') || '없음' },
                   ]}
                 />
               </Panel>
               <Panel title="검증">
                 <div className="grid gap-2">
                   {dataset.validation.length === 0 ? (
-                    <Badge tone="positive">모든 검증을 통과했습니다</Badge>
+                    <p className="text-sm text-muted">보고된 검증 오류가 없습니다.</p>
                   ) : (
                     dataset.validation.map((issue) => (
                       <Badge tone="negative" key={issue}>
@@ -927,7 +1069,7 @@ export function FlywheelDatasetDetailPage() {
               <p className="text-sm text-muted">
                 Collection → {dataset.kind} → Dataset {dataset.id}
               </p>
-              <ActionLink to="/bigdata/lineage">전체 Lineage 열기</ActionLink>
+              <ActionLink to="/bigdata/lineage">전체 계보 열기</ActionLink>
             </Panel>
           </>
         )}
