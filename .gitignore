@@ -15,3 +15,13 @@ test-results
 !.vscode/extensions.json
 *.log
 /docs/internal/
+/.codex/
+/.cursor/
+/.impeccable/
+*.bundle
+*.p12
+*.pfx
+*.key
+id_rsa
+id_ed25519
+id_ecdsa
