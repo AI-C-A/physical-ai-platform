@@ -1,0 +1,126 @@
+:root {
+  --route-morph-content-duration: var(--design-motion-normal);
+  --route-morph-duration: var(--design-motion-route);
+  --route-morph-ease: var(--design-ease-route);
+  --route-morph-object-position: center;
+  --route-morph-radius: 0;
+  --route-morph-screen-delay: var(--design-motion-fast);
+  --route-morph-source-duration: var(--design-motion-fast);
+  --route-morph-target-delay: var(--design-motion-fast);
+}
+
+[data-route-morph-active] {
+  view-transition-name: route-morph-surface;
+}
+
+html[data-route-morph-direction]::view-transition-group(root),
+html[data-route-morph-direction]::view-transition-old(root),
+html[data-route-morph-direction]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-route-morph-direction="open"]::view-transition-old(root) {
+  opacity: 1;
+}
+
+html[data-route-morph-direction="open"]::view-transition-new(root) {
+  opacity: 0;
+}
+
+html[data-route-morph-direction="close"]::view-transition-old(root) {
+  opacity: 0;
+}
+
+html[data-route-morph-direction="close"]::view-transition-new(root) {
+  opacity: 1;
+}
+
+html[data-route-morph-direction]::view-transition-group(route-morph-surface) {
+  animation-duration: var(--route-morph-duration);
+  animation-fill-mode: both;
+  animation-timing-function: var(--route-morph-ease);
+}
+
+html[data-route-morph-direction]::view-transition-image-pair(route-morph-surface) {
+  overflow: hidden;
+  isolation: isolate;
+}
+
+html[data-route-morph-direction]::view-transition-old(route-morph-surface),
+html[data-route-morph-direction]::view-transition-new(route-morph-surface) {
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  mix-blend-mode: normal;
+}
+
+html[data-route-morph-direction="open"]::view-transition-image-pair(route-morph-surface) {
+  animation: route-morph-radius-open var(--route-morph-duration) var(--route-morph-ease) both;
+}
+
+html[data-route-morph-direction="open"]::view-transition-old(route-morph-surface) {
+  object-fit: fill;
+  animation: route-morph-source-out var(--route-morph-source-duration) var(--design-ease-exit) both;
+}
+
+html[data-route-morph-direction="open"]::view-transition-new(route-morph-surface) {
+  object-fit: cover;
+  object-position: var(--route-morph-object-position);
+  animation: route-morph-screen-in var(--route-morph-content-duration) var(--route-morph-screen-delay) var(--design-ease-enter) both;
+}
+
+html[data-route-morph-direction="close"]::view-transition-image-pair(route-morph-surface) {
+  animation: route-morph-radius-close var(--route-morph-duration) var(--route-morph-ease) both;
+}
+
+html[data-route-morph-direction="close"]::view-transition-old(route-morph-surface) {
+  object-fit: cover;
+  object-position: var(--route-morph-object-position);
+  animation: route-morph-screen-out var(--route-morph-content-duration) calc(var(--route-morph-target-delay) + 20ms) var(--design-ease-exit) both;
+}
+
+html[data-route-morph-direction="close"]::view-transition-new(route-morph-surface) {
+  object-fit: fill;
+  animation: route-morph-target-in var(--route-morph-content-duration) var(--route-morph-target-delay) var(--design-ease-enter) both;
+}
+
+@keyframes route-morph-radius-open {
+  from { border-radius: var(--route-morph-radius); }
+  to { border-radius: 0; }
+}
+
+@keyframes route-morph-radius-close {
+  from { border-radius: 0; }
+  to { border-radius: var(--route-morph-radius); }
+}
+
+@keyframes route-morph-source-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes route-morph-screen-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes route-morph-screen-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes route-morph-target-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(route-morph-surface),
+  ::view-transition-image-pair(route-morph-surface),
+  ::view-transition-old(route-morph-surface),
+  ::view-transition-new(route-morph-surface) {
+    animation-delay: 0ms !important;
+    animation-duration: 1ms !important;
+  }
+}
