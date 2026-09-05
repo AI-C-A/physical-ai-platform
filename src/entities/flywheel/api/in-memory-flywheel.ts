@@ -863,8 +863,11 @@ export class InMemoryFlywheel implements FlywheelPort {
         ref.kind === 'episode' ? [ref.episodeId] : [])),
     );
     this.#sessions = this.#sessions.filter((item) => item.id !== collectionId);
+    this.#episodes.filter((episode) => episode.captureSessionId === collectionId && !referencedEpisodeIds.has(episode.id))
+      .forEach((episode) => this.#forgetEpisodeFrames(episode.id));
     this.#episodes = this.#episodes.filter((episode) =>
       episode.captureSessionId !== collectionId || referencedEpisodeIds.has(episode.id));
+    this.#forgetCollectorSession(collectionId);
     this.#notify();
   }
   listEpisodes = () => Promise.resolve(clone(this.#episodes));
@@ -2616,6 +2619,8 @@ export class InMemoryFlywheel implements FlywheelPort {
 
   #forgetCollectorSession(sessionId: string): void {
     this.#removedSessionIds.add(sessionId);
+    this.#handPoseMetrics.delete(sessionId);
+    this.#handPosePreviews.delete(sessionId);
     this.#collectors.forEach((collector, key) => {
       if (collector.sessionId === sessionId) this.#collectors.delete(key);
     });

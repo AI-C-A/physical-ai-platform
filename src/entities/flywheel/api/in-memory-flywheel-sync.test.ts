@@ -216,4 +216,28 @@ describe.each([['a-pc', 'z-quest'], ['z-pc', 'a-quest']])('장치별 동기화 (
     const frame = await sendFrame(quest, sessionId, next.id, 0);
     expect(await pc.getEpisodeHandPoseAt(next.id, 0)).toEqual(frame);
   });
+
+  it('카탈로그 삭제는 원본 프레임을 정리하고 늦은 장치 알림을 무시한다', async () => {
+    const bus = new DelayedBus();
+    const pc = connect(bus, pcId);
+    const quest = connect(bus, questId);
+    const sessionId = await prepare(pc, quest);
+    const episode = await pc.startEpisode(sessionId);
+    await sendFrame(quest, sessionId, episode.id, 0);
+    const frameMessage = bus.sent.at(-1);
+    if (frameMessage === undefined) throw new Error('원본 프레임 메시지가 필요합니다.');
+    await pc.stopEpisode(episode.id);
+    await acknowledge(quest, sessionId, episode.id, 'stop');
+    await vi.advanceTimersByTimeAsync(250);
+    await pc.saveEpisode(episode.id);
+    await pc.stopSession(sessionId);
+    await vi.advanceTimersByTimeAsync(500);
+    await pc.deleteCatalogCollection(sessionId);
+    const observer = connect(bus, 'observer');
+    bus.deliver(frameMessage);
+    for (const port of [pc, quest, observer]) {
+      expect(await port.getCatalogCollection(sessionId)).toBeNull();
+      expect(await port.getEpisodeHandPoseAt(episode.id, 0)).toBeNull();
+    }
+  });
 });
