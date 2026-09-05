@@ -174,10 +174,9 @@ function MonitoringMap({
       button.setAttribute('aria-label', `${robot.label} 위치 선택`);
       button.setAttribute('aria-pressed', String(isSelected));
       button.onclick = () => onSelectRobot(robot.robotId);
-      const coordinates = isSelected && location !== null ? location : robot;
-      marker.setLngLat([coordinates.longitude, coordinates.latitude]);
+      marker.setLngLat([robot.longitude, robot.latitude]);
     });
-  }, [accessToken, fleetLocations, location, mapAttempt, onSelectRobot, selectedRobotId, styleUrl]);
+  }, [accessToken, fleetLocations, mapAttempt, onSelectRobot, selectedRobotId, styleUrl]);
 
   const resetMap = () => {
     setFollowRobot(false);
@@ -281,10 +280,12 @@ function RobotLocationMap({
   readonly onSelectRobot: (robotId: string) => void;
   readonly site: OutdoorSiteDescriptor;
 }) {
-  let location: RobotMapLocation | null = null;
+  let location: RobotMapLocation | null = fleetLocations.find(
+    (candidate) => candidate.robotId === robot?.id,
+  ) ?? null;
   let status: ReactNode = null;
 
-  if (robot !== undefined && geolocation !== null) {
+  if (location === null && robot !== undefined && geolocation !== null) {
     if (geolocation.status === 'loading') {
       status = <QueryFeedback kind="loading" />;
     } else if (geolocation.status === 'error') {

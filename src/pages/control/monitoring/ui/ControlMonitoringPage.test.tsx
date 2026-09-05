@@ -14,6 +14,7 @@ import {
 } from 'vitest';
 
 import {
+  createInMemoryRobotCatalog,
   createInMemoryRobotCatalogWithData,
   RobotCatalogContext,
   RobotOperationalStatusContext,
@@ -21,6 +22,7 @@ import {
   type RobotDescriptor,
   type RobotOperationalStatus,
   type RobotOperationalStatusQueryPort,
+  type RobotOperationalStatusSubscriptionEvent,
 } from '@/entities/robot';
 import {
   RobotGeolocationContext,
@@ -334,6 +336,109 @@ describe('ControlMonitoringPage', () => {
     expect(mapInstance.fitBounds).toHaveBeenCalledWith([[127.11, 37.39], [127.11, 37.39]], expect.objectContaining({ maxZoom: 18 }));
   });
 
+  it.each([
+    { label: '별도 위치 API가 null일 때', fallback: null },
+    { label: '별도 위치 API에 이전 좌표가 있을 때', fallback: createGeolocation('robot-001') },
+  ])('$label 선택 핀과 카메라는 실시간 상태 좌표를 따른다', async ({ fallback }) => {
+    const user = userEvent.setup();
+    const robot = createRobot(1);
+    let current = createOperationalStatus(robot.id);
+    current = { ...current, data: { ...current.data, latitude: 37.39, longitude: 127.11 } };
+    const listeners = new Set<(event: RobotOperationalStatusSubscriptionEvent) => void>();
+    renderPage(createInMemoryRobotCatalog([robot]), {
+      ...operationalStatus,
+      getOperationalStatus: () => Promise.resolve(current),
+      subscribeOperationalStatuses: (_ids, listener) => {
+        listeners.add(listener);
+        return () => { listeners.delete(listener); };
+      },
+    }, { getGeolocationObservation: () => Promise.resolve(fallback) });
+
+    await screen.findByRole('button', { name: '전체 위치' });
+    await user.click(screen.getByRole('button', { name: /로봇 01/u }));
+    const follow = await screen.findByRole('button', { name: '위치 따라가기' });
+    await waitFor(() => expect(easeTo).toHaveBeenLastCalledWith({ center: [127.11, 37.39], duration: 600 }));
+    expect(setMarkerLngLat).toHaveBeenLastCalledWith([127.11, 37.39]);
+    const markerCount = createMarker.mock.calls.length;
+
+    current = { ...current, data: { ...current.data, battery: 84, latitude: 37.4, longitude: 127.12 } };
+    easeTo.mockClear();
+    setMarkerLngLat.mockClear();
+    act(() => listeners.forEach((listener) => listener({ kind: 'updated', robotId: robot.id })));
+    const detail = within(screen.getByRole('region', { name: '로봇 01 로봇 정보' }));
+    await detail.findByRole('group', { name: '배터리 84%' });
+    await waitFor(() => expect(easeTo).toHaveBeenLastCalledWith({ center: [127.12, 37.4], duration: 600 }));
+    expect(setMarkerLngLat).toHaveBeenLastCalledWith([127.12, 37.4]);
+    expect(createMarker).toHaveBeenCalledTimes(markerCount);
+
+    await user.click(follow);
+    easeTo.mockClear();
+    current = { ...current, data: { ...current.data, battery: 83, latitude: 37.41, longitude: 127.13 } };
+    act(() => listeners.forEach((listener) => listener({ kind: 'updated', robotId: robot.id })));
+    await detail.findByRole('group', { name: '배터리 83%' });
+    expect(setMarkerLngLat).toHaveBeenLastCalledWith([127.13, 37.41]);
+    expect(easeTo).not.toHaveBeenCalled();
+  });
+
+  it('로봇을 바꾸어 선택해도 목록의 구독과 조회를 공유하고 해당 로봇의 오류만 표시한다', async () => {
+    const user = userEvent.setup();
+    const robots = [createRobot(1), createRobot(2)];
+    const listeners = new Set<(event: RobotOperationalStatusSubscriptionEvent) => void>();
+    const getOperationalStatus = vi.fn((robotId: string) => Promise.resolve(createOperationalStatus(robotId)));
+    const subscribe = vi.fn((ids: readonly string[], listener: (event: RobotOperationalStatusSubscriptionEvent) => void) => {
+      if (ids.length === 0) return () => undefined;
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    });
+    renderPage(createInMemoryRobotCatalog(robots), {
+      ...operationalStatus, getOperationalStatus, subscribeOperationalStatuses: subscribe,
+    });
+    await user.click(await screen.findByRole('button', { name: /로봇 01/u }));
+    await user.click(screen.getByRole('button', { name: /로봇 02/u }));
+    await user.click(screen.getByRole('button', { name: /로봇 01/u }));
+    expect(getOperationalStatus).toHaveBeenCalledTimes(2);
+    expect(subscribe.mock.calls.filter(([ids]) => ids.length > 0)).toEqual([
+      [['robot-001', 'robot-002'], expect.any(Function)],
+    ]);
+    expect(listeners.size).toBe(1);
+
+    const stale = (robotId: string): RobotOperationalStatusSubscriptionEvent => ({
+      kind: 'stale', robotId, lastSuccessfulAtMs: 1_700_000_000_000,
+      message: '실시간 연결을 확인해 주세요.', reason: 'gateway-unreachable',
+    });
+    act(() => listeners.forEach((listener) => listener(stale('robot-002'))));
+    const detail = within(screen.getByRole('region', { name: '로봇 01 로봇 정보' }));
+    expect(detail.queryByRole('region', { name: '실시간 연결 끊김' })).not.toBeInTheDocument();
+    act(() => listeners.forEach((listener) => listener(stale('robot-001'))));
+    expect(detail.getByRole('region', { name: '실시간 연결 끊김' })).toBeInTheDocument();
+    await user.click(detail.getByRole('button', { name: '연결 다시 확인' }));
+    await waitFor(() => expect(getOperationalStatus).toHaveBeenCalledTimes(4));
+    expect(listeners.size).toBe(1);
+    expect(subscribe.mock.calls.filter(([ids]) => ids.length > 0)).toHaveLength(2);
+    expect(detail.queryByRole('region', { name: '실시간 연결 끊김' })).not.toBeInTheDocument();
+  });
+
+  it('목록의 운영 상태를 기다리는 동안 상세가 별도 조회하지 않고 실패 후 같은 쿼리를 재시도한다', async () => {
+    const user = userEvent.setup();
+    let rejectInitial: (reason: Error) => void = () => undefined;
+    const initial = new Promise<RobotOperationalStatus | null>((_resolve, reject) => { rejectInitial = reject; });
+    const getOperationalStatus = vi.fn()
+      .mockImplementationOnce(() => initial)
+      .mockResolvedValue(createOperationalStatus('robot-001'));
+    renderPage(createInMemoryRobotCatalog([createRobot(1)]), {
+      ...operationalStatus, getOperationalStatus,
+    });
+    await user.click(await screen.findByRole('button', { name: /로봇 01/u }));
+    const detail = within(screen.getByRole('region', { name: '로봇 01 로봇 정보' }));
+    expect(detail.getByRole('status', { name: '운영 정보 불러오는 중' })).toBeInTheDocument();
+    expect(getOperationalStatus).toHaveBeenCalledOnce();
+    act(() => rejectInitial(new Error('internal transport failure')));
+    expect(await detail.findByRole('alert')).toHaveTextContent('로봇 정보를 불러오지 못했습니다.');
+    await user.click(detail.getByRole('button', { name: '다시 불러오기' }));
+    await detail.findByRole('group', { name: '배터리 100%' });
+    expect(getOperationalStatus).toHaveBeenCalledTimes(2);
+  });
+
   it('확인 필요 필터는 저전력 기체만 남기며 선택 기체를 유지한다', async () => {
     const user = userEvent.setup();
     const status: RobotOperationalStatusQueryPort = {
@@ -498,13 +603,16 @@ describe('ControlMonitoringPage', () => {
     const nickname = within(modelViewer).getByText('Mock Robot');
     expect(nickname.tagName).toBe('FIGCAPTION');
     expect(nickname).toHaveClass(
-      'mt-4',
-      'text-4xl',
-      'font-light',
+      'mt-2',
+      'text-xl',
+      'font-medium',
+      'md:mt-4',
+      'md:text-4xl',
+      'md:font-light',
       'text-left',
     );
     expect(nickname).not.toHaveClass('absolute');
-    expect(modelViewerElement).toHaveAttribute('src', '/assets/go2_walk.glb');
+    expect(modelViewerElement).toHaveAttribute('src', '/assets/go2_walk-monitoring.glb');
     expect(modelViewerElement).toHaveAttribute('camera-orbit', '-135deg 65deg 105%');
     expect(modelViewerElement).toHaveAttribute('autoplay');
     expect(modelViewerElement).not.toHaveAttribute('auto-rotate');

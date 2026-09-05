@@ -11,7 +11,6 @@ import {
   RobotInfoOverview,
   RobotModelViewer,
   useRobotCatalog,
-  useRobotOperationalStatus,
   useRobotOperationalStatuses,
   type RobotDescriptor,
   type RobotOperationalStatus,
@@ -88,6 +87,7 @@ interface MonitoringLayoutProps {
   readonly onSelectSite: (siteId: string) => void;
   readonly onToggleMultiRobot: (robotId: string) => void;
   readonly operationalStatuses: Readonly<Record<string, RobotOperationalStatus | null>>;
+  readonly operationalStatusQuery: ReturnType<typeof useRobotOperationalStatuses>;
   readonly robotMonitoringSearch: string;
   readonly search: string;
   readonly selectedMultiRobotIds: readonly string[];
@@ -118,6 +118,7 @@ function MonitoringLayout({
   onSelectSite,
   onToggleMultiRobot,
   operationalStatuses,
+  operationalStatusQuery,
   robotMonitoringSearch,
   search,
   selectedMultiRobotIds,
@@ -373,7 +374,7 @@ function MonitoringLayout({
             </Button>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-4">
-                <SelectedRobotInfo robot={selectedRobot} />
+                <SelectedRobotInfo robot={selectedRobot} statusQuery={operationalStatusQuery} />
               </div>
             </div>
             <Link
@@ -400,8 +401,18 @@ function MonitoringLayout({
   );
 }
 
-function SelectedRobotInfo({ robot }: { readonly robot: RobotDescriptor }) {
-  const operationalStatus = useRobotOperationalStatus(robot.id);
+function SelectedRobotInfo({ robot, statusQuery }: {
+  readonly robot: RobotDescriptor;
+  readonly statusQuery: ReturnType<typeof useRobotOperationalStatuses>;
+}) {
+  const streamIssue = statusQuery.streamIssuesByRobotId[robot.id] ?? null;
+  const refreshError = streamIssue?.message
+    ?? (statusQuery.refreshError === statusQuery.streamIssue?.message ? null : statusQuery.refreshError);
+  const operationalStatus = statusQuery.status === 'ready'
+    ? { ...statusQuery, data: statusQuery.data[robot.id] ?? null, refreshError, streamIssue }
+    : statusQuery.status === 'error'
+      ? { ...statusQuery, message: '로봇 정보를 불러오지 못했습니다.', streamIssue }
+      : { ...statusQuery, streamIssue };
   const robotNickname = operationalStatus.status === 'ready'
     && operationalStatus.data !== null
     ? operationalStatus.data.data.nickname
@@ -607,6 +618,7 @@ export function ControlMonitoringPage() {
       });
     },
     operationalStatuses: statuses,
+    operationalStatusQuery: operationalStatuses,
     robotMonitoringSearch,
     search,
     selectedMultiRobotIds,
