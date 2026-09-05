@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Check } from 'lucide-react';
 
+import { cn } from '@/shared/ui/class-names';
+import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
+
 export interface DropdownItem {
   readonly disabled?: boolean;
   readonly icon?: ReactNode;
@@ -33,7 +36,12 @@ export function Dropdown({
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align={align}
-          className={`z-50 rounded-[var(--design-radius-control)] border-0 bg-layer-floating p-1 text-foreground shadow-lg ${matchTriggerWidth ? 'w-[var(--radix-dropdown-menu-trigger-width)]' : 'min-w-48'}`}
+          className={cn(
+            'z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] max-w-[calc(100vw-1.5rem)] overflow-y-auto overscroll-contain rounded-[var(--design-radius-control)] border-0 p-1 text-foreground',
+            matchTriggerWidth ? 'w-[var(--radix-dropdown-menu-trigger-width)]' : 'min-w-48',
+            getFloatingSurfaceClassName(),
+          )}
+          collisionPadding={12}
           side={side}
           sideOffset={6}
         >

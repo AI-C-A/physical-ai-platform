@@ -1,7 +1,7 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 export interface ToastContextValue {
-  readonly showToast: (message: string, tone?: 'success' | 'error') => void;
+  readonly showToast: (message: ReactNode, tone?: 'success' | 'error') => void;
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null);
