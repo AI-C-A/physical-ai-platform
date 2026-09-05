@@ -8,12 +8,13 @@ ROBOT Army TIGER+는 로봇 상태와 카메라 영상을 확인하고, 데이�
 - 다중 카메라 모니터링과 Kinesis Viewer 재생
 - 브라우저 영상 녹화와 RF-DETR-Seg 오버레이
 - 데이터 수집 Session 실행과 Episode 관리
+- `/collect/quest` 기반 Quest Hand Pose collector와 Human Demonstration source binding
 - Dataset 구성, 검색과 내보내기
 - 운영 이벤트 조회와 BigData 분석
 
 ## 요구 환경
 
-- Node.js 22 이상
+- Node.js 22.12 이상
 - npm 10 이상
 - Real 실행 시 Patrol API와 Kinesis에 접근할 수 있는 서버 환경
 - 세그멘테이션 사용 시 RF-DETR-Seg와 PyTorch를 설치한 Python 환경
@@ -49,6 +50,8 @@ npm run dev:mock
 ```
 
 기본 주소는 `http://localhost:5173`이다. 해당 port가 사용 중이면 Vite가 터미널에 출력한 다음 주소로 접속한다. Mock은 in-memory 데이터, 합성 위치와 저장소에 포함된 Mock 영상을 사용한다.
+
+Mock의 새 수집 화면에서 `시뮬레이션 예시 불러오기`로 작업과 장치 ID를 입력한 뒤 세션을 생성한다. 별도 탭의 `/collect/quest`에서 연결 코드를 입력하면 PC 세션 연결, 수집 시작·종료, 좌·우 손 추적 유실, 에피소드 저장과 전송 대기열을 실기기 없이 확인할 수 있다. 실제 Quest 장치 수집과 저장은 별도 Backend 연결이 필요하며, Real 모드에서는 연결되지 않은 작업을 사용할 수 없다.
 
 ## Real 실행
 
@@ -127,7 +130,13 @@ npm run build:real
 npm run verify
 ```
 
-이 명령은 TypeScript, ESLint, frontend unit test, gateway, Node 도구와 Python segmentation unit test를 실행한다.
+이 명령은 TypeScript, ESLint, 디자인 시스템·저장소 안전 검사, frontend unit test, gateway, Node 도구와 Python segmentation unit test를 실행한다.
+
+커밋할 내용만 별도로 검사하려면 다음 명령을 실행한다. 자격 증명 형식과 로컬 설정 파일을 검사하며, 발견한 값 대신 파일 경로와 줄 번호를 출력한다.
+
+```bash
+npm run check:repository-safety -- --staged
+```
 
 브라우저 회귀:
 
@@ -261,7 +270,7 @@ MLOps Mock 모드는 다음 순환 흐름을 상태형 in-memory Port로 제공�
 - Dataset Version은 `humanoid-episode`, `drive-window`, `intervention-window` 중 한 종류만 포함한다.
 - Released Dataset만 Training에 사용할 수 있고, 통과한 Evaluation이 없는 Model은 Production 승격과 Deployment가 차단된다.
 - Training, Evaluation, Deployment는 입력과 Fixture에 의해 결정되는 단계별 상태와 구독 이벤트를 제공한다.
-- 앱 실행 중 변경한 Mock 상태는 유지되며, 새로고침하면 결정적인 초기 Fixture로 초기화된다.
+- Mock 상태는 메모리에 유지되며 같은 브라우저의 열린 탭끼리 공유한다. 다른 탭이 열려 있으면 새로고침한 탭도 상태를 다시 받는다. 모든 탭을 닫거나 마지막 탭을 새로고침하면 초기 Fixture로 돌아간다.
 
 Real 모드는 동일한 Route와 Port 계약을 유지하지만 신규 Backend endpoint가 정의되지 않은 기능은 빈 조회 결과를 표시한다. Command는 `이 실행 환경에서는 지원하지 않는 작업입니다` 오류로 종료하며 Mock Fixture로 자동 전환하지 않는다. 실제 ROS ingestion, Object Storage, GPU scheduler, 학습 실행과 Robot deployment는 Port 외부 책임이다.
 
