@@ -1,0 +1,10 @@
+@container (max-width: 12rem) {
+  [data-media-panel-header] {
+    gap: 0.25rem;
+    padding-inline: 0.5rem;
+  }
+
+  [data-media-panel-header] h3 {
+    font-size: 0.75rem;
+  }
+}

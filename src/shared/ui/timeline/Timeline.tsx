@@ -37,7 +37,9 @@ export function Timeline({ durationLabel, markers, onMarkerSelect, title = 'ë™ê
       </div>
       <div className="flex flex-wrap gap-2">
         {markers.map((marker) => (
-          <Button
+          onMarkerSelect === undefined ? (
+            <span className="py-2 text-sm text-muted" key={marker.id}>{marker.label}</span>
+          ) : <Button
             key={marker.id}
             onClick={() => onMarkerSelect?.(marker)}
             variant="secondary"
