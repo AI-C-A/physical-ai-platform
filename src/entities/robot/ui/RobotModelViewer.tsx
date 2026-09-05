@@ -1,15 +1,35 @@
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+
 import { Button } from '@/shared/ui/button';
-import { ModelViewer } from '@/shared/ui/model-viewer';
+import { ModelViewer, type ModelViewerElement } from '@/shared/ui/model-viewer';
 import { Spinner } from '@/shared/ui/spinner';
 
 const ROBOT_MODEL_URL = `${import.meta.env.BASE_URL}assets/go2_walk-monitoring.glb`;
 const DEFAULT_CAMERA_ORBIT = '-135deg 65deg 105%';
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeMotionPreference(listener: () => void) {
+  const preference = window.matchMedia?.(REDUCED_MOTION_QUERY);
+  preference?.addEventListener('change', listener);
+  return () => preference?.removeEventListener('change', listener);
+}
+
+function shouldAnimateModel() {
+  return !window.matchMedia?.(REDUCED_MOTION_QUERY).matches;
+}
 
 interface RobotModelViewerProps {
   readonly nickname?: string | null;
 }
 
 export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
+  const modelRef = useRef<ModelViewerElement>(null);
+  const animate = useSyncExternalStore(subscribeMotionPreference, shouldAnimateModel, () => false);
+
+  useEffect(() => {
+    if (!animate) modelRef.current?.pause?.();
+  }, [animate]);
+
   return (
     <figure
       aria-label="로봇 3D 모델"
@@ -19,10 +39,11 @@ export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
       <div className="relative h-28 shrink-0 md:h-52">
         <ModelViewer
           alt="걷는 사족 보행 로봇 3D 모델"
-          autoplay
+          autoplay={animate}
           camera-orbit={DEFAULT_CAMERA_ORBIT}
           camera-controls
           className="block h-full w-full"
+          elementRef={modelRef}
           errorFallback={(retry) => (
             <div className="absolute inset-0 grid place-items-center gap-2 p-4">
               <p className="text-sm text-muted" role="status">

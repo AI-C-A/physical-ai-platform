@@ -261,6 +261,20 @@ test.describe('reduced motion', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
+  test('로봇 미리보기는 모션 설정에 따라 자동 재생을 시작하고 멈춘다', async ({ page }) => {
+    await page.goto('/control/monitoring');
+    await expectApplicationReady(page);
+    await page.getByRole('region', { name: '로봇 선택', exact: true })
+      .getByRole('button', { name: /정찰 로봇 01/u }).click();
+    const model = page.getByRole('group', { name: '로봇 3D 모델' }).locator('model-viewer');
+    await expect(model).toHaveJSProperty('loaded', true);
+    await expect(model).toHaveJSProperty('paused', true);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(model).toHaveJSProperty('paused', false);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(model).toHaveJSProperty('paused', true);
+  });
+
   test('overlay·toast는 1ms로 줄이고 tabs 전환을 제거한다', async ({ page }) => {
     const { dialog } = await openEventDialog(page);
     await expect.poll(() => getAnimationDuration(dialog)).toBe('0.001s');
