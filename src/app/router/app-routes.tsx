@@ -1,7 +1,15 @@
-import { lazy } from 'react';
-import { Navigate, type RouteObject } from 'react-router-dom';
+import { lazy, type PropsWithChildren } from 'react';
+import {
+  Navigate,
+  useLocation,
+  type RouteObject,
+} from 'react-router-dom';
 
 import { PageHeader } from '@/shared/ui/page-header';
+import {
+  RouteMorphProvider,
+  useRouteMorphTarget,
+} from '@/shared/ui/route-morph';
 import { PlatformShell } from '@/widgets/platform-shell';
 
 import { MINI_APP_REGISTRY } from '../config';
@@ -9,6 +17,9 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { ROUTE_PATHS } from './route-paths';
 
 const FlywheelPages = () => import('@/pages/mlops/flywheel');
+const QuestCollectorPage = lazy(async () => ({
+  default: (await import('@/pages/collect/quest')).QuestCollectorPage,
+}));
 const BigDataExplorerPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelExplorerPage }));
 const FlywheelOverviewPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelOverviewPage }));
 const FailuresPage = lazy(async () => ({ default: (await FlywheelPages()).FailuresPage }));
@@ -40,21 +51,18 @@ const RobotsPage = lazy(async () => ({
 const SitesPage = lazy(async () => ({
   default: (await import('@/pages/control/sites')).SitesPage,
 }));
-const CapturePage = lazy(async () => ({ default: (await FlywheelPages()).CaptureHubPage }));
-const HumanoidCapturePage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCapturePage }));
-const MobilityCapturePage = lazy(async () => ({ default: (await FlywheelPages()).MobilityCapturePage }));
-const SessionsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionsPage }));
-const SessionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelSessionDetailPage }));
-const EpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodesPage }));
+const CollectionPage = lazy(async () => ({ default: (await FlywheelPages()).CollectionWorkspacePage }));
+const NewCollectionPage = lazy(async () => ({ default: (await FlywheelPages()).NewHumanoidCollectionPage }));
+const CollectionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCollectionDetailPage }));
+const ReviewPage = lazy(async () => ({ default: (await FlywheelPages()).ReviewWorkspacePage }));
+const OperationsPage = lazy(async () => ({ default: (await FlywheelPages()).OperationsWorkspacePage }));
+const LegacySessionRedirectPage = lazy(async () => ({ default: (await FlywheelPages()).LegacyHumanoidSessionRedirectPage }));
 const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
-const DrivesPage = lazy(async () => ({ default: (await FlywheelPages()).DrivesPage }));
 const DriveDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DriveDetailPage }));
-const InterventionEventsPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionEventsPage }));
 const InterventionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionDetailPage }));
 const CatalogPage = lazy(async () => ({ default: (await FlywheelPages()).CatalogPage }));
-const AnnotationsPage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationsPage }));
+const CatalogDetailPage = lazy(async () => ({ default: (await FlywheelPages()).CatalogDetailPage }));
 const AnnotationWorkspacePage = lazy(async () => ({ default: (await FlywheelPages()).AnnotationWorkspacePage }));
-const QualityPage = lazy(async () => ({ default: (await FlywheelPages()).QualityPage }));
 const QualityDetailPage = lazy(async () => ({ default: (await FlywheelPages()).QualityDetailPage }));
 const DatasetsPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelDatasetsPage }));
 const NewDatasetPage = lazy(async () => ({ default: (await FlywheelPages()).NewFlywheelDatasetPage }));
@@ -67,18 +75,59 @@ const NewEvaluationPage = lazy(async () => ({ default: (await FlywheelPages()).N
 const EvaluationDetailPage = lazy(async () => ({ default: (await FlywheelPages()).EvaluationDetailPage }));
 const ModelsPage = lazy(async () => ({ default: (await FlywheelPages()).ModelsPage }));
 const ModelDetailPage = lazy(async () => ({ default: (await FlywheelPages()).ModelDetailPage }));
-const DeploymentsPage = lazy(async () => ({ default: (await FlywheelPages()).DeploymentsPage }));
 const NewDeploymentPage = lazy(async () => ({ default: (await FlywheelPages()).NewDeploymentPage }));
 const DeploymentDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DeploymentDetailPage }));
-const InferencePage = lazy(async () => ({ default: (await FlywheelPages()).InferencePage }));
 const InferenceDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InferenceDetailPage }));
 const SettingsPage = lazy(async () => ({
   default: (await import('@/pages/platform/settings')).SettingsPage,
 }));
+
+function LegacyMLOpsRedirect({
+  query = {},
+  to,
+}: {
+  readonly query?: Readonly<Record<string, string>>;
+  readonly to: string;
+}) {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  Object.entries(query).forEach(([key, value]) => params.set(key, value));
+  const serialized = params.toString();
+
+  return (
+    <Navigate
+      replace
+      to={{
+        pathname: to,
+        search: serialized === '' ? '' : '?' + serialized,
+      }}
+    />
+  );
+}
+
+function MonitoringMorphRoute({ children }: PropsWithChildren) {
+  const targetProps = useRouteMorphTarget();
+
+  return (
+    <div className="min-h-dvh" {...targetProps}>
+      {children}
+    </div>
+  );
+}
+
 export const APP_ROUTES: RouteObject[] = [
   {
+    path: ROUTE_PATHS.collectQuest,
+    element: <QuestCollectorPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: ROUTE_PATHS.root,
-    element: <PlatformShell miniApps={MINI_APP_REGISTRY} />,
+    element: (
+      <RouteMorphProvider>
+        <PlatformShell miniApps={MINI_APP_REGISTRY} />
+      </RouteMorphProvider>
+    ),
     errorElement: <RouteErrorBoundary />,
     children: [
       {
@@ -91,11 +140,19 @@ export const APP_ROUTES: RouteObject[] = [
       },
       {
         path: ROUTE_PATHS.controlMultiRobotMonitoring,
-        element: <MultiRobotMonitoringPage />,
+        element: (
+          <MonitoringMorphRoute>
+            <MultiRobotMonitoringPage />
+          </MonitoringMorphRoute>
+        ),
       },
       {
         path: ROUTE_PATHS.controlRobotMonitoring,
-        element: <RobotMonitoringPage />,
+        element: (
+          <MonitoringMorphRoute>
+            <RobotMonitoringPage />
+          </MonitoringMorphRoute>
+        ),
       },
       {
         path: ROUTE_PATHS.controlInterventions,
@@ -110,27 +167,80 @@ export const APP_ROUTES: RouteObject[] = [
         path: ROUTE_PATHS.controlSettings,
         element: <SettingsPage showMapStyleSettings />,
       },
-      { path: ROUTE_PATHS.mlopsSessions, element: <SessionsPage /> },
+      { path: ROUTE_PATHS.mlopsCollection, element: <CollectionPage /> },
+      { path: ROUTE_PATHS.mlopsNewCollection, element: <NewCollectionPage /> },
+      { path: ROUTE_PATHS.mlopsCollectionDetail, element: <CollectionDetailPage /> },
+      { path: ROUTE_PATHS.mlopsReview, element: <ReviewPage /> },
+      { path: ROUTE_PATHS.mlopsOperations, element: <OperationsPage /> },
+      {
+        path: ROUTE_PATHS.mlopsSessions,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsCollection} />,
+      },
       {
         path: ROUTE_PATHS.mlopsSessionDetail,
-        element: <SessionDetailPage />,
+        element: <LegacySessionRedirectPage />,
       },
-      { path: ROUTE_PATHS.mlopsCapture, element: <CapturePage /> },
-      { path: ROUTE_PATHS.mlopsCaptureHumanoid, element: <HumanoidCapturePage /> },
-      { path: ROUTE_PATHS.mlopsCaptureMobility, element: <MobilityCapturePage /> },
-      { path: ROUTE_PATHS.mlopsEpisodes, element: <EpisodesPage /> },
+      {
+        path: ROUTE_PATHS.mlopsCapture,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsCollection} />,
+      },
+      {
+        path: ROUTE_PATHS.mlopsCaptureHumanoid,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsNewCollection} />,
+      },
+      {
+        path: ROUTE_PATHS.mlopsCaptureMobility,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsCollection} />,
+      },
+      {
+        path: ROUTE_PATHS.mlopsEpisodes,
+        element: (
+          <LegacyMLOpsRedirect
+            query={{ type: 'episode' }}
+            to={ROUTE_PATHS.mlopsCatalog}
+          />
+        ),
+      },
       {
         path: ROUTE_PATHS.mlopsEpisodeDetail,
         element: <EpisodeDetailPage />,
       },
-      { path: ROUTE_PATHS.mlopsDrives, element: <DrivesPage /> },
+      {
+        path: ROUTE_PATHS.mlopsDrives,
+        element: (
+          <LegacyMLOpsRedirect
+            query={{ type: 'drive' }}
+            to={ROUTE_PATHS.mlopsCatalog}
+          />
+        ),
+      },
       { path: ROUTE_PATHS.mlopsDriveDetail, element: <DriveDetailPage /> },
-      { path: ROUTE_PATHS.mlopsInterventions, element: <InterventionEventsPage /> },
+      {
+        path: ROUTE_PATHS.mlopsInterventions,
+        element: (
+          <LegacyMLOpsRedirect
+            query={{ type: 'intervention' }}
+            to={ROUTE_PATHS.mlopsCatalog}
+          />
+        ),
+      },
       { path: ROUTE_PATHS.mlopsInterventionDetail, element: <InterventionDetailPage /> },
       { path: ROUTE_PATHS.mlopsCatalog, element: <CatalogPage /> },
-      { path: ROUTE_PATHS.mlopsAnnotations, element: <AnnotationsPage /> },
+      { path: ROUTE_PATHS.mlopsCatalogDetail, element: <CatalogDetailPage /> },
+      {
+        path: ROUTE_PATHS.mlopsAnnotations,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsReview} />,
+      },
       { path: ROUTE_PATHS.mlopsAnnotationDetail, element: <AnnotationWorkspacePage /> },
-      { path: ROUTE_PATHS.mlopsQuality, element: <QualityPage /> },
+      {
+        path: ROUTE_PATHS.mlopsQuality,
+        element: (
+          <LegacyMLOpsRedirect
+            query={{ view: 'quality' }}
+            to={ROUTE_PATHS.mlopsReview}
+          />
+        ),
+      },
       { path: ROUTE_PATHS.mlopsQualityDetail, element: <QualityDetailPage /> },
       { path: ROUTE_PATHS.mlopsDatasets, element: <DatasetsPage /> },
       { path: ROUTE_PATHS.mlopsNewDataset, element: <NewDatasetPage /> },
@@ -146,10 +256,21 @@ export const APP_ROUTES: RouteObject[] = [
       { path: ROUTE_PATHS.mlopsEvaluationDetail, element: <EvaluationDetailPage /> },
       { path: ROUTE_PATHS.mlopsModels, element: <ModelsPage /> },
       { path: ROUTE_PATHS.mlopsModelDetail, element: <ModelDetailPage /> },
-      { path: ROUTE_PATHS.mlopsDeployments, element: <DeploymentsPage /> },
+      {
+        path: ROUTE_PATHS.mlopsDeployments,
+        element: <LegacyMLOpsRedirect to={ROUTE_PATHS.mlopsOperations} />,
+      },
       { path: ROUTE_PATHS.mlopsNewDeployment, element: <NewDeploymentPage /> },
       { path: ROUTE_PATHS.mlopsDeploymentDetail, element: <DeploymentDetailPage /> },
-      { path: ROUTE_PATHS.mlopsInference, element: <InferencePage /> },
+      {
+        path: ROUTE_PATHS.mlopsInference,
+        element: (
+          <LegacyMLOpsRedirect
+            query={{ view: 'inference' }}
+            to={ROUTE_PATHS.mlopsOperations}
+          />
+        ),
+      },
       { path: ROUTE_PATHS.mlopsInferenceDetail, element: <InferenceDetailPage /> },
       { path: ROUTE_PATHS.mlopsSettings, element: <SettingsPage /> },
       {

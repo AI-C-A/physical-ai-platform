@@ -59,7 +59,19 @@ function renderShell(initialPath = '/control/monitoring') {
             />
             <Route
               element={<p>MLOps 데이터 수집 화면</p>}
-              path="mlops/capture"
+              path="mlops/collection"
+            />
+            <Route
+              element={<p>새 수집 몰입형 화면</p>}
+              path="mlops/collection/new"
+            />
+            <Route
+              element={<p>수집 세션 몰입형 화면</p>}
+              path="mlops/collection/:sessionId"
+            />
+            <Route
+              element={<p>휴머노이드 몰입형 수집 화면</p>}
+              path="mlops/capture/humanoid"
             />
             <Route
               element={<p>BigData 개요 화면</p>}
@@ -163,6 +175,20 @@ describe('PlatformShell', () => {
     expect(screen.getByRole('main')).toHaveClass('p-0');
   });
 
+  it.each([
+    ['/mlops/collection/new', '새 수집 몰입형 화면'],
+    ['/mlops/collection/capture-h-0001', '수집 세션 몰입형 화면'],
+  ])('새 수집부터 세션 운영까지 관제처럼 글로벌 메뉴를 숨긴다', (path, content) => {
+    renderShell(path);
+
+    expect(screen.getByText(content)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '사이드바 접기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '업무 메뉴 열기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '수집' })).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveClass('p-0');
+    expect(screen.getByRole('main')).toHaveAttribute('data-page-shell', 'full-bleed');
+  });
+
   it('업무 메뉴와 Dropdown으로 미니앱을 이동한다', async () => {
     const user = userEvent.setup();
     renderShell();
@@ -194,19 +220,30 @@ describe('PlatformShell', () => {
     expect(screen.getByText('BigData 개요 화면')).toBeInTheDocument();
   });
 
-  it('한글 MLOps 그룹 라벨은 대문자 변환과 확장 자간을 사용하지 않는다', () => {
-    renderShell('/mlops/capture');
+  it('MLOps 업무 메뉴 8개를 접힘 그룹 없이 한 목록으로 표시한다', () => {
+    renderShell('/mlops/collection');
 
-    for (const label of ['수집', '데이터', '모델']) {
-      const groupButton = screen.getByRole('button', { name: label });
-      expect(groupButton).toHaveClass('normal-case', 'tracking-normal');
-      expect(groupButton).not.toHaveClass('uppercase', 'tracking-[0.08em]');
-    }
+    const navigation = screen.getByRole('navigation', {
+      name: '미니앱 업무 메뉴',
+    });
+    expect(within(navigation).queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      within(navigation).getAllByRole('link').map((link) => link.getAttribute('aria-label')),
+    ).toEqual([
+      '수집',
+      '데이터 카탈로그',
+      '데이터 검수',
+      '데이터셋',
+      '학습',
+      '평가',
+      '모델 레지스트리',
+      '운영',
+    ]);
   });
 
   it.each([
     ['/control/monitoring', '/control/settings'],
-    ['/mlops/capture', '/mlops/settings'],
+    ['/mlops/collection', '/mlops/settings'],
     ['/bigdata/overview', '/bigdata/settings'],
   ])('%s에서 현재 미니앱의 설정 메뉴로 이동한다', async (
     initialPath,
@@ -255,7 +292,7 @@ describe('PlatformShell', () => {
     await user.click(screen.getByRole('button', { name: '미니앱 전환 · 관제' }));
     await user.click(screen.getByRole('menuitem', { name: 'MLOps' }));
     expect(screen.getByTestId('current-location')).toHaveTextContent(
-      '/mlops/capture?siteId=pangyo-army-ax-hub',
+      '/mlops/collection?siteId=pangyo-army-ax-hub',
     );
 
     await user.click(screen.getByRole('button', { name: '미니앱 전환 · MLOps' }));
@@ -315,7 +352,7 @@ describe('PlatformShell', () => {
 
   it('Sheet를 Escape로 닫으면 메뉴 버튼으로 포커스를 복귀한다', async () => {
     const user = userEvent.setup();
-    renderShell('/mlops/capture');
+    renderShell('/mlops/collection');
 
     const menuTrigger = screen.getByRole('button', {
       name: '업무 메뉴 열기',
@@ -333,7 +370,7 @@ describe('PlatformShell', () => {
 
   it('모바일 Sheet 최하단 설정 메뉴는 현재 미니앱 경로로 이동하고 메뉴를 닫는다', async () => {
     const user = userEvent.setup();
-    renderShell('/mlops/capture');
+    renderShell('/mlops/collection');
 
     await user.click(screen.getByRole('button', {
       name: '업무 메뉴 열기',
@@ -354,6 +391,19 @@ describe('PlatformShell', () => {
     expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/mlops/settings',
     );
+    await waitFor(() => expect(screen.getByRole('main')).toHaveFocus());
+  });
+
+  it('모바일 메뉴에서 현재 페이지를 다시 선택해도 닫힌 메뉴 대신 본문에 포커스를 둔다', async () => {
+    const user = userEvent.setup();
+    renderShell('/mlops/collection');
+
+    await user.click(screen.getByRole('button', { name: '업무 메뉴 열기' }));
+    const dialog = screen.getByRole('dialog', { name: 'ROBOT Army TIGER+ 메뉴' });
+    await user.click(within(dialog).getByRole('link', { name: '수집' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('main')).toHaveFocus());
   });
 
   it('유효하지 않은 저장값은 펼침 상태로 복구한다', () => {

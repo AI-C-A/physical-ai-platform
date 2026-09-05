@@ -16,6 +16,10 @@ vi.mock('mapbox-gl', () => ({
       return {
         addControl: vi.fn(),
         easeTo: vi.fn(),
+        fitBounds: vi.fn(),
+        isStyleLoaded: vi.fn(() => true),
+        on: vi.fn(),
+        off: vi.fn(),
         remove: vi.fn(),
       };
     }),
@@ -57,6 +61,7 @@ describe('App routes', () => {
   });
 
   it.each([
+    ['/collect/quest', 'Quest Hand Pose 수집'],
     ['/control/interventions', '개입 요청'],
     ['/control/sites', '사이트 관리'],
     ['/control/coordinates', '경로·좌표 관리'],

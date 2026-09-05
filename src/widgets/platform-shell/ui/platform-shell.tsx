@@ -7,19 +7,22 @@ import {
   useNavigate,
 } from 'react-router-dom';
 
-import { useBranding } from '@/shared/config';
+import { useBranding, useDataEnvironment } from '@/shared/config';
 import { Button } from '@/shared/ui/button';
+import { cn } from '@/shared/ui/class-names';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { Icon, type IconName } from '@/shared/ui/icon';
 import { PageFrame, type PageFrameLayout } from '@/shared/ui/page-frame';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Sheet } from '@/shared/ui/sheet';
+import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
 
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
 
 export interface MiniAppNavigationChild {
+  readonly activePaths?: readonly string[];
   readonly icon: IconName;
   readonly label: string;
   readonly path: string;
@@ -46,6 +49,22 @@ interface PlatformShellProps {
   readonly miniApps: readonly MiniAppNavigationItem[];
 }
 
+function getMatchingNavigationPath(
+  pathname: string,
+  item: MiniAppNavigationChild,
+): string | undefined {
+  return [item.path, ...(item.activePaths ?? [])]
+    .filter((path) => pathname === path || pathname.startsWith(path + '/'))
+    .sort((left, right) => right.length - left.length)[0];
+}
+
+function isNavigationItemActive(
+  pathname: string,
+  item: MiniAppNavigationChild,
+): boolean {
+  return getMatchingNavigationPath(pathname, item) !== undefined;
+}
+
 function getRouteLabel(
   pathname: string,
   miniApps: readonly MiniAppNavigationItem[],
@@ -67,13 +86,17 @@ function getRouteLabel(
     .flatMap((miniApp) => miniApp.items.flatMap((entry) => (
       'path' in entry ? [entry] : entry.items
     )))
-    .filter(
-      (item) =>
-        pathname === item.path || pathname.startsWith(`${item.path}/`),
-    )
-    .sort((left, right) => right.path.length - left.path.length);
+    .map((item) => ({
+      item,
+      matchingPath: getMatchingNavigationPath(pathname, item),
+    }))
+    .filter((match) => match.matchingPath !== undefined)
+    .sort(
+      (left, right) =>
+        (right.matchingPath?.length ?? 0) - (left.matchingPath?.length ?? 0),
+    );
 
-  return matchingItems[0]?.label ?? '페이지를 찾을 수 없습니다';
+  return matchingItems[0]?.item.label ?? '페이지를 찾을 수 없습니다';
 }
 
 function readSidebarCollapsed(): boolean {
@@ -234,11 +257,10 @@ function InnerNavigation({
           );
         }
         const item = entry;
-        const isActive =
-          location.pathname === item.path ||
-          location.pathname.startsWith(`${item.path}/`);
+        const isActive = isNavigationItemActive(location.pathname, item);
         const link = (
-          <NavLink
+          <Link
+            aria-current={isActive ? 'page' : undefined}
             aria-label={item.label}
             className={
               isActive
@@ -253,7 +275,7 @@ function InnerNavigation({
           >
             <Icon name={item.icon} />
             {collapsed ? null : <span>{item.label}</span>}
-          </NavLink>
+          </Link>
         );
         return collapsed ? (
           <Tooltip content={item.label} key={item.path} trigger={link} />
@@ -276,8 +298,7 @@ function NavigationGroup({
 }) {
   const location = useLocation();
   const hasActiveItem = group.items.some(
-    (item) => location.pathname === item.path
-      || location.pathname.startsWith(`${item.path}/`),
+    (item) => isNavigationItemActive(location.pathname, item),
   );
   const [expanded, setExpanded] = useState(hasActiveItem);
   const effectiveExpanded = expanded || hasActiveItem;
@@ -335,10 +356,10 @@ function NavigationLink({
 }) {
   const location = useLocation();
   const siteSelectionSearch = getSiteSelectionSearch(location.search);
-  const isActive = location.pathname === item.path
-    || location.pathname.startsWith(`${item.path}/`);
+  const isActive = isNavigationItemActive(location.pathname, item);
   const link = (
-    <NavLink
+    <Link
+      aria-current={isActive ? 'page' : undefined}
       aria-label={item.label}
       className={
         isActive
@@ -350,7 +371,7 @@ function NavigationLink({
     >
       <Icon name={item.icon} />
       {collapsed ? null : <span>{item.label}</span>}
-    </NavLink>
+    </Link>
   );
   return collapsed ? (
     <Tooltip content={item.label} trigger={link} />
@@ -395,13 +416,19 @@ function SettingsNavigation({
 
 export function PlatformShell({ miniApps }: PlatformShellProps) {
   const branding = useBranding();
+  const dataEnvironment = useDataEnvironment();
   const location = useLocation();
   const mainContentRef = useRef<HTMLElement>(null);
+  const mobileMenuNavigationRef = useRef(false);
   const previousPathnameRef = useRef<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     readSidebarCollapsed,
   );
+  const closeMobileMenuForNavigation = () => {
+    mobileMenuNavigationRef.current = true;
+    setMobileMenuOpen(false);
+  };
   const currentMiniApp = useMemo(
     () =>
       miniApps.find((item) =>
@@ -418,11 +445,18 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
     || location.pathname.startsWith('/control/monitoring/');
   const isImmersiveMonitoringRoute =
     /^\/control\/monitoring\/[^/]+$/u.test(location.pathname);
-  const pageFrameLayout: PageFrameLayout = isImmersiveMonitoringRoute
+  const isImmersiveCaptureRoute =
+    location.pathname === '/mlops/capture/humanoid'
+    || /^\/mlops\/collection\/[^/]+$/u.test(location.pathname);
+  const isImmersiveRoute =
+    isImmersiveMonitoringRoute || isImmersiveCaptureRoute;
+  const isFullBleedRoute = isMonitoringRoute || isImmersiveCaptureRoute;
+  const pageFrameLayout: PageFrameLayout = isImmersiveRoute
     ? 'immersive'
     : isMonitoringRoute
       ? 'full-bleed'
       : location.pathname.endsWith('/settings')
+        || location.pathname === '/mlops/collection'
         || location.pathname === '/mlops/capture'
         || location.pathname === '/mlops/datasets/new'
         ? 'focused'
@@ -451,9 +485,11 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
       return;
     }
 
-    const focusTimer = window.setTimeout(() => {
-      mainContentRef.current?.focus();
-    }, 0);
+    if (mobileMenuNavigationRef.current) return;
+    const focusTimer = window.setTimeout(
+      () => mainContentRef.current?.focus(),
+      0,
+    );
 
     return () => window.clearTimeout(focusTimer);
   }, [location.pathname]);
@@ -462,20 +498,32 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className={cn('min-h-screen bg-background text-foreground', dataEnvironment === 'simulation' && !isImmersiveRoute ? '[--platform-environment-height:1.5rem]' : '[--platform-environment-height:0rem]')}>
         <a
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-layer-floating focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:ring-2 focus:ring-focus"
+          className={cn(
+            'sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--design-radius-control)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:ring-2 focus:ring-focus',
+            getFloatingSurfaceClassName(),
+          )}
           href="#main-content"
           onClick={() => mainContentRef.current?.focus()}
         >
           본문으로 건너뛰기
         </a>
-        {isImmersiveMonitoringRoute ? null : (
+        {isImmersiveRoute ? null : (
           <header className="sticky top-0 z-30 border-b border-border bg-layer-base lg:hidden">
             <div className="flex min-h-14 items-center justify-between gap-3 px-4">
               <Brand compact={false} />
               <Sheet
-                onOpenChange={setMobileMenuOpen}
+                onCloseAutoFocus={(event) => {
+                  if (!mobileMenuNavigationRef.current) return;
+                  event.preventDefault();
+                  mobileMenuNavigationRef.current = false;
+                  mainContentRef.current?.focus();
+                }}
+                onOpenChange={(open) => {
+                  if (open) mobileMenuNavigationRef.current = false;
+                  setMobileMenuOpen(open);
+                }}
                 open={mobileMenuOpen}
                 title={`${branding.productName} 메뉴`}
                 trigger={
@@ -489,19 +537,19 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                     collapsed={false}
                     currentMiniApp={currentMiniApp}
                     miniApps={miniApps}
-                    onNavigate={() => setMobileMenuOpen(false)}
+                    onNavigate={closeMobileMenuForNavigation}
                   />
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     <InnerNavigation
                       collapsed={false}
                       items={currentMiniApp.items}
-                      onNavigate={() => setMobileMenuOpen(false)}
+                      onNavigate={closeMobileMenuForNavigation}
                     />
                   </div>
                   <div className="border-t border-border pt-3">
                     <SettingsNavigation
                       collapsed={false}
-                      onNavigate={() => setMobileMenuOpen(false)}
+                      onNavigate={closeMobileMenuForNavigation}
                       path={currentMiniApp.settingsPath}
                     />
                   </div>
@@ -511,7 +559,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
           </header>
         )}
 
-        {isImmersiveMonitoringRoute ? null : (
+        {isImmersiveRoute ? null : (
           <aside
             className={`fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-layer-base p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
@@ -561,19 +609,24 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
         )}
 
         <div
-          className={isImmersiveMonitoringRoute
+          className={isImmersiveRoute
             ? undefined
             : sidebarCollapsed ? 'lg:pl-14' : 'lg:pl-60'}
         >
           <main
-              className={isMonitoringRoute
+              className={isFullBleedRoute
               ? 'min-w-0 w-full p-0'
               : 'mx-auto min-w-0 w-full max-w-[100rem] p-[var(--layout-page-gutter)]'}
-            data-page-shell={isMonitoringRoute ? 'full-bleed' : 'standard'}
+            data-page-shell={isFullBleedRoute ? 'full-bleed' : 'standard'}
             id="main-content"
             ref={mainContentRef}
             tabIndex={-1}
           >
+            {dataEnvironment === 'simulation' && !isImmersiveRoute ? (
+              <p className={cn('flex h-6 items-center bg-layer-raised px-4 text-xs text-muted', !isFullBleedRoute && 'mb-4')}>
+                시뮬레이션 데이터 · 실제 운영 기록이 아닙니다
+              </p>
+            ) : null}
             <Suspense fallback={<QueryFeedback kind="loading" />}>
               <PageFrame layout={pageFrameLayout}>
                 <Outlet />
