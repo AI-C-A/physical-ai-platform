@@ -322,8 +322,10 @@ describe('ControlMonitoringPage', () => {
     renderPage(undefined, status);
 
     await screen.findByRole('button', { name: '전체 위치' });
+    const robotCount = (await createInMemoryRobotCatalogWithData().listRobots()).length;
+    await waitFor(() => expect(createMarker.mock.calls.filter(([options]) => options.element !== undefined)).toHaveLength(robotCount));
     const markers = createMarker.mock.calls.flatMap(([options]) => options.element === undefined ? [] : [options.element]);
-    expect(markers).toHaveLength((await createInMemoryRobotCatalogWithData().listRobots()).length);
+    expect(markers).toHaveLength(robotCount);
     const marker = markers.find((element) => element.getAttribute('aria-label') === '수송 로봇 02 위치 선택');
     expect(marker).toBeDefined();
     expect(marker).toHaveAttribute('role', 'button');
