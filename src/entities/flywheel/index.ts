@@ -1,18 +1,55 @@
 export { FlywheelContext, useFlywheelPort, useFlywheelQuery } from './model/flywheel-context';
+export {
+  getEffectiveCollectionConnectionState,
+  useCollectionTelemetry,
+  type CollectionTelemetryQuery,
+} from './model/use-collection-telemetry';
 export type {
   AnnotationTask,
+  CatalogCollection,
+  CollectorAcknowledgement,
+  CollectorAcknowledgementState,
+  CollectorEpisodeCommand,
   CollectionKind,
+  CollectionBodyPoseTelemetry,
+  CollectionHeadPerception,
+  CollectionCapabilities,
+  CollectionCommand,
+  CollectionHandJointPose,
+  CollectionHandPoseFrame,
+  CollectionHandPoseObservation,
+  CollectionHandPoseTelemetry,
+  CollectionIssue,
+  CollectionOperationalState,
+  CollectionReadiness,
+  CollectionSourceHealth,
+  CollectionSpatialTelemetry,
+  CollectionStreamTelemetry,
+  CollectionStreamOrigin,
+  CollectionTelemetryConnectionState,
+  CollectionTelemetryHealth,
+  CollectionTelemetryIssue,
+  CollectionTelemetryModality,
+  CollectionTelemetryQualityVerdict,
+  CollectionTelemetrySnapshot,
+  CollectionTelemetrySyncState,
+  CollectionWriterHealth,
   CollectionTemplate,
+  CollectionTimelineAnomaly,
+  CollectionTimelineAnomalyKind,
+  CollectionTimelineTrack,
   ComputeResource,
   CreateDatasetVersionInput,
   CreateDeploymentInput,
   CreateEvaluationRunInput,
   CreateHumanoidSessionInput,
+  CreateHumanDemonstrationSessionInput,
   CreateMobilitySessionInput,
   CreateTrainingRunInput,
   DataUnitKind,
   DatasetUnitRef,
   DatasetVersion,
+  DerivedArtifactProcessingState,
   Deployment,
   DriveSession,
   EpisodeEvent,
@@ -22,6 +59,16 @@ export type {
   FlywheelEpisode,
   FlywheelOverview,
   FlywheelPort,
+  FlywheelPreflightCheck,
+  HandPoseBatchReceiptInput,
+  HandPosePreviewInput,
+  HumanDemonstrationBinding,
+  HumanDemonstrationPairingResult,
+  HumanDemonstrationProfile,
+  HumanDemonstrationSourceBinding,
+  HumanDemonstrationSourceRole,
+  HumanDemonstrationSourceState,
+  HumanDemonstrationStreamPolicy,
   HumanoidCaptureSession,
   InferenceSession,
   InterventionEvent,
@@ -31,6 +78,7 @@ export type {
   ModelFamily,
   ModelVersion,
   ProjectDescriptor,
+  PairHumanDemonstrationSourceInput,
   QualityRun,
   QualityRuleSet,
   QualityStatus,
@@ -40,5 +88,23 @@ export type {
   TrainingMetric,
   TrainingRun,
 } from './model/flywheel';
-export { createInMemoryFlywheel } from './api/in-memory-flywheel';
+export {
+  createInMemoryFlywheel,
+  type InMemoryFlywheelSyncTransport,
+} from './api/in-memory-flywheel';
 export { createUnavailableFlywheel } from './api/unavailable-flywheel';
+export { HumanoidRigViewer } from './ui/HumanoidRigViewer';
+export async function loadQuestHandPoseViewer() {
+  return import('./ui/QuestHandPoseViewer');
+}
+export async function loadCollectionBodyPoseViewer() {
+  return import('./ui/CollectionBodyPoseViewer');
+}
+export { CollectionPerceptionViewer } from './ui/CollectionPerceptionViewer';
+export {
+  QUEST_HAND_BONES,
+  QUEST_HAND_JOINT_NAMES,
+  transformHandJoint,
+  type HandPoseCoordinateMode,
+  type HandPoseVisibility,
+} from './ui/quest-hand-pose-geometry';
