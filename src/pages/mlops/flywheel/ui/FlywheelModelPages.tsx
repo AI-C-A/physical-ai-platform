@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -6,9 +6,9 @@ import {
   useFlywheelQuery,
   type ModelFamily,
   type ModelVersion,
-  type RobotType,
+  type EvaluationRun,
 } from "@/entities/flywheel";
-import { Badge } from "@/shared/ui/badge";
+import { useRobotCatalog } from '@/entities/robot';
 import { Button } from "@/shared/ui/button";
 import { Chart } from "@/shared/ui/chart";
 import { Input } from "@/shared/ui/input";
@@ -52,12 +52,11 @@ function actionFailureMessage(): string {
   return "작업을 완료하지 못했습니다. 다시 시도해 주세요.";
 }
 const wizardSteps = [
-  "Compute",
-  "Model",
-  "Dataset Version",
-  "Hyperparameters",
-  "Resume",
-  "Review",
+  '컴퓨팅 자원',
+  '모델',
+  '데이터셋',
+  '학습 설정',
+  '검토',
 ].map((label) => ({ label }));
 
 export function TrainingPage() {
@@ -119,18 +118,33 @@ export function NewTrainingPage() {
   const resources = useFlywheelQuery(loadCompute);
   const datasets = useFlywheelQuery(loadDatasets);
   const [step, setStep] = useState(0);
-  const [resourceIds, setResourceIds] = useState<string[]>(["gpu-0"]);
+  const [resourceIds, setResourceIds] = useState<string[]>([]);
   const [modelFamily, setModelFamily] = useState<ModelFamily>("pi0");
-  const [datasetId, setDatasetId] = useState("dataset-h-v3");
+  const [datasetId, setDatasetId] = useState('');
   const [batchSize, setBatchSize] = useState(8);
   const [steps, setSteps] = useState(10_000);
   const [learningRate, setLearningRate] = useState(0.000025);
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const released = datasets.status === 'ready'
+    ? datasets.data.filter((item) => item.status === 'released')
+    : [];
+  const selectedDataset = released.find((dataset) => dataset.id === datasetId);
+  const resourcesValid = resources.status === 'ready' && resourceIds.length > 0
+    && resourceIds.every((id) => resources.data.some((resource) => resource.id === id && resource.status !== 'busy'));
+  const parametersValid = Number.isInteger(batchSize) && batchSize > 0
+    && Number.isInteger(steps) && steps > 0 && Number.isFinite(learningRate) && learningRate > 0;
+  const canCreate = resourcesValid && selectedDataset !== undefined && parametersValid;
   async function create(): Promise<void> {
+    if (pendingRef.current || !canCreate || selectedDataset === undefined) return;
+    pendingRef.current = true;
+    setPending(true);
+    setMessage(null);
     try {
       const run = await port.createTrainingRun({
-        projectId: "project-tiger",
-        name: `${modelFamily} finetune · ${new Date().toLocaleTimeString("ko-KR")}`,
+        projectId: selectedDataset.projectId,
+        name: `${modelFamily} 학습 · ${new Date().toLocaleTimeString("ko-KR")}`,
         datasetVersionId: datasetId,
         modelFamily,
         computeResourceIds: resourceIds,
@@ -140,21 +154,20 @@ export function NewTrainingPage() {
       });
       void navigate(`/mlops/training/${run.id}`);
     } catch {
-      setMessage(actionFailureMessage());
+      setMessage('학습을 시작하지 못했습니다. 선택한 자원과 데이터셋 상태를 확인한 뒤 다시 시도하세요.');
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   }
-  const released =
-    datasets.status === "ready"
-      ? datasets.data.filter((item) => item.status === "released")
-      : [];
   return (
     <div className="grid gap-6">
       <PageHeader
         title="학습 실행 생성"
-        description="컴퓨팅 자원 → 모델 → Dataset 버전 → 하이퍼파라미터 → 재개 → 검토 순서로 설정합니다."
+        description="컴퓨팅 자원과 릴리스된 데이터셋을 선택해 새 학습을 시작하세요."
       />
       <Stepper activeIndex={step} items={wizardSteps} />
-      <Panel title={wizardSteps[step]?.label ?? "Review"}>
+      <Panel title={wizardSteps[step]?.label ?? '검토'}>
         {step === 0 ? (
           <AsyncState query={resources}>
             {(items) => (
@@ -181,6 +194,12 @@ export function NewTrainingPage() {
             )}
           </AsyncState>
         ) : null}
+        {step === 0 && resources.status === 'ready' && resourceIds.length > 0 && !resourcesValid ? (
+          <div className="mt-4 grid justify-items-start gap-2">
+            <p className="text-sm text-negative" role="alert">선택한 자원을 현재 사용할 수 없습니다. 사용 가능한 자원을 다시 선택하세요.</p>
+            <Button onClick={() => setResourceIds([])} variant="secondary">자원 다시 선택</Button>
+          </div>
+        ) : null}
         {step === 1 ? (
           <div className="grid gap-3 md:grid-cols-4">
             {(["pi0", "pi05", "act", "custom"] as const).map((model) => (
@@ -204,19 +223,21 @@ export function NewTrainingPage() {
                 </strong>
                 <p className="mt-3 text-sm text-muted">
                   {model === "act"
-                    ? "고정밀 Action Chunking"
+                    ? '동작 시퀀스 학습'
                     : model === "custom"
-                      ? "Custom image와 startup parameters"
-                      : "General-purpose VLA policy"}
+                      ? '사용자 정의 모델 계열'
+                      : '시각·언어·행동 모델'}
                 </p>
               </button>
             ))}
           </div>
         ) : null}
         {step === 2 ? (
-          <div className="grid gap-3">
+          <AsyncState query={datasets} emptyMessage="릴리스된 데이터셋이 없습니다. 데이터셋을 구성하고 릴리스한 뒤 다시 확인하세요.">
+            {() => released.length === 0 ? <p className="text-sm text-muted" role="status">릴리스된 데이터셋이 없습니다. 데이터셋을 릴리스한 뒤 다시 확인하세요.</p> : <div className="grid gap-3">
             {released.map((dataset) => (
               <button
+                aria-pressed={datasetId === dataset.id}
                 className={
                   datasetId === dataset.id
                     ? "rounded-[var(--design-radius-control)] bg-action-secondary-active ring-2 ring-focus p-4 text-left"
@@ -230,68 +251,51 @@ export function NewTrainingPage() {
                   {dataset.name} v{String(dataset.version)}
                 </strong>
                 <p className="mt-1 text-sm text-muted">
-                  {dataset.kind} · {String(dataset.unitRefs.length)} units ·
-                  Released
+                  데이터 {String(dataset.unitRefs.length)}개 · 릴리스됨
                 </p>
               </button>
             ))}
-          </div>
+          </div>}
+          </AsyncState>
         ) : null}
         {step === 3 ? (
           <div className="grid gap-4 md:grid-cols-2">
             <Input
-              label="batch_size"
+              label="배치 크기"
+              min={1}
+              step={1}
               type="number"
               value={batchSize}
               onChange={(event) => setBatchSize(Number(event.target.value))}
             />
             <Input
-              label="steps"
+              label="학습 단계 수"
+              min={1}
+              step={1}
               type="number"
               value={steps}
               onChange={(event) => setSteps(Number(event.target.value))}
             />
             <Input
-              label="learning_rate"
+              label="학습률"
+              min={Number.MIN_VALUE}
               type="number"
-              step="0.000001"
+              step="any"
               value={learningRate}
               onChange={(event) => setLearningRate(Number(event.target.value))}
             />
-            <Input label="save_interval" type="number" defaultValue="5000" />
+            <p className="text-sm text-muted md:col-span-2">새 실행으로 시작하며 체크포인트는 학습 서비스의 기본 정책에 따라 저장됩니다.</p>
           </div>
         ) : null}
         {step === 4 ? (
-          <div className="grid gap-4">
-            <Select
-              label="기존 Training Run"
-              value="none"
-              options={[
-                { label: "새로 시작", value: "none" },
-                { label: "training-001", value: "training-001" },
-              ]}
-              onValueChange={() => undefined}
-            />
-            <Select
-              label="Checkpoint"
-              value="none"
-              options={[
-                { label: "선택 안 함", value: "none" },
-                { label: "checkpoint-5000", value: "checkpoint-5000" },
-              ]}
-              onValueChange={() => undefined}
-            />
-          </div>
-        ) : null}
-        {step === 5 ? (
           <DefinitionGrid
             items={[
-              { label: "Compute", value: resourceIds.join(", ") },
-              { label: "Model", value: modelFamily },
-              { label: "Dataset", value: datasetId },
+              { label: '컴퓨팅 자원', value: resourceIds.join(', ') },
+              { label: '모델', value: modelFamily },
+              { label: '데이터셋', value: selectedDataset?.name ?? '선택한 데이터셋을 다시 확인하세요.' },
               {
-                label: "Hyperparameters",
-                value: `batch ${String(batchSize)} · ${String(steps)} steps · lr ${String(learningRate)}`,
+                label: '학습 설정',
+                value: `배치 ${String(batchSize)} · ${String(steps)}단계 · 학습률 ${String(learningRate)}`,
               },
             ]}
           />
@@ -303,7 +307,7 @@ export function NewTrainingPage() {
         )}
         <div className="mt-6 flex justify-between gap-3">
           <Button
-            disabled={step === 0}
+            disabled={step === 0 || pending}
             variant="secondary"
             onClick={() => setStep((value) => Math.max(0, value - 1))}
           >
@@ -311,7 +315,7 @@ export function NewTrainingPage() {
           </Button>
           {step < wizardSteps.length - 1 ? (
             <Button
-              disabled={step === 0 && resourceIds.length === 0}
+              disabled={(step === 0 && !resourcesValid) || (step === 2 && selectedDataset === undefined) || (step === 3 && !parametersValid)}
               onClick={() =>
                 setStep((value) => Math.min(wizardSteps.length - 1, value + 1))
               }
@@ -319,7 +323,7 @@ export function NewTrainingPage() {
               다음
             </Button>
           ) : (
-            <Button onClick={() => void create()}>학습 실행 생성</Button>
+            <Button disabled={!canCreate} isLoading={pending} onClick={() => void create()}>학습 실행 생성</Button>
           )}
         </div>
       </Panel>
@@ -490,87 +494,103 @@ export function NewEvaluationPage() {
   const port = useFlywheelPort();
   const navigate = useNavigate();
   const models = useFlywheelQuery(loadModels);
-  const [modelId, setModelId] = useState("model-pi0-v3");
-  const [robotType, setRobotType] = useState<RobotType>("humanoid");
-  const [scenario, setScenario] = useState("Mixed lighting regression");
+  const [modelId, setModelId] = useState('');
+  const [scenario, setScenario] = useState('');
+  const [repetitions, setRepetitions] = useState(50);
+  const [environment, setEnvironment] = useState<EvaluationRun['environment']>('simulation');
   const [threshold, setThreshold] = useState(80);
+  const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const availableModels = models.status === 'ready' ? models.data.filter((model) => model.stage !== 'archived') : [];
+  const selectedModel = availableModels.find((model) => model.id === modelId) ?? availableModels[0];
+  const validParameters = scenario.trim().length > 0 && Number.isInteger(repetitions) && repetitions > 0
+    && Number.isFinite(threshold) && threshold >= 0 && threshold <= 100;
+
+  async function create(): Promise<void> {
+    if (pending || selectedModel === undefined || !validParameters) return;
+    setMessage(null);
+    setPending(true);
+    try {
+      const run = await port.createEvaluationRun({
+        projectId: selectedModel.projectId,
+        name: `${scenario.trim()} 평가`, modelVersionId: selectedModel.id,
+        robotType: selectedModel.robotType, environment, scenario: scenario.trim(), repetitions, passThreshold: threshold,
+      });
+      await navigate(`/mlops/evaluations/${run.id}`);
+    } catch {
+      setMessage('평가를 시작하지 못했습니다. 입력한 설정을 확인하고 다시 시도하세요.');
+    } finally {
+      setPending(false);
+    }
+  }
   return (
     <div className="grid gap-6">
       <PageHeader
         title="평가 실행 생성"
-        description="휴머노이드와 Mobility에 맞는 지표와 통과 기준을 적용합니다."
+        description="모델의 로봇 유형에 맞춰 시나리오와 반복 횟수, 평가 환경을 설정하세요."
       />
       <Panel>
         <form
           className="grid gap-4 md:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
-            void port
-              .createEvaluationRun({
-                projectId: "project-tiger",
-                name: `${scenario} evaluation`,
-                modelVersionId: modelId,
-                robotType,
-                environment: "simulation",
-                scenario,
-                repetitions: 50,
-                passThreshold: threshold,
-              })
-              .then((run) => navigate(`/mlops/evaluations/${run.id}`))
-              .catch(() => setMessage(actionFailureMessage()));
+            void create();
           }}
         >
           <Select
             label="모델 버전"
-            value={modelId}
-            options={
-              models.status === "ready"
-                ? models.data.map((model) => ({
-                    label: `${model.name} v${String(model.version)}`,
-                    value: model.id,
-                  }))
-                : [{ label: "Model 없음", value: "" }]
-            }
+            disabled={pending || availableModels.length === 0}
+            placeholder={models.status === 'loading' ? '모델을 불러오는 중' : '사용 가능한 모델 없음'}
+            value={selectedModel?.id ?? ''}
+            options={availableModels.map((model) => ({ label: `${model.name} v${String(model.version)}`, value: model.id }))}
             onValueChange={setModelId}
           />
-          <Select
-            label="로봇 유형"
-            value={robotType}
-            options={["humanoid", "quadruped", "mobile"].map((value) => ({
-              label: value,
-              value,
-            }))}
-            onValueChange={(value) => setRobotType(value as RobotType)}
-          />
+          <DefinitionGrid items={[{ label: '로봇 유형', value: selectedModel === undefined ? '모델 선택 후 표시' : ({ humanoid: '휴머노이드', quadruped: '사족보행', mobile: '이동형' } as const)[selectedModel.robotType] }]} />
+          {models.status === 'error' ? (
+            <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-negative" role="alert">모델 목록을 불러오지 못했습니다.</p>
+              <Button onClick={models.retry} variant="secondary">모델 다시 불러오기</Button>
+            </div>
+          ) : models.status === 'ready' && availableModels.length === 0 ? (
+            <p className="md:col-span-2 text-sm text-muted" role="status">평가할 수 있는 모델이 없습니다. 학습을 완료하거나 모델 레지스트리를 확인하세요.</p>
+          ) : null}
           <Input
+            disabled={pending}
             label="시나리오"
+            placeholder="평가할 작업과 조건"
+            required
             value={scenario}
             onChange={(event) => setScenario(event.target.value)}
           />
-          <Input label="반복 횟수" type="number" defaultValue="50" />
+          <Input disabled={pending} label="반복 횟수" type="number" min={1} step={1} value={repetitions} onChange={(event) => setRepetitions(Number(event.target.value))} required />
           <Input
+            disabled={pending}
             label="통과 기준 (%)"
+            max={100}
+            min={0}
+            step={0.1}
             type="number"
+            required
             value={threshold}
             onChange={(event) => setThreshold(Number(event.target.value))}
           />
           <Select
+            disabled={pending}
             label="환경"
-            value="simulation"
+            value={environment}
             options={[
-              { label: "Simulation", value: "simulation" },
-              { label: "Physical", value: "physical" },
-              { label: "Replay", value: "replay" },
+              { label: "시뮬레이션", value: "simulation" },
+              { label: "실물 로봇", value: "physical" },
+              { label: "기록 재생", value: "replay" },
             ]}
-            onValueChange={() => undefined}
+            onValueChange={(value) => setEnvironment(value as EvaluationRun['environment'])}
           />
           {message === null ? null : (
             <p className="md:col-span-2 text-negative" role="alert">
               {message}
             </p>
           )}
-          <Button className="md:col-span-2" type="submit">
+          <Button className="md:col-span-2" disabled={selectedModel === undefined || !validParameters} isLoading={pending} type="submit">
             평가 실행
           </Button>
         </form>
@@ -856,86 +876,113 @@ export function NewDeploymentPage() {
   const port = useFlywheelPort();
   const navigate = useNavigate();
   const models = useFlywheelQuery(loadModels);
+  const robots = useRobotCatalog();
   const production =
     models.status === "ready"
       ? models.data.filter((item) => item.stage === "production")
       : [];
-  const [modelId, setModelId] = useState("model-pi0-v3");
+  const [modelId, setModelId] = useState('');
+  const [robotId, setRobotId] = useState('');
+  const [runtime, setRuntime] = useState('TensorRT Edge');
+  const [controlFrequencyHz, setControlFrequencyHz] = useState(20);
+  const [rolloutPercent, setRolloutPercent] = useState(25);
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
+  const selectedModel = production.find((model) => model.id === modelId) ?? production[0];
+  const compatibleRobots = robots.robots.filter((robot) => selectedModel !== undefined && robot.robotType === selectedModel.robotType);
+  const selectedRobot = compatibleRobots.find((robot) => robot.id === robotId) ?? compatibleRobots[0];
+  const canCreate = selectedModel !== undefined && selectedRobot !== undefined
+    && Number.isFinite(controlFrequencyHz) && controlFrequencyHz > 0
+    && Number.isFinite(rolloutPercent) && rolloutPercent > 0 && rolloutPercent <= 100;
+
+  async function create(): Promise<void> {
+    if (pendingRef.current || !canCreate || selectedModel === undefined || selectedRobot === undefined) return;
+    pendingRef.current = true;
+    setPending(true);
+    setMessage(null);
+    try {
+      const deployment = await port.createDeployment({
+        projectId: selectedModel.projectId, name: `${selectedModel.name} 배포`,
+        modelVersionId: selectedModel.id, robotIds: [selectedRobot.id], runtime, controlFrequencyHz, rolloutPercent,
+      });
+      await navigate(`/mlops/deployments/${deployment.id}`);
+    } catch {
+      setMessage('배포를 시작하지 못했습니다. 모델과 대상 로봇 상태를 확인한 뒤 다시 시도하세요.');
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
+    }
+  }
   return (
     <div className="grid gap-6">
       <PageHeader
         title="배포 생성"
-        description="호환성 검증 후 Production Model을 단계적으로 rollout합니다."
+        description="운영 모델과 같은 유형의 로봇을 선택하고 실행 환경과 배포 비율을 설정하세요."
       />
       <Panel>
         <form
           className="grid gap-4 md:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
-            void port
-              .createDeployment({
-                projectId: "project-tiger",
-                name: "TIGER canary deployment",
-                modelVersionId: modelId,
-                robotIds: ["robot-001"],
-                runtime: "TensorRT Edge",
-                controlFrequencyHz: 20,
-                rolloutPercent: 25,
-              })
-              .then((item) => navigate(`/mlops/deployments/${item.id}`))
-              .catch(() => setMessage(actionFailureMessage()));
+            void create();
           }}
         >
           <Select
+            disabled={pending || production.length === 0}
             label="운영 모델"
-            value={modelId}
+            placeholder={models.status === 'loading' ? '모델을 불러오는 중' : '운영 모델 없음'}
+            value={selectedModel?.id ?? ''}
             options={production.map((model) => ({
               label: `${model.name} v${String(model.version)}`,
               value: model.id,
             }))}
-            onValueChange={setModelId}
+            onValueChange={(value) => { setModelId(value); setRobotId(''); }}
           />
           <Select
+            disabled={pending || compatibleRobots.length === 0}
             label="대상 로봇"
-            value="robot-001"
-            options={[{ label: "robot-001 · compatible", value: "robot-001" }]}
-            onValueChange={() => undefined}
+            placeholder={robots.status === 'loading' ? '로봇을 불러오는 중' : '같은 유형의 로봇 없음'}
+            value={selectedRobot?.id ?? ''}
+            options={compatibleRobots.map((robot) => ({ label: robot.displayName, value: robot.id }))}
+            onValueChange={setRobotId}
           />
           <Select
-            label="Runtime"
-            value="tensorrt"
+            disabled={pending}
+            label="런타임"
+            value={runtime}
             options={[
-              { label: "TensorRT Edge", value: "tensorrt" },
-              { label: "ONNX Runtime", value: "onnx" },
+              { label: 'TensorRT Edge', value: 'TensorRT Edge' },
+              { label: 'ONNX Runtime', value: 'ONNX Runtime' },
             ]}
-            onValueChange={() => undefined}
+            onValueChange={setRuntime}
           />
           <Input
+            disabled={pending}
             label="제어 주기 (Hz)"
+            min={Number.MIN_VALUE}
+            step="any"
+            required
             type="number"
-            defaultValue="20"
+            value={controlFrequencyHz}
+            onChange={(event) => setControlFrequencyHz(Number(event.target.value))}
           />
-          <Input label="배포 비율 (%)" type="number" defaultValue="25" />
-          <Input
-            label="복구 지연 시간 (ms)"
-            type="number"
-            defaultValue="80"
-          />
-          <Panel className="md:col-span-2" layer="base" title="호환성">
-            <div className="flex flex-wrap gap-2">
-              <Badge tone="positive">로봇 유형 호환</Badge>
-              <Badge tone="positive">Runtime 사용 가능</Badge>
-              <Badge tone="positive">평가 통과</Badge>
+          <Input disabled={pending} label="배포 비율 (%)" type="number" min={Number.MIN_VALUE} max={100} step="any" value={rolloutPercent} onChange={(event) => setRolloutPercent(Number(event.target.value))} required />
+          {models.status === 'error' || robots.status === 'error' ? (
+            <div className="md:col-span-2 grid justify-items-start gap-3">
+              <p className="text-sm text-negative" role="alert">배포 대상 정보를 불러오지 못했습니다.</p>
+              <Button variant="secondary" onClick={() => { if (models.status === 'error') models.retry(); if (robots.status === 'error') robots.retry(); }}>배포 대상 다시 불러오기</Button>
             </div>
-          </Panel>
+          ) : models.status === 'ready' && robots.status === 'ready' && (selectedModel === undefined || selectedRobot === undefined) ? (
+            <p className="md:col-span-2 text-sm text-muted" role="status">{selectedModel === undefined ? '운영 단계의 모델이 없습니다. 모델 레지스트리에서 운영 모델을 지정하세요.' : '모델과 같은 유형의 로봇이 없습니다. 로봇 등록 정보와 유형을 확인하세요.'}</p>
+          ) : null}
           {message === null ? null : (
             <p className="md:col-span-2 text-negative" role="alert">
               {message}
             </p>
           )}
-          <Button className="md:col-span-2" type="submit">
-            Deployment 시작
+          <Button className="md:col-span-2" disabled={!canCreate} isLoading={pending} type="submit">
+            배포 시작
           </Button>
         </form>
       </Panel>
