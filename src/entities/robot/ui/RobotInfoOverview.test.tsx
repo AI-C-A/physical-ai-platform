@@ -95,7 +95,13 @@ describe('RobotInfoOverview', () => {
     expect(batteryGauge).not.toContainElement(batteryValue);
     const batteryFill = batteryGauge.querySelector('[data-battery-fill]');
     expect(batteryFill).toHaveStyle({ width: '80.25%' });
-    expect(batteryFill).toHaveClass('bg-foreground', 'rounded-full');
+    expect(batteryFill).toHaveClass(
+      'bg-foreground',
+      'rounded-full',
+      'duration-[var(--design-motion-progress)]',
+      'ease-[var(--design-ease-standard)]',
+      'motion-reduce:transition-none',
+    );
     expect(batteryLabel).not.toHaveClass(
       'uppercase',
       'tracking-[0.16em]',

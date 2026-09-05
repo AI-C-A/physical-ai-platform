@@ -99,7 +99,7 @@ function BatteryIndicator({
       >
         <span
           className={cn(
-            'block h-full rounded-full transition-[width] duration-500',
+            'block h-full rounded-full transition-[width] duration-[var(--design-motion-progress)] ease-[var(--design-ease-standard)] motion-reduce:transition-none',
             batteryTone,
           )}
           data-battery-fill
