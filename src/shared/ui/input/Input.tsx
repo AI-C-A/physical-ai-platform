@@ -13,6 +13,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({
+  'aria-describedby': describedBy,
+  'aria-invalid': invalid,
   className,
   error,
   id,
@@ -28,8 +30,8 @@ export function Input({
   const errorId = `${inputId}-error`;
 
   return (
-    <label className={cn('grid gap-1.5 text-sm font-medium text-foreground', className)} htmlFor={inputId}>
-      <span className={showLabel ? undefined : 'sr-only'}>{label}</span>
+    <div className={cn('grid gap-1.5 text-sm font-medium text-foreground', className)}>
+      <label className={showLabel ? undefined : 'sr-only'} htmlFor={inputId}>{label}</label>
       <span className="relative">
         {leadingIcon === undefined ? null : (
           <span
@@ -40,8 +42,8 @@ export function Input({
           </span>
         )}
         <input
-          aria-describedby={error === undefined ? undefined : errorId}
-          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={[describedBy, error === undefined ? undefined : errorId].filter(Boolean).join(' ') || undefined}
+          aria-invalid={error === undefined ? invalid : true}
           className={cn(
             'min-h-[var(--layout-control-height)] w-full rounded-[var(--design-radius-control)] border border-border bg-layer-base px-3 py-2 font-normal text-foreground placeholder:text-muted disabled:cursor-not-allowed disabled:bg-surface-muted',
             leadingIcon === undefined ? undefined : 'pl-9',
@@ -57,6 +59,6 @@ export function Input({
           {error}
         </span>
       )}
-    </label>
+    </div>
   );
 }

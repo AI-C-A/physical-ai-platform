@@ -2,6 +2,7 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 
 import { cn } from '@/shared/ui/class-names';
 import { Icon, type IconName } from '@/shared/ui/icon';
+import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 
 export interface SelectOption {
   readonly label: string;
@@ -70,12 +71,15 @@ export function Select({
           <SelectPrimitive.Content
             aria-label={`${label} 선택`}
             className={cn(
-              'z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[var(--design-radius-control)] border-0 bg-layer-floating p-1 text-foreground shadow-lg',
+              'z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[var(--design-radius-control)] border-0 p-1 text-foreground',
               contentClassName,
+              getFloatingSurfaceClassName(),
             )}
+            collisionPadding={12}
             position="popper"
+            sideOffset={6}
           >
-            <SelectPrimitive.Viewport>
+            <SelectPrimitive.Viewport className="max-h-[var(--radix-select-content-available-height)] overscroll-contain">
               {options.map((option) => (
                 <SelectPrimitive.Item
                   className={cn(

@@ -29,11 +29,15 @@ export function Checkbox({
     )}>
       <CheckboxPrimitive.Root
         checked={checked}
-        className="grid size-5 place-items-center rounded border border-border bg-surface data-[state=checked]:border-action-primary data-[state=checked]:bg-action-primary data-[state=checked]:text-action-on-fill"
+        className="grid size-5 transform-gpu place-items-center rounded border border-border bg-surface transition-[background-color,border-color,color,transform] active:scale-[0.96] motion-reduce:active:scale-100 disabled:active:scale-100 data-[state=checked]:border-action-primary data-[state=checked]:bg-action-primary data-[state=checked]:text-action-on-fill"
         disabled={disabled}
         onCheckedChange={(value) => onCheckedChange(value === true)}
       >
-        <CheckboxPrimitive.Indicator aria-hidden="true">
+        <CheckboxPrimitive.Indicator
+          aria-hidden="true"
+          className="grid scale-75 place-items-center opacity-0 transition-[opacity,transform] duration-[var(--design-motion-fast)] ease-[var(--design-ease-enter)] motion-reduce:transition-none data-[state=checked]:scale-100 data-[state=checked]:opacity-100"
+          forceMount
+        >
           <Icon name="check" />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>

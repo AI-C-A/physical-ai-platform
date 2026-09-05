@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Circle,
   CircleAlert,
   Database,
   Download,
@@ -21,8 +22,10 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Pause,
   Play,
   Radio,
+  RotateCcw,
   Route,
   Search,
   Settings as SettingsIcon,
@@ -56,9 +59,12 @@ export type IconName =
   | 'more'
   | 'panel-close'
   | 'panel-open'
+  | 'pause'
   | 'play'
   | 'radio'
+  | 'record'
   | 'report'
+  | 'restart'
   | 'robot'
   | 'route'
   | 'search'
@@ -97,9 +103,12 @@ const icons = {
   more: MoreHorizontal,
   'panel-close': PanelLeftClose,
   'panel-open': PanelLeftOpen,
+  pause: Pause,
   play: Play,
   radio: Radio,
+  record: Circle,
   report: FileChartColumn,
+  restart: RotateCcw,
   robot: Bot,
   route: Route,
   search: Search,

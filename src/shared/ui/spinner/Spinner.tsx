@@ -12,7 +12,7 @@ export function Spinner({ className, label, ...props }: SpinnerProps) {
     <LoaderCircle
       aria-hidden={label === undefined}
       aria-label={label}
-      className={cn('size-4 animate-spin', className)}
+      className={cn('size-4 motion-safe:animate-spin motion-reduce:animate-none', className)}
       role={label === undefined ? undefined : 'status'}
       {...props}
     />

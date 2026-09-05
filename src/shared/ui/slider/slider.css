@@ -1,0 +1,166 @@
+.slider {
+  --slider-color: var(--action-primary);
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: var(--layout-control-height);
+  width: 100%;
+  height: var(--layout-control-height);
+}
+
+.slider__track {
+  position: absolute;
+  inset-inline: calc(var(--design-slider-thumb-size) / 2);
+  height: var(--design-slider-track-height);
+  overflow: hidden;
+  border-radius: var(--design-radius-round);
+  background: var(--border);
+  pointer-events: none;
+}
+
+.slider__fill {
+  display: block;
+  width: var(--slider-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--slider-color);
+}
+
+.slider__input {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--design-radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider__input::-webkit-slider-runnable-track {
+  height: var(--design-slider-track-height);
+  background: transparent;
+}
+
+.slider__input::-moz-range-track {
+  height: var(--design-slider-track-height);
+  background: transparent;
+}
+
+.slider__input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: var(--design-slider-thumb-size);
+  height: var(--design-slider-thumb-size);
+  margin-top: calc((var(--design-slider-track-height) - var(--design-slider-thumb-size)) / 2);
+  border: 1px solid var(--border);
+  border-radius: var(--design-radius-round);
+  background: var(--action-on-fill);
+  outline: 4px solid transparent;
+  transition: outline-color var(--design-motion-fast) var(--design-ease-standard);
+}
+
+.slider__input::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--design-slider-thumb-size);
+  height: var(--design-slider-thumb-size);
+  border: 1px solid var(--border);
+  border-radius: var(--design-radius-round);
+  background: var(--action-on-fill);
+  outline: 4px solid transparent;
+  transition: outline-color var(--design-motion-fast) var(--design-ease-standard);
+}
+
+.slider__input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.slider:not([data-disabled]):hover .slider__input::-webkit-slider-thumb,
+.slider__input:focus-visible::-webkit-slider-thumb {
+  outline-color: var(--status-info-background);
+}
+
+.slider:not([data-disabled]):hover .slider__input::-moz-range-thumb,
+.slider__input:focus-visible::-moz-range-thumb {
+  outline-color: var(--status-info-background);
+}
+
+.slider__input:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.slider__input:active:not(:disabled)::-webkit-slider-thumb {
+  border-color: var(--slider-color);
+  outline-color: var(--status-info-background);
+}
+
+.slider__input:active:not(:disabled)::-moz-range-thumb {
+  border-color: var(--slider-color);
+  outline-color: var(--status-info-background);
+}
+
+/* Match the thumb's travel, including its inset at both endpoints. */
+.slider__value-anchor {
+  position: absolute;
+  inset-inline: calc(var(--design-slider-thumb-size) / 2);
+  bottom: calc(50% + var(--design-slider-thumb-size) / 2 + 6px);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.slider__value {
+  position: absolute;
+  inset-inline-start: var(--slider-progress);
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--design-motion-fast) var(--design-ease-standard);
+}
+
+.slider:has(.slider__input:focus-visible, .slider__input:active):not([data-disabled]) .slider__value {
+  visibility: visible;
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .slider:not([data-disabled]):hover .slider__value {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+.slider[data-disabled] {
+  --slider-color: var(--muted);
+  opacity: 0.5;
+}
+
+.slider__input:disabled {
+  cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .slider {
+    --slider-color: Highlight;
+  }
+
+  .slider__track {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .slider__input::-webkit-slider-thumb {
+    background: Canvas;
+  }
+
+  .slider__input::-moz-range-thumb {
+    background: Canvas;
+  }
+}

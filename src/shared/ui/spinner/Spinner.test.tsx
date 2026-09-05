@@ -8,6 +8,10 @@ describe('Spinner', () => {
     render(<Spinner data-testid="spinner" />);
 
     expect(screen.getByTestId('spinner')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('spinner')).toHaveClass(
+      'motion-safe:animate-spin',
+      'motion-reduce:animate-none',
+    );
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 

@@ -67,16 +67,18 @@ describe('Select', () => {
     trigger.focus();
     await user.keyboard('{ArrowDown}');
 
-    expect(
-      screen.getByRole('listbox', { name: '로봇 선택' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: '로봇 선택' })).toHaveClass(
+      'bg-layer-floating',
+      'shadow-lg',
+      'backdrop-blur-[var(--design-backdrop-blur-floating)]',
+    );
   });
 
   it('열린 목록과 항목에 화면별 표면 스타일을 적용한다', async () => {
     const user = userEvent.setup();
     render(
       <Select
-        contentClassName="rounded-2xl border-0 bg-white/80"
+        contentClassName="rounded-2xl border-0 bg-white/80 shadow-none backdrop-blur-none"
         itemClassName="rounded-xl"
         label="사이트"
         onValueChange={vi.fn()}
@@ -92,7 +94,9 @@ describe('Select', () => {
     expect(screen.getByRole('listbox', { name: '사이트 선택' })).toHaveClass(
       'rounded-2xl',
       'border-0',
-      'bg-white/80',
+      'bg-layer-floating',
+      'shadow-lg',
+      'backdrop-blur-[var(--design-backdrop-blur-floating)]',
     );
     expect(screen.getByRole('option', { name: '판교' })).toHaveClass(
       'rounded-xl',

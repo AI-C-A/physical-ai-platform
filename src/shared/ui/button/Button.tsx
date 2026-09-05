@@ -31,12 +31,22 @@ export function Button({
       type={type}
       {...props}
     >
+      <span
+        className={`inline-flex w-full items-center gap-2 transition-opacity duration-[var(--design-motion-fast)] motion-reduce:transition-none ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        data-button-content
+        style={{ gap: 'inherit', justifyContent: 'inherit' }}
+      >
+        {children}
+      </span>
       {isLoading ? (
-        <>
-          <span className="sr-only">{children}</span>
+        <span
+          aria-hidden="true"
+          className="design-motion-button-loader pointer-events-none absolute inset-0 grid place-items-center"
+          data-button-loader
+        >
           <Spinner />
-        </>
-      ) : children}
+        </span>
+      ) : null}
     </button>
   );
 }
