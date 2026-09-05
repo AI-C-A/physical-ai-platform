@@ -2,7 +2,7 @@ import { Button } from '@/shared/ui/button';
 import { ModelViewer } from '@/shared/ui/model-viewer';
 import { Spinner } from '@/shared/ui/spinner';
 
-const ROBOT_MODEL_URL = `${import.meta.env.BASE_URL}assets/go2_walk.glb`;
+const ROBOT_MODEL_URL = `${import.meta.env.BASE_URL}assets/go2_walk-monitoring.glb`;
 const DEFAULT_CAMERA_ORBIT = '-135deg 65deg 105%';
 
 interface RobotModelViewerProps {

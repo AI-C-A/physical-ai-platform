@@ -6,6 +6,7 @@ __pycache__/
 .venv/
 playwright-report
 test-results
+artifacts/
 # Local environment files (keep templates in version control)
 .env
 .env.*
