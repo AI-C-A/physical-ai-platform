@@ -66,6 +66,79 @@ describe('InMemoryFlywheel', () => {
     pc.dispose();
   });
 
+  it('Quest의 늦은 정지 응답은 PC가 확정한 Episode를 파일 확정 중으로 되돌리지 않는다', async () => {
+    vi.useFakeTimers();
+    const clock = { nowMs: () => Date.now() };
+    const bus = new InProcessSyncBus();
+    const pcTransport = bus.createTransport('pc');
+    const delayedMessages: string[] = [];
+    let delayPcMessages = false;
+    const pc = createInMemoryFlywheel(clock, { syncTransport: {
+      ...pcTransport,
+      send: (message) => { if (delayPcMessages) delayedMessages.push(message); else pcTransport.send(message); },
+    } });
+    const quest = createInMemoryFlywheel(clock, { syncTransport: bus.createTransport('quest') });
+    try {
+      const session = await pc.createHumanDemonstrationSession({
+        projectId: 'project-tiger', siteId: 'site-lab', name: '지연된 장치 응답',
+        taskId: 'task-sort', instruction: '분류', exoskeletonDeviceId: 'exoskeleton-001',
+        questDeviceId: 'quest2-001', headCameraDeviceId: 'rbp-headcam-001', externalCameraDeviceId: '',
+      });
+      await quest.updateHumanDemonstrationSource(session.id, 'quest2-001', 'ready');
+      await pc.validateSession(session.id);
+      await pc.startSession(session.id);
+      const episode = await pc.startEpisode(session.id);
+      await pc.stopEpisode(episode.id);
+      delayPcMessages = true;
+      await vi.advanceTimersByTimeAsync(250);
+      expect(await pc.getEpisode(episode.id)).toMatchObject({ status: 'completed' });
+      expect(await quest.getEpisode(episode.id)).toMatchObject({ status: 'finalizing' });
+      const handPose = {
+        coordinateFrame: 'quest-local-floor' as const, deviceTimestampMs: 1,
+        receivedTimestampMs: clock.nowMs(),
+        hands: {
+          left: { sourcePresent: false, poseObserved: false, joints: [] },
+          right: { sourcePresent: false, poseObserved: false, joints: [] },
+        },
+      };
+      const frame = { ...handPose, sequence: 0, frameEpoch: 1, episodeOffsetMs: 0 };
+      await quest.reportHandPoseBatch({
+        sessionId: session.id, episodeId: episode.id, sourceDeviceId: 'quest2-001',
+        firstSequence: 0, lastSequence: 0, frameCount: 1, byteLength: 128,
+        deviceTimestampMs: handPose.deviceTimestampMs, receivedTimestampMs: handPose.receivedTimestampMs,
+        leftPoseObserved: false, rightPoseObserved: false, leftSourcePresent: false, rightSourcePresent: false,
+        latestHandPose: handPose, frames: [frame],
+      });
+      await quest.acknowledgeCollectorCommand({
+        sessionId: session.id, episodeId: episode.id, sourceDeviceId: 'quest2-001',
+        command: 'stop', state: 'acknowledged', acknowledgedAtMs: clock.nowMs(), detail: null,
+      });
+      await quest.updateHumanDemonstrationSource(session.id, 'quest2-001', 'ready');
+      delayPcMessages = false;
+      delayedMessages.splice(0).forEach((message) => pcTransport.send(message));
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await pc.getEpisode(episode.id)).toMatchObject({ status: 'completed', finalizationError: null });
+      expect(await pc.getEpisodeHandPoseAt(episode.id, 0)).toEqual(frame);
+      delayPcMessages = true;
+      await expect(pc.saveEpisode(episode.id)).resolves.toMatchObject({ id: episode.id });
+      await quest.updateHumanDemonstrationSource(session.id, 'quest2-001', 'ready');
+      expect(await pc.getSession(session.id)).toMatchObject({ activeEpisodeId: null });
+      expect(await pc.getEpisode(episode.id)).toMatchObject({ status: 'completed' });
+      expect(await pc.getEpisodeHandPoseAt(episode.id, 0)).toEqual(frame);
+      delayPcMessages = false;
+      delayedMessages.splice(0).forEach((message) => pcTransport.send(message));
+      const nextEpisode = await pc.startEpisode(session.id);
+      await quest.updateHumanDemonstrationSource(session.id, 'quest2-001', 'recording');
+      expect(await pc.getSession(session.id)).toMatchObject({ activeEpisodeId: nextEpisode.id });
+      expect(await quest.getSession(session.id)).toMatchObject({ activeEpisodeId: nextEpisode.id });
+      expect(await pc.getEpisode(nextEpisode.id)).toMatchObject({ status: 'recording' });
+      expect(await quest.getEpisode(episode.id)).toMatchObject({ status: 'completed' });
+    } finally {
+      pc.dispose();
+      quest.dispose();
+    }
+  });
+
   it('선택 외부 카메라가 비어 있으면 장치와 관측률을 만들지 않는다', async () => {
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     try {

@@ -19,6 +19,7 @@ import {
 import {
   CollectionPerceptionViewer,
   HumanoidRigViewer,
+  isEpisodeTransferComplete,
   loadCollectionBodyPoseViewer,
   loadQuestHandPoseViewer,
   useCollectionTelemetry,
@@ -153,12 +154,15 @@ function getCollectionWorkspaceState(
   if (activeEpisode?.status === 'recording') return 'recording';
   if (activeEpisode?.status === 'finalizing' && activeEpisode.finalizationError !== null) return 'attention';
   if (activeEpisode?.status === 'finalizing') return 'finalizing';
-  if (activeEpisode?.status === 'completed' && activeEpisode.outcome === null) return 'review';
+  if (activeEpisode?.status === 'completed' && activeEpisode.outcome === null) {
+    return isEpisodeTransferComplete(activeEpisode) ? 'review' : 'finalizing';
+  }
   if ((session.status === 'active' || session.status === 'ready') && activeEpisode === null) return 'episode-ready';
   return 'prepare';
 }
 
-function getWorkspaceStateLabel(state: CollectionWorkspaceState): string {
+function getWorkspaceStateLabel(state: CollectionWorkspaceState, episode: FlywheelEpisode | null = null): string {
+  if (state === 'finalizing' && episode !== null && !isEpisodeTransferComplete(episode)) return '원본 전송 중';
   const labels: Readonly<Record<CollectionWorkspaceState, string>> = {
     prepare: '사전점검이 필요합니다',
     'episode-ready': '녹화 준비 완료',
@@ -233,17 +237,19 @@ function PairingCountdown({ expiresAtMs }: { readonly expiresAtMs: number | null
 }
 
 function CollectionWorkspaceLiveStatus({
+  activeEpisode,
   effectiveConnectionState,
   session,
   state,
 }: {
+  readonly activeEpisode: FlywheelEpisode | null;
   readonly effectiveConnectionState: CollectionTelemetryConnectionState;
   readonly session: HumanoidCaptureSession;
   readonly state: CollectionWorkspaceState;
 }) {
   const label = state === 'processing'
     ? session.processingStage === 'indexing' ? '인덱스 생성 중' : '파일 확정 중'
-    : getWorkspaceStateLabel(state);
+    : getWorkspaceStateLabel(state, activeEpisode);
   const connection = effectiveConnectionState === 'live'
     ? '수집 소스 연결 정상'
     : effectiveConnectionState === 'stale'
@@ -282,11 +288,16 @@ function getRecordingSummary(
   session: HumanoidCaptureSession,
   state: CollectionWorkspaceState,
   telemetry: CollectionTelemetrySnapshot | null,
+  activeEpisode: FlywheelEpisode | null,
 ) {
   if (state === 'recording') {
     return { label: '수신 중 · 저장 미확인', detail: `${formatBytes(telemetry?.bytesWritten ?? session.bytesWritten)} 수신`, tone: 'warning' as const };
   }
-  if (state === 'finalizing') return { label: '파일 확정 중', detail: '창을 닫지 마세요', tone: 'warning' as const };
+  if (state === 'finalizing') {
+    return activeEpisode !== null && !isEpisodeTransferComplete(activeEpisode)
+      ? { label: '원본 전송 중', detail: '필수 장치의 전송 완료를 기다리고 있습니다. 수집 장치의 연결을 유지하세요.', tone: 'warning' as const }
+      : { label: '파일 확정 중', detail: '창을 닫지 마세요', tone: 'warning' as const };
+  }
   if (state === 'review') return { label: '녹화본 준비 완료', detail: '저장 여부를 결정하세요', tone: 'positive' as const };
   if (state === 'processing') {
     return {
@@ -1179,7 +1190,7 @@ export function CollectionWorkspacePage() {
                         </TableCell>
                         <TableCell className="block min-w-0 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
                           <p aria-hidden="true" className="mb-2 text-xs text-muted @min-[58rem]:hidden">현재 단계</p>
-                          <StatusIndicator label={getWorkspaceStateLabel(state)} tone={workspaceTone(state)} />
+                          <StatusIndicator label={getWorkspaceStateLabel(state, activeEpisode)} tone={workspaceTone(state)} />
                           <p className="mt-1 break-words text-xs leading-relaxed text-muted">{activeEpisode?.name ?? '녹화 중인 Episode 없음'}</p>
                         </TableCell>
                         <TableCell className="block min-w-0 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
@@ -1652,6 +1663,7 @@ export function HumanoidCollectionDetailPage() {
           : episodes.find((episode) => episode.id === session.activeEpisodeId) ?? null;
         const reviewEpisode = activeEpisode?.status === 'completed'
           && activeEpisode.outcome === null
+          && isEpisodeTransferComplete(activeEpisode)
           ? activeEpisode
           : null;
         const savedEpisodes = episodes.filter((episode) => (
@@ -1672,9 +1684,10 @@ export function HumanoidCollectionDetailPage() {
           && (session.status === 'active' || session.status === 'ready')
           && requiredSourcesOperational;
         const workspaceState = getCollectionWorkspaceState(session, activeEpisode);
-        const recordingSummary = getRecordingSummary(session, workspaceState, telemetry);
+        const recordingSummary = getRecordingSummary(session, workspaceState, telemetry, activeEpisode);
         const closeIntent = getCloseIntent(workspaceState, savedEpisodes.length);
         const recordedPreview = activeEpisode?.status === 'finalizing'
+          || workspaceState === 'finalizing'
           || workspaceState === 'review';
         const livePreview = (session.status === 'active' || session.status === 'ready') && !recordedPreview;
         const configuredCameraSources = session.humanDemonstration === null
@@ -1850,6 +1863,7 @@ export function HumanoidCollectionDetailPage() {
               />
             </header>
             <CollectionWorkspaceLiveStatus
+              activeEpisode={activeEpisode}
               effectiveConnectionState={telemetryQuery.effectiveConnectionState}
               session={session}
               state={workspaceState}
@@ -1982,7 +1996,7 @@ export function HumanoidCollectionDetailPage() {
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <StatusIndicator label={episodeData === null ? 'Episode 상태 확인 필요' : getWorkspaceStateLabel(workspaceState)} pulse={workspaceState === 'recording'} tone={episodeData === null ? 'warning' : workspaceState === 'recording' ? 'negative' : workspaceTone(workspaceState)} />
+                        <StatusIndicator label={episodeData === null ? 'Episode 상태 확인 필요' : getWorkspaceStateLabel(workspaceState, activeEpisode)} pulse={workspaceState === 'recording'} tone={episodeData === null ? 'warning' : workspaceState === 'recording' ? 'negative' : workspaceTone(workspaceState)} />
                         {activeEpisode?.status === 'recording' ? <span aria-label="녹화 경과 시간" className="text-2xl font-semibold tabular-nums"><RecordingElapsedTime episode={activeEpisode} /></span> : null}
                       </div>
                     </div>

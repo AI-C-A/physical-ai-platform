@@ -1,4 +1,5 @@
 export { FlywheelContext, useFlywheelPort, useFlywheelQuery } from './model/flywheel-context';
+export { isEpisodeTransferComplete } from './model/episode-transfer';
 export {
   getEffectiveCollectionConnectionState,
   useCollectionTelemetry,

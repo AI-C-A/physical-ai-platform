@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/require-await -- In-memory commands intentionally preserve the asynchronous Port contract. */
 import type { ClockPort } from '@/shared/lib/clock';
 import { createCollectionVisuals } from './in-memory-collection-visuals';
+import { isEpisodeTransferComplete } from '../model/episode-transfer';
 
 import type {
   AnnotationTask,
@@ -2319,15 +2320,7 @@ export class InMemoryFlywheel implements FlywheelPort {
   }
 
   #assertEpisodeTransferCompleted(episode: FlywheelEpisode): void {
-    const binding = episode.humanDemonstration;
-    if (binding !== null && binding.sourceBindings.some((source) => (
-      source.required && !binding.collectorAcknowledgements.some((acknowledgement) => (
-        acknowledgement.episodeId === episode.id
-        && acknowledgement.sourceDeviceId === source.sourceDeviceId
-        && acknowledgement.command === 'stop'
-        && acknowledgement.state === 'acknowledged'
-      ))
-    ))) {
+    if (!isEpisodeTransferComplete(episode)) {
       throw new Error('필수 수집 장치의 원본 전송이 끝나지 않았습니다. 연결 상태를 확인하고 다시 시도하세요.');
     }
   }
@@ -2423,8 +2416,27 @@ export class InMemoryFlywheel implements FlywheelPort {
   }
 
   #applyOperationalSnapshot(snapshot: OperationalSnapshot): void {
-    this.#sessions = snapshot.sessions;
-    this.#episodes = snapshot.episodes;
+    const localEpisodes = new Map(this.#episodes.map((episode) => [episode.id, episode]));
+    const localSessions = new Map(this.#sessions.map((session) => [session.id, session]));
+    this.#sessions = snapshot.sessions.map((session) => {
+      const localSession = localSessions.get(session.id);
+      if (session.kind === 'humanoid' && localSession?.kind === 'humanoid'
+        && localSession.activeEpisodeId === null && session.activeEpisodeId !== null
+        && localEpisodes.get(session.activeEpisodeId)?.status === 'completed') {
+        return { ...session, activeEpisodeId: null, status: localSession.status,
+          processingStage: localSession.processingStage, stoppedAtMs: localSession.stoppedAtMs,
+          errorMessage: localSession.errorMessage };
+      }
+      return session;
+    });
+    this.#episodes = snapshot.episodes.map((episode) => {
+      const localEpisode = localEpisodes.get(episode.id);
+      // 장치 응답의 최신 revision이 PC에서 이미 끝낸 파일 확정을 되돌릴 수는 없다.
+      return localEpisode?.status === 'completed' && episode.status === 'finalizing'
+        ? { ...episode, status: localEpisode.status, outcome: localEpisode.outcome,
+          endedAtMs: localEpisode.endedAtMs, finalizationError: localEpisode.finalizationError }
+        : episode;
+    });
     this.#handPoseMetrics.clear();
     snapshot.handPoseMetrics.forEach(([sessionId, metrics]) => this.#handPoseMetrics.set(sessionId, metrics));
     this.#handPoseFrames.clear();
