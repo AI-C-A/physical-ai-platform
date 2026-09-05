@@ -80,7 +80,7 @@ export type QuestSupportState = 'checking' | 'supported' | 'unsupported' | 'unav
 export type QuestPairingState = 'unpaired' | 'pairing' | 'paired' | 'error';
 export type QuestImmersiveState = 'idle' | 'starting' | 'running' | 'ending' | 'error';
 export type QuestBackendState = 'offline' | 'connecting' | 'live' | 'reconnecting' | 'unavailable' | 'error';
-export type QuestRecordingState = 'idle' | 'recording' | 'review' | 'error';
+export type QuestRecordingState = 'idle' | 'recording' | 'stopping' | 'review' | 'error';
 export type HandTrackingQualityState = 'tracking' | 'partial' | 'lost';
 
 export interface QuestHandStatus {

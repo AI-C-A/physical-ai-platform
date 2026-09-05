@@ -21,7 +21,7 @@ function stateTone(state: string): StatusIndicatorTone {
   if (state === 'supported' || state === 'paired' || state === 'running' || state === 'live'
     || state === 'recording' || state === 'tracking' || state === 'acknowledged') return 'neutral';
   if (state === 'checking' || state === 'pairing' || state === 'starting' || state === 'reconnecting'
-    || state === 'partial' || state === 'pending' || state === 'review') return 'warning';
+    || state === 'partial' || state === 'pending' || state === 'stopping' || state === 'review') return 'warning';
   if (state === 'idle' || state === 'unpaired' || state === 'offline') return 'neutral';
   return 'negative';
 }
@@ -46,6 +46,7 @@ function stateLabel(state: string): string {
     review: '검토 대기',
     running: 'MR 실행 중',
     starting: '시작 중',
+    stopping: '원본 전송 중',
     supported: '사용 가능',
     tracking: '추적 정상',
     unavailable: '지원되지 않음',

@@ -94,7 +94,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
   #previewTimer: ReturnType<typeof setTimeout> | null = null;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #uiTimer: ReturnType<typeof setTimeout> | null = null;
-  #flushRunning = false;
+  #flushPromise: Promise<boolean> | null = null;
   #previewRunning = false;
   #commandSyncRunning = false;
   #commandSyncRequested = false;
@@ -208,6 +208,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
     if (this.#snapshot.support.state !== 'supported') throw new Error(this.#snapshot.support.detail);
     if (this.#activeSession !== null) return this.getSnapshot();
     const generation = ++this.#generation;
+    let startedSession: ActiveWebXrSession | null = null;
     this.#update({ immersive: { state: 'starting', detail: null } });
     try {
       const activeSession = await this.#runtime.start(
@@ -218,6 +219,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
           if (generation === this.#generation) this.#handleRuntimeEnded();
         },
       );
+      startedSession = activeSession;
       if (generation !== this.#generation) {
         await activeSession.end();
         return this.getSnapshot();
@@ -229,6 +231,12 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
       await this.#requestCommandSync(true);
       return this.getSnapshot();
     } catch (reason) {
+      if (generation !== this.#generation) return this.getSnapshot();
+      if (startedSession !== null) {
+        this.#activeSession = null;
+        await startedSession.end().catch(() => undefined);
+      }
+      if (generation !== this.#generation) return this.getSnapshot();
       const detail = reason instanceof Error ? reason.message : 'immersive session을 시작하지 못했습니다.';
       this.#update({ immersive: { state: 'error', detail } });
       throw reason;
@@ -282,6 +290,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
     this.#queue?.clear();
     this.#pairing = null;
     this.#queue = null;
+    this.#flushPromise = null;
     this.#lastCommandEpisodeId = null;
     this.#sequence = 0;
     this.#frameEpoch = 0;
@@ -336,6 +345,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         const pairing = this.#pairing;
         if (pairing === null || this.#snapshot.backend.state !== 'live') continue;
         const state = await this.#backend.getCommandState(pairing);
+        if (this.#pairing !== pairing) continue;
         await this.#applyCommandState(state, force);
         force = false;
       } while (this.#commandSyncRequested);
@@ -396,7 +406,18 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
 
     const previousEpisodeId = this.#lastCommandEpisodeId;
     if (previousEpisodeId === null) return;
-    await this.#flush();
+    this.#clearFlushTimer();
+    this.#clearPreview();
+    this.#update({
+      recording: {
+        state: 'stopping',
+        episodeId: previousEpisodeId,
+        command: 'stop',
+        acknowledgement: 'pending',
+        detail: '남은 Hand Pose 원본을 전송하고 있습니다.',
+      },
+    });
+    if (!await this.#drainFrames(pairing)) return;
     await this.#backend.acknowledge({
       sessionId: pairing.sessionId,
       episodeId: previousEpisodeId,
@@ -405,7 +426,9 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
       state: 'acknowledged',
       detail: null,
     });
+    if (this.#pairing !== pairing) return;
     await this.#backend.updatePresence(pairing, this.#activeSession === null ? 'paired' : 'ready');
+    if (this.#pairing !== pairing) return;
     this.#lastCommandEpisodeId = null;
     this.#update({
       recording: {
@@ -457,7 +480,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         },
       };
       this.#scheduleFlush(pairing.policy.flushIntervalMs);
-    } else if (pairing !== null && this.#snapshot.backend.state === 'live') {
+    } else if (pairing !== null && this.#snapshot.backend.state === 'live' && this.#previewAllowed()) {
       this.#latestPreviewObservation = observation;
       this.#schedulePreview();
     }
@@ -507,7 +530,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
   }
 
   #scheduleFlush(delayMs: number): void {
-    if (this.#flushTimer !== null || this.#flushRunning) return;
+    if (this.#flushTimer !== null || this.#flushPromise !== null) return;
     this.#flushTimer = setTimeout(() => {
       this.#flushTimer = null;
       void this.#flush();
@@ -545,19 +568,43 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
   }
 
   #previewAllowed(): boolean {
-    return this.#snapshot.recording.state !== 'recording';
+    return this.#snapshot.recording.state !== 'recording'
+      && this.#snapshot.recording.state !== 'stopping';
   }
 
-  async #flush(): Promise<void> {
+  async #drainFrames(pairing: QuestPairingResult): Promise<boolean> {
+    while (this.#pairing === pairing && (this.#flushPromise !== null || (this.#queue?.size ?? 0) > 0)) {
+      if (!await this.#flush()) return false;
+    }
+    return this.#pairing === pairing && this.#snapshot.backend.state === 'live';
+  }
+
+  #flush(): Promise<boolean> {
+    if (this.#flushPromise !== null) return this.#flushPromise;
     const pairing = this.#pairing;
     const queue = this.#queue;
-    if (pairing === null || queue === null || queue.size === 0 || this.#flushRunning) return;
-    if (this.#snapshot.backend.state !== 'live') return;
-    this.#flushRunning = true;
+    if (pairing === null || queue === null || this.#snapshot.backend.state !== 'live') {
+      return Promise.resolve(false);
+    }
+    if (queue.size === 0) return Promise.resolve(true);
+    const flush = this.#sendBatch(pairing, queue).finally(() => {
+      if (this.#flushPromise !== flush) return;
+      this.#flushPromise = null;
+      if (queue.size > 0 && this.#pairing === pairing && this.#snapshot.backend.state === 'live'
+        && this.#snapshot.recording.state !== 'stopping') {
+        this.#scheduleFlush(pairing.policy.flushIntervalMs);
+      }
+    });
+    this.#flushPromise = flush;
+    return flush;
+  }
+
+  async #sendBatch(pairing: QuestPairingResult, queue: HandPoseFrameQueue): Promise<boolean> {
     const frames = queue.take(pairing.policy.maximumBatchFrames);
     try {
       const payload = encodeHandPoseBatch(frames);
       const receipt = await this.#backend.sendHandPoseBatch({ pairing, frames, payload });
+      if (this.#pairing !== pairing || this.#queue !== queue) return false;
       this.#snapshot = {
         ...this.#snapshot,
         backend: {
@@ -569,14 +616,12 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         },
       };
       this.#scheduleUiPublish();
+      return true;
     } catch (reason) {
+      if (this.#pairing !== pairing || this.#queue !== queue) return false;
       queue.restoreFront(frames);
       this.#handleBackendFailure(reason);
-    } finally {
-      this.#flushRunning = false;
-      if (queue.size > 0 && this.#snapshot.backend.state === 'live') {
-        this.#scheduleFlush(pairing.policy.flushIntervalMs);
-      }
+      return false;
     }
   }
 

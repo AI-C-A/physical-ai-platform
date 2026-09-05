@@ -1397,6 +1397,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     ) {
       throw new Error('현재 검토 중인 녹화본만 저장할 수 있습니다.');
     }
+    this.#assertEpisodeTransferCompleted(episode);
     this.#replaceSession({ ...session, activeEpisodeId: null });
     return clone(episode);
   }
@@ -1416,6 +1417,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     ) {
       throw new Error('현재 녹화 중이거나 검토 중인 Episode만 폐기할 수 있습니다.');
     }
+    if (episode.status === 'completed') this.#assertEpisodeTransferCompleted(episode);
     this.#episodes = this.#episodes.filter((item) => item.id !== episodeId);
     this.#handPoseFrames.delete(episodeId);
     this.#replaceSession({
@@ -1429,6 +1431,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     const episode = this.#episodes.find((item) => item.id === episodeId);
     if (episode === undefined) throw new Error('Episode를 찾을 수 없습니다.');
     if (episode.status !== 'completed') throw new Error('저장이 완료된 Episode에만 결과를 입력할 수 있습니다.');
+    this.#assertEpisodeTransferCompleted(episode);
     const updated: FlywheelEpisode = { ...episode, outcome };
     this.#episodes = this.#episodes.map((item) => item.id === episodeId ? updated : item);
     const session = this.#sessions.find((item) => item.id === episode.captureSessionId);
@@ -2138,27 +2141,27 @@ export class InMemoryFlywheel implements FlywheelPort {
     return [
       {
         id: 'participant',
-        label: 'Participant 가명',
+        label: '참여자 식별',
         state: 'passed' as const,
-        detail: `${session.humanDemonstration.participantId} · Session 범위`,
+        detail: `${session.humanDemonstration.participantId} · 이 세션에서 사용`,
       },
       {
         id: 'sources',
-        label: '필수 source',
+        label: '필수 장치',
         state: connectedRequiredSources.length === requiredSources.length ? 'passed' as const : 'failed' as const,
-        detail: `${String(connectedRequiredSources.length)}/${String(requiredSources.length)} collectors connected`,
+        detail: `${String(connectedRequiredSources.length)}/${String(requiredSources.length)}대 연결`,
       },
       {
         id: 'clock-contract',
-        label: '시간 계약',
+        label: '기록 시각',
         state: 'passed' as const,
-        detail: 'device monotonic / Backend receive 분리',
+        detail: '장치 시각과 서버 수신 시각을 각각 기록합니다.',
       },
       {
         id: 'calibration',
-        label: '좌표계 Calibration',
+        label: '좌표계 보정',
         state: 'warning' as const,
-        detail: '품질 검토 필요 · raw 수집은 보존',
+        detail: '보정값을 검토하세요. 원본 기록은 보존합니다.',
       },
     ];
   }
@@ -2313,6 +2316,20 @@ export class InMemoryFlywheel implements FlywheelPort {
         };
       })
       .sort((left, right) => right.completedAtMs - left.completedAtMs);
+  }
+
+  #assertEpisodeTransferCompleted(episode: FlywheelEpisode): void {
+    const binding = episode.humanDemonstration;
+    if (binding !== null && binding.sourceBindings.some((source) => (
+      source.required && !binding.collectorAcknowledgements.some((acknowledgement) => (
+        acknowledgement.episodeId === episode.id
+        && acknowledgement.sourceDeviceId === source.sourceDeviceId
+        && acknowledgement.command === 'stop'
+        && acknowledgement.state === 'acknowledged'
+      ))
+    ))) {
+      throw new Error('필수 수집 장치의 원본 전송이 끝나지 않았습니다. 연결 상태를 확인하고 다시 시도하세요.');
+    }
   }
 
   #finalizeEpisode(episodeId: string, outcome: FlywheelEpisode['outcome']): FlywheelEpisode {
