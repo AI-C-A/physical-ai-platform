@@ -189,6 +189,18 @@ test('upstream 인증 오류를 raw detail 없이 502로 정규화한다', async
   );
 });
 
+test('로봇 접근 거부는 인증 키 오류와 구분하고 민감한 상세를 노출하지 않는다', async () => {
+  const integration = createIntegration(async () => Response.json({
+    code: 'ROBOT_ACCESS_DENIED', detail: '민감한 로봇 접근 정책',
+  }, { status: 403 }));
+  await assert.rejects(() => integration.listRobots(), (error) => {
+    assert.equal(error.status, 502);
+    assert.equal(error.code, 'ROBOT_ACCESS_DENIED');
+    assert.equal(error.message, '등록된 로봇의 조회 권한이 없습니다.');
+    return true;
+  });
+});
+
 test('upstream Robot 없음과 서비스 장애를 각각 404와 503으로 정규화한다', async () => {
   const missing = createIntegration(async () => new Response(
     JSON.stringify({ code: 'ROBOT_NOT_FOUND', detail: 'upstream 내부 상세' }),

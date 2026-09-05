@@ -4,13 +4,14 @@ import { useAsyncQuery, type AsyncQueryState } from '@/shared/lib/async-query';
 import type { PageResult } from '@/shared/lib/query';
 
 import type { RobotDescriptor } from './robot';
-import type { RobotQuery } from './robot-catalog';
+import { RobotCatalogAccessError, type RobotQuery } from './robot-catalog';
 import { useRobotCatalogPort } from './robot-catalog-context';
 
 async function loadRobotData<T>(load: () => Promise<T>): Promise<T> {
   try {
     return await load();
   } catch (error: unknown) {
+    if (error instanceof RobotCatalogAccessError) throw error;
     throw new Error('로봇 목록을 불러오지 못했습니다.', { cause: error });
   }
 }

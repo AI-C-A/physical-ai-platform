@@ -6,7 +6,7 @@ import {
 } from '@/shared/lib/http-json';
 import { createPageResult } from '@/shared/lib/query';
 
-import type { RobotCatalogPort, RobotQuery } from '../model/robot-catalog';
+import { RobotCatalogAccessError, type RobotCatalogPort, type RobotQuery } from '../model/robot-catalog';
 import {
   PatrolApiStatusCheckError,
   type PatrolApiStatusPort,
@@ -228,11 +228,20 @@ implements RobotCatalogPort, PatrolApiStatusPort {
   async #loadRobots(
     signal?: AbortSignal,
   ): Promise<readonly RobotDescriptor[]> {
-    const value = await requestJson(
-      createEndpoint(this.#base, 'robots'),
-      signal === undefined ? {} : { signal },
-      this.#fetcher,
-    );
+    let value: unknown;
+    try {
+      value = await requestJson(
+        createEndpoint(this.#base, 'robots'),
+        signal === undefined ? {} : { signal },
+        this.#fetcher,
+      );
+    } catch (error: unknown) {
+      if (error instanceof HttpJsonError) {
+        if (error.code === 'ROBOT_ACCESS_DENIED') throw new RobotCatalogAccessError('access-denied', { cause: error });
+        if (error.code === 'INTEGRATION_CONFIGURATION_ERROR') throw new RobotCatalogAccessError('authentication', { cause: error });
+      }
+      throw error;
+    }
     try {
       return parseRobotList(value);
     } catch (error: unknown) {

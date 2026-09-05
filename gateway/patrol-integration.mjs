@@ -197,6 +197,9 @@ function mapUpstreamFailure(status, code) {
     return new GatewayError(502, 'VIDEO_NOT_CONFIGURED', 'Robot 카메라 접속 정보를 받지 못했습니다.');
   }
   if (status === 403) {
+    if (code === 'ROBOT_ACCESS_DENIED') {
+      return new GatewayError(502, 'ROBOT_ACCESS_DENIED', '등록된 로봇의 조회 권한이 없습니다.');
+    }
     return new GatewayError(502, 'INTEGRATION_CONFIGURATION_ERROR', 'Patrol 연동 인증을 확인해야 합니다.');
   }
   if (status >= 500) {
