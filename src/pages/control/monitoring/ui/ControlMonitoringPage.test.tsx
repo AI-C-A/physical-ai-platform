@@ -78,7 +78,10 @@ const {
       void options;
       return map;
     }),
-    createMarker: vi.fn(function Marker(options: { element?: HTMLElement; anchor?: string; color?: string }) { void options; return marker; }),
+    createMarker: vi.fn(function Marker(options: { element?: HTMLElement; anchor?: string; color?: string }) {
+      options.element?.setAttribute('role', 'img');
+      return marker;
+    }),
     easeTo: easeToMock,
     mapInstance: map,
     setMarkerAttribute: setMarkerAttributeMock,
@@ -321,6 +324,7 @@ describe('ControlMonitoringPage', () => {
     expect(markers).toHaveLength((await createInMemoryRobotCatalogWithData().listRobots()).length);
     const marker = markers.find((element) => element.getAttribute('aria-label') === '수송 로봇 02 위치 선택');
     expect(marker).toBeDefined();
+    expect(marker).toHaveAttribute('role', 'button');
     fireEvent.click(marker as HTMLElement);
     expect(await screen.findByRole('region', { name: '수송 로봇 02 로봇 패널' })).toBeInTheDocument();
     expect(marker).toHaveAttribute('aria-pressed', 'true');

@@ -169,6 +169,8 @@ function MonitoringMap({
       button.dataset.selected = String(isSelected);
       button.textContent = robot.label.match(/\d+$/u)?.[0] ?? String(index + 1);
       button.title = robot.label;
+      // Mapbox가 사용자 지정 마커에도 role="img"를 부여하므로 조작 의미를 복원한다.
+      button.setAttribute('role', 'button');
       button.setAttribute('aria-label', `${robot.label} 위치 선택`);
       button.setAttribute('aria-pressed', String(isSelected));
       button.onclick = () => onSelectRobot(robot.robotId);
@@ -215,8 +217,8 @@ function MonitoringMap({
         <>
           <div className="h-full w-full" ref={containerRef} />
           {!mapError ? (
-            <div className={`absolute inset-x-0 z-10 flex justify-center px-4 ${location === null ? 'bottom-8' : 'bottom-[calc(45dvh+1.5rem)]'} md:top-4 md:bottom-auto`}>
-              <div className={`flex items-center gap-1 rounded-[var(--design-radius-control)] p-1 ${mapOverlaySurfaceClassName}`} role="group" aria-label="지도 보기 제어">
+            <div className={`absolute inset-x-0 z-10 flex justify-center px-4 md:px-0 ${location === null ? 'bottom-8 md:right-4' : 'bottom-[calc(45dvh+1.5rem)] md:right-[22rem] xl:right-[25rem]'} md:top-4 md:bottom-auto md:left-[18rem] xl:left-[19rem]`}>
+              <div className={`flex max-w-full flex-wrap items-center justify-center gap-1 rounded-[var(--design-radius-control)] p-1 ${mapOverlaySurfaceClassName}`} role="group" aria-label="지도 보기 제어">
                 <Button className="min-h-10 px-3 text-xs" onClick={resetMap} variant="ghost">
                   <Icon name="map" />사이트 중심
                 </Button>
