@@ -276,5 +276,7 @@ Real 모드는 동일한 Route와 Port 계약을 유지하지만 신규 Backend 
 
 ## 추가 문서
 
+- [관제·데이터 수집 시연 가이드](docs/demo-guide.md)
+- [디자인 시스템](docs/design-system.md)
 - [기여 및 검증 규칙](CONTRIBUTING.md)
 - [세그멘테이션 설치와 실행](segmentation/README.md)
