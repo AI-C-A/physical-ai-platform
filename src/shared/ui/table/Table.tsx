@@ -17,7 +17,7 @@ export function Table({
     <div
       aria-label={`${ariaLabel ?? '표'} 가로 스크롤 영역`}
       className={cn(
-        'w-full overflow-x-auto rounded-[var(--design-radius-surface)] border-0 bg-layer-raised text-foreground shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        'relative min-w-0 w-full max-w-full overflow-x-auto rounded-[var(--design-radius-surface)] border-0 bg-layer-raised text-foreground shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
         containerClassName,
       )}
       data-density={density}

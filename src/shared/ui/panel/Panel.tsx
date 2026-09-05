@@ -24,7 +24,7 @@ export function Panel({
 }: PanelProps) {
   return (
     <Surface
-      className={className}
+      className={cn('min-w-0', className)}
       density={density}
       layer={layer}
       {...props}
