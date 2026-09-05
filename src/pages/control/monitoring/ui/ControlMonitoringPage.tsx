@@ -1,14 +1,11 @@
-import mapboxgl from 'mapbox-gl';
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, type To } from 'react-router-dom';
 
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 import {
   RobotInfoOverview,
@@ -20,25 +17,19 @@ import {
   type RobotOperationalStatus,
 } from '@/entities/robot';
 import {
-  IndoorSiteMap,
   monitoringSites,
-  type OutdoorSiteDescriptor,
   type SiteDescriptor,
 } from '@/entities/site';
 import {
-  isValidRobotGeolocation,
   useRobotGeolocation,
-  type RobotGeolocationLoadState,
-  type RobotGeolocationObservation,
 } from '@/entities/robot-telemetry';
-import { useMapStylePreference } from '@/shared/config';
 import { appendPathSegment } from '@/shared/lib/navigation';
 import { Button, getButtonClassName } from '@/shared/ui/button';
-import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { Input } from '@/shared/ui/input';
 import { Panel } from '@/shared/ui/panel';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
+import { useRouteMorph } from '@/shared/ui/route-morph';
 import { Select } from '@/shared/ui/select';
 
 import {
@@ -51,234 +42,50 @@ import {
   setMultiMonitoringSelectionMode,
   writeMultiMonitoringRobotIds,
 } from '../model/multi-monitoring-search-params';
+import {
+  filterMonitoringRobots,
+  needsMonitoringAttention,
+  type MonitoringRobotFilter,
+  type MonitoringRobotSort,
+} from '../model/monitoring-robot-health';
 import { RobotMultiSelectionList } from './RobotMultiSelectionList';
+import { getRobotMapLocation, type FleetMapLocation } from '../model/monitoring-map-locations';
+import { mapOverlaySurfaceClassName, SiteMap } from './MonitoringMap';
 import {
   RobotMonitoringListRow,
   robotMonitoringListClassName,
 } from './RobotMonitoringListRow';
 
 const monitoringViewportClassName =
-  'relative h-[calc(100dvh-3.5rem)] min-h-0 overflow-hidden lg:h-dvh';
-const mapOverlaySurfaceClassName =
-  'border-0 bg-surface-muted/[0.88] shadow-xl backdrop-blur-xl';
+  'relative h-[calc(100dvh-3.5rem-var(--platform-environment-height,0rem))] min-h-0 overflow-hidden lg:h-[calc(100dvh-var(--platform-environment-height,0rem))]';
 const mapOverlayControlClassName =
-  'min-h-12 rounded-md border-0 px-4 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus/10 focus-visible:ring-inset';
+  'min-h-12 rounded-md border-0 px-4 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset';
 const siteIdSearchParameter = 'siteId';
+const emptyOperationalStatuses: Readonly<Record<string, RobotOperationalStatus | null>> = {};
 
 const siteOptions = monitoringSites.map((site) => ({
   label: site.displayName,
   value: site.id,
 }));
 
-interface RobotMapLocation {
-  readonly label: string;
-  readonly latitude: number;
-  readonly longitude: number;
-}
-
-function getRobotMapLocation(
-  robot: RobotDescriptor | undefined,
-  geolocation: RobotGeolocationObservation | null,
-): RobotMapLocation | null {
-  if (
-    robot === undefined
-    || geolocation === null
-    || geolocation.robotId !== robot.id
-    || !isValidRobotGeolocation(geolocation)
-  ) return null;
-
-  return {
-    label: robot.displayName,
-    latitude: geolocation.latitudeDegrees,
-    longitude: geolocation.longitudeDegrees,
-  };
-}
-
-function MonitoringMap({
-  location,
-  site,
-  status,
-}: {
-  readonly location: RobotMapLocation | null;
-  readonly site: OutdoorSiteDescriptor;
-  readonly status: ReactNode;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const initialLocationRef = useRef(location);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const { selectedStyle } = useMapStylePreference();
-  const accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? '';
-  const styleUrl = selectedStyle.styleUrl;
-  const mapCenterLatitude = site.mapCenter.latitude;
-  const mapCenterLongitude = site.mapCenter.longitude;
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container === null || accessToken === '' || styleUrl === '') return undefined;
-
-    const initialLocation = initialLocationRef.current;
-    const initialMapCenter = initialLocation ?? {
-      latitude: mapCenterLatitude,
-      longitude: mapCenterLongitude,
-    };
-    const cameraOptions = {
-      bearing: 347.2,
-      center: [
-        initialMapCenter.longitude,
-        initialMapCenter.latitude,
-      ] as [number, number],
-      pitch: 55,
-      zoom: 15.5,
-    };
-    const map = new mapboxgl.Map({
-      accessToken,
-      attributionControl: false,
-      ...cameraOptions,
-      container,
-      language: 'ko',
-      logoPosition: 'bottom',
-      performanceMetricsCollection: false,
-      style: styleUrl,
-    });
-    mapRef.current = map;
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
-
-    return () => {
-      markerRef.current?.remove();
-      markerRef.current = null;
-      mapRef.current = null;
-      map.remove();
-    };
-  }, [accessToken, mapCenterLatitude, mapCenterLongitude, styleUrl]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (map === null) return;
-    if (location === null) {
-      markerRef.current?.remove();
-      markerRef.current = null;
-      return;
-    }
-
-    const coordinates: [number, number] = [location.longitude, location.latitude];
-    let marker = markerRef.current;
-    if (marker === null) {
-      marker = new mapboxgl.Marker({ color: 'var(--action-primary)' });
-      markerRef.current = marker;
-      marker.setLngLat(coordinates);
-      marker.addTo(map);
-    } else {
-      marker.setLngLat(coordinates);
-    }
-
-    const markerElement = marker.getElement();
-    markerElement.setAttribute('aria-label', `${location.label} 현재 위치`);
-    markerElement.setAttribute('role', 'img');
-    markerElement.setAttribute('title', `${location.label} 현재 위치`);
-    map.easeTo({ center: coordinates, duration: 600 });
-  }, [accessToken, location, styleUrl]);
-
-  return (
-    <div
-      aria-label="로봇 위치 지도"
-      className="absolute inset-0 z-0 h-full w-full"
-      role="region"
-    >
-      {accessToken === '' ? (
-        <ErrorMessage className="m-4 p-3">
-          지도를 사용할 수 없습니다.
-        </ErrorMessage>
-      ) : styleUrl === '' ? (
-        <ErrorMessage className="m-4 p-3">
-          지도를 사용할 수 없습니다.
-        </ErrorMessage>
-      ) : (
-        <>
-          <div className="h-full w-full" ref={containerRef} />
-          {status === null ? null : (
-            <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-4">
-              <div className={'pointer-events-auto w-full max-w-sm rounded-lg p-3 '
-                + mapOverlaySurfaceClassName}>
-                {status}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function RobotLocationMap({
-  geolocation,
-  robot,
-  site,
-}: {
-  readonly geolocation: RobotGeolocationLoadState | null;
-  readonly robot: RobotDescriptor | undefined;
-  readonly site: OutdoorSiteDescriptor;
-}) {
-  let location: RobotMapLocation | null = null;
-  let status: ReactNode = null;
-
-  if (robot !== undefined && geolocation !== null) {
-    if (geolocation.status === 'loading') {
-      status = <QueryFeedback kind="loading" />;
-    } else if (geolocation.status === 'error') {
-      status = (
-        <QueryFeedback
-          kind="error"
-          message="로봇 위치를 불러오지 못했습니다."
-          onRetry={geolocation.retry}
-        />
-      );
-    } else {
-      location = getRobotMapLocation(robot, geolocation.data);
-    }
-  }
-
-  return (
-    <MonitoringMap
-      location={location}
-      site={site}
-      status={status}
-    />
-  );
-}
-
-function SiteMap({
-  geolocation,
-  robot,
-  site,
-}: {
-  readonly geolocation: RobotGeolocationLoadState | null;
-  readonly robot: RobotDescriptor | undefined;
-  readonly site: SiteDescriptor;
-}) {
-  if (site.environment === 'indoor') {
-    return <IndoorSiteMap site={site} />;
-  }
-
-  return (
-    <RobotLocationMap
-      geolocation={geolocation}
-      robot={robot}
-      site={site}
-    />
-  );
-}
 
 interface MonitoringLayoutProps {
+  readonly fleetLocations: readonly FleetMapLocation[];
+  readonly attentionCount: number;
+  readonly connectedCount: number;
+  readonly filter: MonitoringRobotFilter;
   readonly isMultiSelectMode: boolean;
   readonly monitoredRobots: readonly RobotDescriptor[];
+  readonly multiMonitoringTarget: To;
   readonly onCancelMultiSelect: () => void;
   readonly onCloseRobotInfo: () => void;
   readonly onEnterMultiSelect: () => void;
   readonly onSearchChange: (value: string) => void;
+  readonly onFilterChange: (value: MonitoringRobotFilter) => void;
+  readonly onSortChange: (value: MonitoringRobotSort) => void;
+  readonly onRefreshStatuses: () => void;
   readonly onSelectRobot: (robotId: string) => void;
   readonly onSelectSite: (siteId: string) => void;
-  readonly onStartMultiMonitoring: () => void;
   readonly onToggleMultiRobot: (robotId: string) => void;
   readonly operationalStatuses: Readonly<Record<string, RobotOperationalStatus | null>>;
   readonly robotMonitoringSearch: string;
@@ -286,18 +93,29 @@ interface MonitoringLayoutProps {
   readonly selectedMultiRobotIds: readonly string[];
   readonly selectedRobot: RobotDescriptor | undefined;
   readonly selectedSite: SiteDescriptor;
+  readonly sort: MonitoringRobotSort;
+  readonly staleRobotIds: ReadonlySet<string>;
+  readonly statusesUnavailable: boolean;
+  readonly totalRobotCount: number;
 }
 
 function MonitoringLayout({
+  fleetLocations,
+  attentionCount,
+  connectedCount,
+  filter,
   isMultiSelectMode,
   monitoredRobots,
+  multiMonitoringTarget,
   onCancelMultiSelect,
   onCloseRobotInfo,
   onEnterMultiSelect,
   onSearchChange,
+  onFilterChange,
+  onSortChange,
+  onRefreshStatuses,
   onSelectRobot,
   onSelectSite,
-  onStartMultiMonitoring,
   onToggleMultiRobot,
   operationalStatuses,
   robotMonitoringSearch,
@@ -305,39 +123,52 @@ function MonitoringLayout({
   selectedMultiRobotIds,
   selectedRobot,
   selectedSite,
+  sort,
+  staleRobotIds,
+  statusesUnavailable,
+  totalRobotCount,
 }: MonitoringLayoutProps) {
+  const [mobileListOpen, setMobileListOpen] = useState(false);
+  const mobileListToggleRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const multiSelectActionRef = useRef<HTMLButtonElement>(null);
   const restoreMultiSelectActionFocusRef = useRef(false);
+  const robotMonitoringMorph = useRouteMorph(
+    selectedRobot === undefined
+      ? 'control-monitoring:unselected'
+      : `control-monitoring:${selectedRobot.id}`,
+  );
+  const multiMonitoringMorph = useRouteMorph('control-monitoring:multi');
   useEffect(() => {
     if (isMultiSelectMode || !restoreMultiSelectActionFocusRef.current) return;
     restoreMultiSelectActionFocusRef.current = false;
     multiSelectActionRef.current?.focus();
   }, [isMultiSelectMode]);
-  const mobileGridRowsClassName = selectedRobot === undefined
-    ? 'grid-rows-[minmax(0,1fr)_auto]'
-    : 'grid-rows-[minmax(0,1fr)_minmax(0,1fr)]';
   const desktopGridColumnsClassName = selectedRobot === undefined
     ? 'md:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_0rem] xl:grid-cols-[minmax(14rem,17rem)_minmax(22rem,1fr)_0rem]'
     : 'md:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_minmax(17rem,20rem)] xl:grid-cols-[minmax(14rem,17rem)_minmax(22rem,1fr)_minmax(20rem,23rem)]';
 
   return (
     <>
-      <SelectedRobotSiteMap
-        robot={selectedRobot}
-        site={selectedSite}
-      />
+      <div className={mobileListOpen ? 'max-md:invisible' : undefined}>
+        <SelectedRobotSiteMap
+          fleetLocations={fleetLocations}
+          onSelectRobot={onSelectRobot}
+          robot={selectedRobot}
+          site={selectedSite}
+        />
+      </div>
       <div
         className={[
           'pointer-events-none relative z-10 grid h-full min-h-0 gap-4 overflow-hidden p-4 transition-[grid-template-columns,grid-template-rows] duration-200 motion-reduce:transition-none md:grid-rows-[minmax(0,1fr)]',
-          mobileGridRowsClassName,
+          mobileListOpen ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[auto_minmax(0,1fr)]',
           desktopGridColumnsClassName,
         ].join(' ')}
       >
-        <div className="pointer-events-auto grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-visible">
+        <div className="pointer-events-auto grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-4 overflow-visible md:grid-rows-[auto_minmax(0,1fr)]">
           <Select
             className="min-w-0"
-            contentClassName="rounded-lg border-0 bg-surface-muted/[0.97] p-1.5 shadow-xl backdrop-blur-xl"
+            contentClassName="rounded-[var(--design-radius-surface)] p-1.5"
             itemClassName="min-h-10 rounded-md data-[highlighted]:bg-foreground/[0.05]"
             label="사이트"
             leadingIcon="location"
@@ -350,10 +181,23 @@ function MonitoringLayout({
             value={selectedSite.id}
           />
 
+          <Button
+            aria-controls="monitoring-robot-list"
+            aria-expanded={mobileListOpen}
+            className="min-h-12 justify-between md:hidden"
+            onClick={() => setMobileListOpen((open) => !open)}
+            buttonRef={mobileListToggleRef}
+            variant="secondary"
+          >
+            {mobileListOpen ? '목록 접고 지도 보기' : `로봇 목록 보기 · ${String(monitoredRobots.length)}대`}
+            <span className={mobileListOpen ? 'rotate-180' : undefined}><Icon name="chevron-down" /></span>
+          </Button>
+
           <Panel
             aria-label="로봇 선택"
-            className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
+            className={`${mobileListOpen ? 'flex' : 'hidden md:flex'} h-full min-h-0 flex-col overflow-hidden rounded-lg`}
             contentClassName="flex min-h-0 flex-1 flex-col"
+            id="monitoring-robot-list"
             layer="translucent"
             onKeyDown={(event) => {
               if (
@@ -366,6 +210,12 @@ function MonitoringLayout({
               onCancelMultiSelect();
             }}
           >
+            <div className="mb-4 flex items-baseline justify-between gap-2" aria-label="기체 현황">
+              <p className="text-base font-semibold tracking-tight">운용 로봇 <span className="tabular-nums">{totalRobotCount}</span></p>
+              <span className="text-xs text-muted">
+                {statusesUnavailable ? '상태 확인 필요' : `연결 ${String(connectedCount)}대`}
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="relative min-w-0 flex-1">
                 <Input
@@ -376,7 +226,7 @@ function MonitoringLayout({
                   label="로봇 검색"
                   leadingIcon="search"
                   onChange={(event) => onSearchChange(event.target.value)}
-                  placeholder="이름 또는 ID"
+                  placeholder="이름, ID 또는 기체 번호"
                   role="searchbox"
                   showLabel={false}
                   type="text"
@@ -408,8 +258,47 @@ function MonitoringLayout({
                 {isMultiSelectMode ? '취소' : '선택'}
               </Button>
             </div>
+            <div className="mt-3 flex items-center gap-1 rounded-md bg-foreground/[0.035] p-1" role="group" aria-label="로봇 상태 필터">
+              {([
+                { value: 'all', label: '전체' },
+                { value: 'attention', label: `확인 필요 ${String(attentionCount)}` },
+              ] as const).map((option) => (
+                <Button
+                  aria-pressed={filter === option.value}
+                  className={`min-h-10 flex-1 px-2 text-xs ${filter === option.value ? 'bg-surface text-foreground shadow-sm' : 'text-muted'}`}
+                  key={option.value}
+                  onClick={() => onFilterChange(option.value)}
+                  variant="ghost"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+            <Select
+              className="mt-2"
+              label="로봇 정렬"
+              onValueChange={(value) => onSortChange(value as MonitoringRobotSort)}
+              options={[
+                { label: '이름순', value: 'name' },
+                { label: '확인 필요 우선', value: 'attention' },
+                { label: '배터리 낮은 순', value: 'battery' },
+              ]}
+              showLabel={false}
+              triggerClassName="min-h-10 border-0 bg-transparent px-3 text-xs text-muted shadow-none"
+              value={sort}
+            />
+            {statusesUnavailable || staleRobotIds.size > 0 ? (
+              <div className="mt-2 rounded-md bg-status-warning-background p-3 text-xs text-status-warning-foreground" role="status">
+                <p>{statusesUnavailable ? '로봇 상태를 불러오지 못했습니다.' : `${String(staleRobotIds.size)}대의 상태 수신이 지연되고 있습니다.`}</p>
+                <Button className="mt-2 min-h-10 px-2 text-xs" onClick={onRefreshStatuses} variant="secondary">상태 다시 확인</Button>
+              </div>
+            ) : null}
             {monitoredRobots.length === 0 ? (
-              <p className="mt-4" role="status">검색 결과가 없습니다.</p>
+              <div className="my-6 text-sm" role="status">
+                <p className="font-medium">{filter === 'attention' && search.trim() === '' ? '확인이 필요한 로봇이 없습니다.' : '조건에 맞는 로봇이 없습니다.'}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">검색어나 상태 필터를 바꾸어 확인하세요.</p>
+                <Button className="mt-3 min-h-10 text-xs" onClick={() => { onSearchChange(''); onFilterChange('all'); searchInputRef.current?.focus(); }} variant="secondary">전체 로봇 보기</Button>
+              </div>
             ) : isMultiSelectMode ? (
               <RobotMultiSelectionList
                 maximumSelection={maximumMultiMonitoringRobotCount}
@@ -417,20 +306,24 @@ function MonitoringLayout({
                 operationalStatuses={operationalStatuses}
                 robots={monitoredRobots}
                 selectedRobotIds={selectedMultiRobotIds}
+                staleRobotIds={staleRobotIds}
               />
             ) : (
               <ul className={robotMonitoringListClassName}>
                 {monitoredRobots.map((robot) => {
-                  const isDisconnected = operationalStatuses[robot.id]
-                    ?.data.isConnecting === false;
                   const isSelected = selectedRobot?.id === robot.id;
                   return (
                     <li key={robot.id}>
                       <RobotMonitoringListRow
-                        isDisconnected={isDisconnected}
+                        isStale={staleRobotIds.has(robot.id)}
                         isSelected={isSelected}
                         mode="single"
-                        onActivate={() => onSelectRobot(robot.id)}
+                        operationalStatus={operationalStatuses[robot.id]}
+                        onActivate={() => {
+                          onSelectRobot(robot.id);
+                          setMobileListOpen(false);
+                          if (mobileListToggleRef.current?.getClientRects().length) mobileListToggleRef.current.focus();
+                        }}
                         robot={robot}
                       />
                     </li>
@@ -441,13 +334,13 @@ function MonitoringLayout({
             {isMultiSelectMode ? (
               <div className="mt-2 shrink-0 border-t border-border/70 pt-3">
                 <Button
+                  {...multiMonitoringMorph.getTriggerProps(multiMonitoringTarget)}
                   aria-label="다중 관제 시작"
                   className="w-full"
                   disabled={
                     selectedMultiRobotIds.length
                     < minimumMultiMonitoringRobotCount
                   }
-                  onClick={onStartMultiMonitoring}
                 >
                   <Icon name="play" />
                   다중 관제 시작
@@ -466,7 +359,7 @@ function MonitoringLayout({
         {selectedRobot === undefined ? null : (
           <Panel
             aria-label={`${selectedRobot.displayName} 로봇 패널`}
-            className="pointer-events-auto relative flex min-h-0 flex-col overflow-hidden rounded-lg md:col-start-3 md:row-start-1"
+            className={`pointer-events-auto relative ${mobileListOpen ? 'hidden md:flex' : 'flex'} min-h-0 flex-col overflow-hidden rounded-lg max-md:max-h-[45dvh] max-md:self-end md:col-start-3 md:row-start-1`}
             contentClassName="flex min-h-0 flex-1 flex-col"
             layer="translucent"
           >
@@ -484,6 +377,10 @@ function MonitoringLayout({
               </div>
             </div>
             <Link
+              {...robotMonitoringMorph.getTriggerProps({
+                pathname: appendPathSegment('/control/monitoring', selectedRobot.id),
+                search: robotMonitoringSearch,
+              })}
               className={getButtonClassName(
                 'primary',
                 'mt-4 min-h-12 w-full shrink-0 rounded-md border-0',
@@ -519,23 +416,28 @@ function SelectedRobotInfo({ robot }: { readonly robot: RobotDescriptor }) {
 }
 
 function SelectedRobotSiteMap({
+  fleetLocations,
+  onSelectRobot,
   robot,
   site,
 }: {
+  readonly fleetLocations: readonly FleetMapLocation[];
+  readonly onSelectRobot: (robotId: string) => void;
   readonly robot: RobotDescriptor | undefined;
   readonly site: SiteDescriptor;
 }) {
   const geolocation = useRobotGeolocation(
     robot === undefined || site.environment === 'indoor' ? null : robot.id,
   );
-  return <SiteMap geolocation={geolocation} robot={robot} site={site} />;
+  return <SiteMap fleetLocations={fleetLocations} geolocation={geolocation} onSelectRobot={onSelectRobot} robot={robot} site={site} />;
 }
 
 export function ControlMonitoringPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<MonitoringRobotFilter>('all');
+  const [sort, setSort] = useState<MonitoringRobotSort>('name');
   const robots = useRobotCatalog();
   const multiSelectMode = isMultiMonitoringSelectionMode(searchParams);
   const selectedMultiRobotIds = useMemo(
@@ -544,6 +446,31 @@ export function ControlMonitoringPage() {
   );
   const robotIds = useMemo(() => robots.robots.map((robot) => robot.id), [robots.robots]);
   const operationalStatuses = useRobotOperationalStatuses(robotIds);
+  const statuses = operationalStatuses.status === 'ready'
+    ? operationalStatuses.data : emptyOperationalStatuses;
+  const staleRobotIds = useMemo(
+    () => new Set(Object.keys(operationalStatuses.streamIssuesByRobotId)),
+    [operationalStatuses.streamIssuesByRobotId],
+  );
+  const fleetLocations = useMemo(() => robots.robots.flatMap((robot): FleetMapLocation[] => {
+    const status = statuses[robot.id];
+    const latitude = status?.data.latitude;
+    const longitude = status?.data.longitude;
+    if (status == null || latitude == null || longitude == null || (latitude === 0 && longitude === 0)) return [];
+    const location = getRobotMapLocation(robot, {
+      robotId: robot.id,
+      latitudeDegrees: latitude,
+      longitudeDegrees: longitude,
+      horizontalAccuracyMeters: null,
+      sourceTimestampMs: null,
+      receivedTimestampMs: status.receivedTimestampMs,
+    });
+    return location === null ? [] : [{
+      ...location,
+      robotId: robot.id,
+      needsAttention: needsMonitoringAttention(status, staleRobotIds.has(robot.id)),
+    }];
+  }), [robots.robots, staleRobotIds, statuses]);
   const requestedSiteId = searchParams.get(siteIdSearchParameter);
   const selectedSite = monitoringSites.find((site) => site.id === requestedSiteId)
     ?? monitoringSites[0];
@@ -552,6 +479,14 @@ export function ControlMonitoringPage() {
   robotMonitoringSearchParams.delete(multiMonitoringModeSearchParameter);
   robotMonitoringSearchParams.delete(multiMonitoringRobotIdSearchParameter);
   const robotMonitoringSearch = `?${robotMonitoringSearchParams.toString()}`;
+  const multiMonitoringSearchParams = setMultiMonitoringSelectionMode(
+    writeMultiMonitoringRobotIds(searchParams, selectedMultiRobotIds),
+    true,
+  );
+  const multiMonitoringTarget: To = {
+    pathname: '/control/monitoring/multi',
+    search: `?${multiMonitoringSearchParams.toString()}`,
+  };
 
   useEffect(() => {
     if (requestedSiteId === selectedSite.id) return;
@@ -582,22 +517,18 @@ export function ControlMonitoringPage() {
     setSearchParams,
   ]);
 
-  const monitoredRobots = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase();
-    return robots.robots
-      .filter((robot) =>
-        robot.displayName.toLocaleLowerCase().includes(normalizedSearch)
-        || robot.id.toLocaleLowerCase().includes(normalizedSearch))
-      .sort((left, right) => {
-        const primary = left.displayName.localeCompare(right.displayName, 'ko');
-        return primary === 0 ? left.id.localeCompare(right.id) : primary;
-      });
-  }, [robots.robots, search]);
+  const monitoredRobots = useMemo(() => filterMonitoringRobots({
+    filter,
+    robots: robots.robots,
+    search,
+    sort,
+    staleRobotIds,
+    statuses,
+  }), [filter, robots.robots, search, sort, staleRobotIds, statuses]);
   const selectedRobot = !multiSelectMode
     && robots.status === 'ready'
     && selectedRobotId !== null
-    ? monitoredRobots.find((robot) => robot.id === selectedRobotId)
-      ?? monitoredRobots[0]
+    ? robots.robots.find((robot) => robot.id === selectedRobotId)
     : undefined;
 
   if (robots.status === 'loading') {
@@ -626,8 +557,13 @@ export function ControlMonitoringPage() {
   }
 
   const layoutProps = {
+    fleetLocations,
+    attentionCount: robots.robots.filter((robot) => needsMonitoringAttention(statuses[robot.id], staleRobotIds.has(robot.id))).length,
+    connectedCount: robots.robots.filter((robot) => statuses[robot.id]?.data.isConnecting === true && !staleRobotIds.has(robot.id)).length,
+    filter,
     isMultiSelectMode: multiSelectMode,
     monitoredRobots,
+    multiMonitoringTarget,
     onCancelMultiSelect: () => {
       setSearchParams((currentSearchParams) =>
         setMultiMonitoringSelectionMode(currentSearchParams, false), {
@@ -643,6 +579,9 @@ export function ControlMonitoringPage() {
       });
     },
     onSearchChange: setSearch,
+    onFilterChange: setFilter,
+    onSortChange: setSort,
+    onRefreshStatuses: operationalStatuses.retry,
     onSelectRobot: setSelectedRobotId,
     onSelectSite: (siteId: string) => {
       if (!monitoringSites.some((site) => site.id === siteId)) return;
@@ -651,20 +590,6 @@ export function ControlMonitoringPage() {
         const nextSearchParams = new URLSearchParams(currentSearchParams);
         nextSearchParams.set(siteIdSearchParameter, siteId);
         return nextSearchParams;
-      });
-    },
-    onStartMultiMonitoring: () => {
-      if (
-        selectedMultiRobotIds.length
-        < minimumMultiMonitoringRobotCount
-      ) return;
-      const nextSearchParams = setMultiMonitoringSelectionMode(
-        writeMultiMonitoringRobotIds(searchParams, selectedMultiRobotIds),
-        true,
-      );
-      void navigate({
-        pathname: '/control/monitoring/multi',
-        search: `?${nextSearchParams.toString()}`,
       });
     },
     onToggleMultiRobot: (robotId: string) => {
@@ -681,14 +606,16 @@ export function ControlMonitoringPage() {
         replace: true,
       });
     },
-    operationalStatuses: operationalStatuses.status === 'ready'
-      ? operationalStatuses.data
-      : {},
+    operationalStatuses: statuses,
     robotMonitoringSearch,
     search,
     selectedMultiRobotIds,
     selectedRobot,
     selectedSite,
+    sort,
+    staleRobotIds,
+    statusesUnavailable: operationalStatuses.status === 'error',
+    totalRobotCount: robots.robots.length,
   };
 
   return (

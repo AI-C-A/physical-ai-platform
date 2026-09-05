@@ -15,6 +15,7 @@ interface RobotMultiSelectionListProps {
   readonly operationalStatuses: Readonly<Record<string, RobotOperationalStatus | null>>;
   readonly robots: readonly RobotDescriptor[];
   readonly selectedRobotIds: readonly string[];
+  readonly staleRobotIds?: ReadonlySet<string>;
 }
 
 export function RobotMultiSelectionList({
@@ -24,6 +25,7 @@ export function RobotMultiSelectionList({
   operationalStatuses,
   robots,
   selectedRobotIds,
+  staleRobotIds,
 }: RobotMultiSelectionListProps) {
   const selectedRobotIdSet = new Set(selectedRobotIds);
 
@@ -34,8 +36,6 @@ export function RobotMultiSelectionList({
     >
       {robots.map((robot) => {
         const isSelected = selectedRobotIdSet.has(robot.id);
-        const isDisconnected = operationalStatuses[robot.id]
-          ?.data.isConnecting === false;
         const selectionLimitReached = !isSelected
           && selectedRobotIds.length >= maximumSelection;
         const minimumSelectionReached = isSelected
@@ -45,10 +45,11 @@ export function RobotMultiSelectionList({
           <li key={robot.id}>
             <RobotMonitoringListRow
               disabled={selectionLimitReached || minimumSelectionReached}
-              isDisconnected={isDisconnected}
+              isStale={staleRobotIds?.has(robot.id) ?? false}
               isSelected={isSelected}
               mode="multiple"
               onActivate={() => onToggleRobot(robot.id)}
+              operationalStatus={operationalStatuses[robot.id]}
               robot={robot}
             />
           </li>

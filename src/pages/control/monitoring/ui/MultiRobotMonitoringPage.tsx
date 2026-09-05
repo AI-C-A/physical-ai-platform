@@ -28,18 +28,12 @@ import {
   setMultiMonitoringSelectionMode,
   writeMultiMonitoringRobotIds,
 } from '../model/multi-monitoring-search-params';
+import { filterMonitoringRobots } from '../model/monitoring-robot-health';
 import {
   monitoringViewportContentClassName,
   monitoringViewportHeaderClassName,
 } from './monitoring-viewport-layout';
 import { RobotMultiSelectionList } from './RobotMultiSelectionList';
-
-function sortRobots(robots: readonly RobotDescriptor[]): readonly RobotDescriptor[] {
-  return [...robots].sort((left, right) => {
-    const primary = left.displayName.localeCompare(right.displayName, 'ko');
-    return primary === 0 ? left.id.localeCompare(right.id) : primary;
-  });
-}
 
 function isSameSequence(
   left: readonly string[],
@@ -85,12 +79,15 @@ function ConfigurationSheet({
   readonly selectedRobotIds: readonly string[];
 }) {
   const [search, setSearch] = useState('');
-  const filteredRobots = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase();
-    return sortRobots(robots).filter((robot) =>
-      robot.displayName.toLocaleLowerCase().includes(normalizedSearch)
-      || robot.id.toLocaleLowerCase().includes(normalizedSearch));
-  }, [robots, search]);
+  const staleRobotIds = useMemo(() => new Set(Object.keys(operationalStatuses.streamIssuesByRobotId)), [operationalStatuses.streamIssuesByRobotId]);
+  const filteredRobots = useMemo(() => filterMonitoringRobots({
+    filter: 'all',
+    robots,
+    search,
+    sort: 'name',
+    staleRobotIds: new Set<string>(),
+    statuses: {},
+  }), [robots, search]);
 
   return (
     <Sheet
@@ -107,13 +104,13 @@ function ConfigurationSheet({
           label="로봇 검색"
           leadingIcon="search"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="이름 또는 ID"
+          placeholder="이름, ID 또는 기체 번호"
           role="searchbox"
           showLabel={false}
           value={search}
         />
         <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
-          <span>최소 2대 · 최대 6대</span>
+          <span>최소 2대, 최대 6대 선택</span>
           <span aria-live="polite" className="font-semibold tabular-nums">
             {selectedRobotIds.length}/{maximumMultiMonitoringRobotCount}
           </span>
@@ -138,6 +135,7 @@ function ConfigurationSheet({
             }
             robots={filteredRobots}
             selectedRobotIds={selectedRobotIds}
+            staleRobotIds={staleRobotIds}
           />
         )}
       </div>
@@ -297,7 +295,7 @@ export function MultiRobotMonitoringPage() {
       {selectionNotice === null ? null : (
         <p
           aria-label="선택 정리 안내"
-          className="mx-2 mb-2 mt-2 shrink-0 border-l-2 border-warning bg-status-warning-background px-3 py-1.5 text-xs text-status-warning-foreground sm:mx-3"
+          className="mx-2 mb-2 mt-2 shrink-0 rounded-[var(--design-radius-control)] bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground sm:mx-3"
           role="status"
         >
           {selectionNotice}
