@@ -11,6 +11,15 @@ import {
   YAxis,
 } from 'recharts';
 
+const axisTick = { fill: 'var(--muted)', fontSize: 14 };
+const axisLine = { stroke: 'var(--border)' };
+const tooltipStyle = {
+  backgroundColor: 'var(--layer-raised)',
+  borderColor: 'var(--border)',
+  borderRadius: 'var(--design-radius-control)',
+  color: 'var(--foreground)',
+};
+
 export interface ChartDatum {
   readonly id?: string;
   readonly label: string;
@@ -39,10 +48,10 @@ export function Chart({
         <ResponsiveContainer height="100%" width="100%">
           {kind === 'bar' ? (
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" />
-              <YAxis width={48} />
-              <Tooltip />
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+              <XAxis axisLine={axisLine} dataKey="label" tick={axisTick} tickLine={false} />
+              <YAxis axisLine={false} tick={axisTick} tickLine={false} width={48} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'var(--foreground)' }} cursor={{ fill: 'var(--surface-muted)' }} />
               <Bar
                 dataKey="value"
                 fill="var(--action-primary)"
@@ -51,10 +60,10 @@ export function Chart({
             </BarChart>
           ) : (
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" />
-              <YAxis width={48} />
-              <Tooltip />
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+              <XAxis axisLine={axisLine} dataKey="label" tick={axisTick} tickLine={false} />
+              <YAxis axisLine={false} tick={axisTick} tickLine={false} width={48} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'var(--foreground)' }} cursor={{ stroke: 'var(--muted)' }} />
               <Line
                 dataKey="value"
                 dot={false}

@@ -8,8 +8,9 @@ type QueryFeedbackProps =
       readonly kind: 'loading';
     }
   | {
-      readonly kind: 'empty' | 'not-found';
+      readonly kind: 'empty' | 'filtered-empty' | 'not-found' | 'stale-cache' | 'unavailable';
       readonly message: string;
+      readonly onRetry?: () => void;
     }
   | {
       readonly kind: 'error';
@@ -20,7 +21,10 @@ type QueryFeedbackProps =
 const titles = {
   error: '데이터를 불러오지 못했습니다',
   empty: '표시할 데이터가 없습니다',
+  'filtered-empty': '조건에 맞는 결과가 없습니다',
   'not-found': '대상을 찾을 수 없습니다',
+  'stale-cache': '마지막 정상 데이터를 표시합니다',
+  unavailable: '현재 사용할 수 없습니다',
 } as const;
 
 export function QueryFeedback(props: QueryFeedbackProps) {
@@ -37,11 +41,11 @@ export function QueryFeedback(props: QueryFeedbackProps) {
       {props.kind === 'error' ? (
         <ErrorMessage>{props.message}</ErrorMessage>
       ) : <p role="status">{props.message}</p>}
-      {props.kind === 'error' ? (
+      {props.onRetry === undefined ? null : (
         <Button className="mt-4" onClick={props.onRetry} variant="secondary">
           다시 시도
         </Button>
-      ) : null}
+      )}
     </Panel>
   );
 }

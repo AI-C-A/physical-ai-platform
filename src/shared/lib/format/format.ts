@@ -24,6 +24,18 @@ export function formatRateHertz(rateHz: number | null): string {
   return rateHz === null ? '—' : `${rateHz.toFixed(1)} Hz`;
 }
 
+export function formatRelativeTime(timestampMs: number | null, nowMs = Date.now()): string {
+  if (timestampMs === null) return '수신 기록 없음';
+  const elapsedSeconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1_000));
+  if (elapsedSeconds < 5) return '방금 전';
+  if (elapsedSeconds < 60) return `${String(elapsedSeconds)}초 전`;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) return `${String(elapsedMinutes)}분 전`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${String(elapsedHours)}시간 전`;
+  return dateTimeFormatter.format(timestampMs);
+}
+
 export function getDisplayTimeZoneLabel(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || '브라우저 기본 시간대';
 }
