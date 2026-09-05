@@ -39,6 +39,7 @@ import type {
   HumanDemonstrationBinding,
   HumanDemonstrationPairingResult,
   HumanDemonstrationProfile,
+  HumanDemonstrationSourceBinding,
   HumanDemonstrationSourceState,
   HumanoidCaptureSession,
   InferenceSession,
@@ -173,6 +174,22 @@ interface OperationalSnapshot {
   readonly handPoseMetrics: readonly (readonly [string, HandPoseSessionMetrics])[];
   readonly handPoseFrames: readonly (readonly [string, readonly CollectionHandPoseFrame[]])[];
   readonly handPosePreviews: readonly (readonly [string, CollectionHandPoseTelemetry])[];
+  readonly collectors: readonly CollectorSnapshot[];
+  readonly removedEpisodeIds: readonly string[];
+  readonly removedSessionIds: readonly string[];
+}
+
+interface CollectorSnapshot {
+  readonly sessionId: string;
+  readonly revision: number;
+  readonly writerId: string;
+  readonly activeEpisodeId: string | null;
+  readonly source: Pick<HumanDemonstrationSourceBinding, 'sourceDeviceId' | 'state' | 'lastSeenAtMs' | 'activeEpisodeId'>;
+  readonly acknowledgements: readonly CollectorAcknowledgement[];
+  readonly streams: readonly FlywheelStream[];
+  readonly episodeStreams: readonly (readonly [string, readonly FlywheelStream[]])[];
+  readonly metrics: HandPoseSessionMetrics | null;
+  readonly preview: CollectionHandPoseTelemetry | null;
 }
 
 export interface InMemoryFlywheelSyncTransport {
@@ -196,10 +213,20 @@ interface OperationalSyncSnapshot {
   readonly type: 'state-snapshot';
   readonly senderId: string;
   readonly revision: number;
+  readonly workflowWriterId: string;
+  readonly recipientId?: string;
   readonly snapshot: OperationalSnapshot;
 }
 
-type OperationalSyncMessage = OperationalSyncRequest | OperationalSyncSnapshot;
+interface CollectorSyncUpdate {
+  readonly schemaVersion: 1;
+  readonly type: 'collector-update';
+  readonly senderId: string;
+  readonly collector: CollectorSnapshot;
+  readonly frames: readonly (readonly [string, readonly CollectionHandPoseFrame[]])[];
+}
+
+type OperationalSyncMessage = OperationalSyncRequest | OperationalSyncSnapshot | CollectorSyncUpdate;
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
@@ -266,6 +293,82 @@ function isCollectionHandPoseFrame(value: unknown): value is CollectionHandPoseF
     && value.episodeOffsetMs >= 0;
 }
 
+function isFrameEntries(value: unknown): value is OperationalSnapshot['handPoseFrames'] {
+  return Array.isArray(value) && value.every((entry) => (
+    Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string'
+    && Array.isArray(entry[1]) && entry[1].every(isCollectionHandPoseFrame)
+  ));
+}
+
+function isCollectorSnapshot(value: unknown): value is CollectorSnapshot {
+  if (!isRecord(value) || typeof value.sessionId !== 'string'
+    || !Number.isSafeInteger(value.revision) || !isFiniteNumber(value.revision) || value.revision < 0
+    || typeof value.writerId !== 'string' || value.writerId.length === 0
+    || !(value.activeEpisodeId === null || typeof value.activeEpisodeId === 'string')
+    || !isRecord(value.source)) return false;
+  const source = value.source;
+  const isSourceStream = (stream: unknown): boolean => isRecord(stream)
+    && typeof stream.id === 'string' && stream.sourceDeviceId === source.sourceDeviceId
+    && isFiniteNumber(stream.bytesWritten) && stream.bytesWritten >= 0
+    && isNullableFiniteNumber(stream.observedRateHz)
+    && typeof stream.status === 'string';
+  return typeof source.sourceDeviceId === 'string'
+    && typeof source.state === 'string'
+    && ['pending', 'paired', 'ready', 'recording', 'stale', 'offline', 'error'].includes(source.state)
+    && isNullableFiniteNumber(source.lastSeenAtMs)
+    && (source.activeEpisodeId === null || typeof source.activeEpisodeId === 'string')
+    && Array.isArray(value.acknowledgements) && value.acknowledgements.every((ack) => (
+      isRecord(ack) && ack.sessionId === value.sessionId
+      && ack.sourceDeviceId === source.sourceDeviceId && typeof ack.episodeId === 'string'
+      && (ack.command === 'start' || ack.command === 'stop')
+      && (ack.state === 'acknowledged' || ack.state === 'rejected')
+      && isNullableFiniteNumber(ack.acknowledgedAtMs)
+      && (ack.detail === null || typeof ack.detail === 'string')
+    ))
+    && Array.isArray(value.streams) && value.streams.every(isSourceStream)
+    && Array.isArray(value.episodeStreams) && value.episodeStreams.every((entry) => (
+      Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string'
+      && Array.isArray(entry[1]) && entry[1].every(isSourceStream)
+    ))
+    && (value.metrics === null || isHandPoseSessionMetrics(value.metrics))
+    && (value.preview === null || isCollectionHandPoseTelemetry(value.preview));
+}
+
+function isNewerRevision(
+  revision: number, writerId: string, previousRevision: number, previousWriterId: string,
+): boolean {
+  return revision > previousRevision || (revision === previousRevision && writerId > previousWriterId);
+}
+
+function mergeAcknowledgements(
+  previous: readonly CollectorAcknowledgement[], incoming: readonly CollectorAcknowledgement[],
+): readonly CollectorAcknowledgement[] {
+  const key = (ack: CollectorAcknowledgement): string => JSON.stringify([ack.episodeId, ack.sourceDeviceId, ack.command]);
+  const merged = new Map(previous.map((ack) => [key(ack), ack]));
+  incoming.forEach((ack) => merged.set(key(ack), ack));
+  return [...merged.values()];
+}
+
+function mergeFrames(
+  previous: readonly CollectionHandPoseFrame[], incoming: readonly CollectionHandPoseFrame[],
+): readonly CollectionHandPoseFrame[] {
+  if (incoming.length === 0 || previous === incoming) return previous;
+  if (previous.length === 0) return incoming;
+  const compare = (a: CollectionHandPoseFrame, b: CollectionHandPoseFrame): number => (
+    a.episodeOffsetMs - b.episodeOffsetMs || a.receivedTimestampMs - b.receivedTimestampMs
+    || a.frameEpoch - b.frameEpoch || a.sequence - b.sequence
+  );
+  const first = incoming[0];
+  const last = previous.at(-1);
+  if (first !== undefined && last !== undefined && compare(first, last) > 0) return [...previous, ...incoming];
+  const key = (frame: CollectionHandPoseFrame): string => (
+    `${frame.frameEpoch}:${frame.sequence}:${frame.deviceTimestampMs}:${frame.receivedTimestampMs}`
+  );
+  const frames = new Map(previous.map((frame) => [key(frame), frame]));
+  incoming.forEach((frame) => frames.set(key(frame), frame));
+  return [...frames.values()].sort(compare);
+}
+
 function parseOperationalSnapshot(parsed: unknown): OperationalSnapshot | null {
   if (!isRecord(parsed) || !Array.isArray(parsed.sessions) || !Array.isArray(parsed.episodes)) return null;
   if (!parsed.sessions.every((session) => (
@@ -286,13 +389,7 @@ function parseOperationalSnapshot(parsed: unknown): OperationalSnapshot | null {
     && isHandPoseSessionMetrics(entry[1])
   ))) return null;
   const rawFrames = parsed.handPoseFrames ?? [];
-  if (!Array.isArray(rawFrames) || !rawFrames.every((entry) => (
-    Array.isArray(entry)
-    && entry.length === 2
-    && typeof entry[0] === 'string'
-    && Array.isArray(entry[1])
-    && entry[1].every(isCollectionHandPoseFrame)
-  ))) return null;
+  if (!isFrameEntries(rawFrames)) return null;
   const rawPreviews = parsed.handPosePreviews ?? [];
   if (!Array.isArray(rawPreviews) || !rawPreviews.every((entry) => (
     Array.isArray(entry)
@@ -300,6 +397,12 @@ function parseOperationalSnapshot(parsed: unknown): OperationalSnapshot | null {
     && typeof entry[0] === 'string'
     && isCollectionHandPoseTelemetry(entry[1])
   ))) return null;
+  const collectors = parsed.collectors ?? [];
+  if (!Array.isArray(collectors) || !collectors.every(isCollectorSnapshot)) return null;
+  const removedEpisodeIds = parsed.removedEpisodeIds ?? [];
+  const removedSessionIds = parsed.removedSessionIds ?? [];
+  if (!Array.isArray(removedEpisodeIds) || !removedEpisodeIds.every((id): id is string => typeof id === 'string')
+    || !Array.isArray(removedSessionIds) || !removedSessionIds.every((id): id is string => typeof id === 'string')) return null;
   return {
     sessions: (parsed.sessions as FlywheelCaptureSession[]).map((session) => (
       session.kind === 'humanoid'
@@ -311,8 +414,11 @@ function parseOperationalSnapshot(parsed: unknown): OperationalSnapshot | null {
       humanDemonstration: episode.humanDemonstration ?? null,
     })),
     handPoseMetrics: rawMetrics as unknown as readonly (readonly [string, HandPoseSessionMetrics])[],
-    handPoseFrames: rawFrames as unknown as readonly (readonly [string, readonly CollectionHandPoseFrame[]])[],
+    handPoseFrames: rawFrames,
     handPosePreviews: rawPreviews as unknown as readonly (readonly [string, CollectionHandPoseTelemetry])[],
+    collectors,
+    removedEpisodeIds,
+    removedSessionIds,
   };
 }
 
@@ -325,16 +431,26 @@ function parseOperationalSyncMessage(serialized: string): OperationalSyncMessage
   if (parsed.type === 'state-request') {
     return { schemaVersion: 1, type: 'state-request', senderId: parsed.senderId };
   }
+  if (parsed.type === 'collector-update') {
+    return isCollectorSnapshot(parsed.collector) && isFrameEntries(parsed.frames)
+      ? { schemaVersion: 1, type: 'collector-update', senderId: parsed.senderId,
+        collector: parsed.collector, frames: parsed.frames }
+      : null;
+  }
   if (parsed.type !== 'state-snapshot'
     || !Number.isSafeInteger(parsed.revision)
     || typeof parsed.revision !== 'number'
-    || parsed.revision < 0) return null;
+    || parsed.revision < 0
+    || (parsed.workflowWriterId !== undefined && typeof parsed.workflowWriterId !== 'string')
+    || (parsed.recipientId !== undefined && typeof parsed.recipientId !== 'string')) return null;
   const snapshot = parseOperationalSnapshot(parsed.snapshot);
   return snapshot === null ? null : {
     schemaVersion: 1,
     type: 'state-snapshot',
     senderId: parsed.senderId,
     revision: parsed.revision,
+    workflowWriterId: typeof parsed.workflowWriterId === 'string' ? parsed.workflowWriterId : parsed.senderId,
+    ...(typeof parsed.recipientId === 'string' ? { recipientId: parsed.recipientId } : {}),
     snapshot,
   };
 }
@@ -350,6 +466,9 @@ export class InMemoryFlywheel implements FlywheelPort {
   readonly #handPoseMetrics = new Map<string, HandPoseSessionMetrics>();
   readonly #handPoseFrames = new Map<string, readonly CollectionHandPoseFrame[]>();
   readonly #handPosePreviews = new Map<string, CollectionHandPoseTelemetry>();
+  readonly #collectors = new Map<string, CollectorSnapshot>();
+  readonly #removedEpisodeIds = new Set<string>();
+  readonly #removedSessionIds = new Set<string>();
   readonly #syncTransport: InMemoryFlywheelSyncTransport | null;
   #syncUnsubscribe: (() => void) | null = null;
   #syncRevision = 0;
@@ -507,7 +626,8 @@ export class InMemoryFlywheel implements FlywheelPort {
       .map((episode) => episode.id);
     this.#episodes = this.#episodes.filter((episode) =>
       episode.captureSessionId !== sessionId || referencedEpisodeIds.has(episode.id));
-    removedEpisodeIds.forEach((episodeId) => this.#handPoseFrames.delete(episodeId));
+    removedEpisodeIds.forEach((episodeId) => this.#forgetEpisodeFrames(episodeId));
+    this.#forgetCollectorSession(sessionId);
     this.#handPoseMetrics.delete(sessionId);
     this.#handPosePreviews.delete(sessionId);
     this.#notify();
@@ -914,7 +1034,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       ...session,
       humanDemonstration,
       streams: humanDemonstrationStreams(humanDemonstration, session.status === 'active' ? 'active' : 'waiting'),
-    });
+    }, source.sourceDeviceId);
     return clone({
       sessionId: session.id,
       sourceDeviceId: source.sourceDeviceId,
@@ -977,7 +1097,7 @@ export class InMemoryFlywheel implements FlywheelPort {
         };
       });
     }
-    this.#replaceSession(updated);
+    this.#replaceSession(updated, sourceDeviceId);
     return clone(updated);
   }
 
@@ -1001,6 +1121,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       ...session.humanDemonstration,
       collectorAcknowledgements: [...acknowledgements, acknowledgement],
       sourceBindings: session.humanDemonstration.sourceBindings.map((item) => item.sourceDeviceId === acknowledgement.sourceDeviceId
+        && session.activeEpisodeId === acknowledgement.episodeId
         ? {
           ...item,
           state: acknowledgement.state === 'rejected'
@@ -1019,7 +1140,7 @@ export class InMemoryFlywheel implements FlywheelPort {
         : episode
     ));
     const updated = { ...session, humanDemonstration };
-    this.#replaceSession(updated);
+    this.#replaceSession(updated, acknowledgement.sourceDeviceId);
     return clone(updated);
   }
 
@@ -1087,7 +1208,7 @@ export class InMemoryFlywheel implements FlywheelPort {
           : stream),
       }
       : episode);
-    this.#replaceSession({ ...session, streams });
+    this.#replaceSession({ ...session, streams }, input.sourceDeviceId, [[input.episodeId, input.frames]]);
   }
 
   async reportHandPosePreview(input: HandPosePreviewInput): Promise<void> {
@@ -1107,7 +1228,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       receivedTimestampMs: input.receivedTimestampMs,
       hands: input.hands,
     });
-    this.#notify();
+    this.#notifyCollector(session.id, input.sourceDeviceId);
   }
 
   async createMobilitySession(input: CreateMobilitySessionInput): Promise<MobilityCaptureSession> {
@@ -1420,7 +1541,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     }
     if (episode.status === 'completed') this.#assertEpisodeTransferCompleted(episode);
     this.#episodes = this.#episodes.filter((item) => item.id !== episodeId);
-    this.#handPoseFrames.delete(episodeId);
+    this.#forgetEpisodeFrames(episodeId);
     this.#replaceSession({
       ...session,
       activeEpisodeId: null,
@@ -1898,6 +2019,9 @@ export class InMemoryFlywheel implements FlywheelPort {
     this.#handPoseMetrics.clear();
     this.#handPoseFrames.clear();
     this.#handPosePreviews.clear();
+    this.#collectors.clear();
+    this.#removedEpisodeIds.clear();
+    this.#removedSessionIds.clear();
   }
 
   #getHumanDemonstrationTelemetry(
@@ -2378,15 +2502,25 @@ export class InMemoryFlywheel implements FlywheelPort {
       const message = parseOperationalSyncMessage(serializedMessage);
       if (message === null || message.senderId === this.#syncTransport.clientId) return;
       if (message.type === 'state-request') {
-        this.#publishOperationalSnapshot();
+        this.#publishOperationalSnapshot(message.senderId);
         return;
       }
-      const isNewer = message.revision > this.#syncRevision
-        || (message.revision === this.#syncRevision && message.senderId > this.#lastSyncSenderId);
-      if (!isNewer) return;
-      this.#syncRevision = message.revision;
-      this.#lastSyncSenderId = message.senderId;
-      this.#applyOperationalSnapshot(message.snapshot);
+      if (message.type === 'collector-update') {
+        const changed = this.#rememberCollector(message.collector);
+        this.#mergeHandPoseFrames(message.frames);
+        if (changed) this.#applyCollector(this.#collectors.get(this.#collectorKey(message.collector)) ?? message.collector);
+      } else {
+        if (message.recipientId !== undefined && message.recipientId !== this.#syncTransport.clientId) return;
+        const changed = message.snapshot.collectors.filter((collector) => this.#rememberCollector(collector));
+        if (isNewerRevision(message.revision, message.workflowWriterId, this.#syncRevision, this.#lastSyncSenderId)) {
+          this.#syncRevision = message.revision;
+          this.#lastSyncSenderId = message.workflowWriterId;
+          this.#applyOperationalSnapshot(message.snapshot);
+        } else {
+          this.#mergeHandPoseFrames(message.snapshot.handPoseFrames);
+          changed.forEach((collector) => this.#applyCollector(this.#collectors.get(this.#collectorKey(collector)) ?? collector));
+        }
+      }
       this.#listeners.forEach((listener) => listener());
     } catch {
       // 호환되지 않거나 손상된 Mock transport 입력은 현재 상태를 덮어쓰지 않는다.
@@ -2397,7 +2531,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     this.#syncTransport?.send(JSON.stringify(message));
   }
 
-  #publishOperationalSnapshot(): void {
+  #publishOperationalSnapshot(recipientId?: string): void {
     const transport = this.#syncTransport;
     if (transport === null) return;
     this.#sendSyncMessage({
@@ -2405,54 +2539,167 @@ export class InMemoryFlywheel implements FlywheelPort {
       type: 'state-snapshot',
       senderId: transport.clientId,
       revision: this.#syncRevision,
+      workflowWriterId: this.#lastSyncSenderId,
+      ...(recipientId === undefined ? {} : { recipientId }),
       snapshot: {
         sessions: this.#sessions,
         episodes: this.#episodes,
         handPoseMetrics: [...this.#handPoseMetrics.entries()],
-        handPoseFrames: [...this.#handPoseFrames.entries()],
+        handPoseFrames: [...this.#handPoseFrames.entries()].filter(([id]) => this.#episodes.some((episode) => episode.id === id)),
         handPosePreviews: [...this.#handPosePreviews.entries()],
+        collectors: [...this.#collectors.values()],
+        removedEpisodeIds: [...this.#removedEpisodeIds],
+        removedSessionIds: [...this.#removedSessionIds],
       },
     });
   }
 
   #applyOperationalSnapshot(snapshot: OperationalSnapshot): void {
-    const localEpisodes = new Map(this.#episodes.map((episode) => [episode.id, episode]));
-    const localSessions = new Map(this.#sessions.map((session) => [session.id, session]));
-    this.#sessions = snapshot.sessions.map((session) => {
-      const localSession = localSessions.get(session.id);
-      if (session.kind === 'humanoid' && localSession?.kind === 'humanoid'
-        && localSession.activeEpisodeId === null && session.activeEpisodeId !== null
-        && localEpisodes.get(session.activeEpisodeId)?.status === 'completed') {
-        return { ...session, activeEpisodeId: null, status: localSession.status,
-          processingStage: localSession.processingStage, stoppedAtMs: localSession.stoppedAtMs,
-          errorMessage: localSession.errorMessage };
-      }
-      return session;
+    snapshot.removedEpisodeIds.forEach((id) => this.#forgetEpisodeFrames(id));
+    snapshot.removedSessionIds.forEach((id) => this.#forgetCollectorSession(id));
+    this.#episodes.forEach((episode) => {
+      if (!snapshot.episodes.some((item) => item.id === episode.id)) this.#forgetEpisodeFrames(episode.id);
     });
-    this.#episodes = snapshot.episodes.map((episode) => {
-      const localEpisode = localEpisodes.get(episode.id);
-      // 장치 응답의 최신 revision이 PC에서 이미 끝낸 파일 확정을 되돌릴 수는 없다.
-      return localEpisode?.status === 'completed' && episode.status === 'finalizing'
-        ? { ...episode, status: localEpisode.status, outcome: localEpisode.outcome,
-          endedAtMs: localEpisode.endedAtMs, finalizationError: localEpisode.finalizationError }
-        : episode;
+    this.#sessions.forEach((session) => {
+      if (!snapshot.sessions.some((item) => item.id === session.id)) this.#forgetCollectorSession(session.id);
     });
+    this.#sessions = snapshot.sessions;
+    this.#episodes = snapshot.episodes;
     this.#handPoseMetrics.clear();
     snapshot.handPoseMetrics.forEach(([sessionId, metrics]) => this.#handPoseMetrics.set(sessionId, metrics));
-    this.#handPoseFrames.clear();
-    snapshot.handPoseFrames.forEach(([episodeId, frames]) => this.#handPoseFrames.set(episodeId, frames));
+    this.#mergeHandPoseFrames(snapshot.handPoseFrames);
     this.#handPosePreviews.clear();
     snapshot.handPosePreviews.forEach(([sessionId, preview]) => this.#handPosePreviews.set(sessionId, preview));
-    this.#sequence = [...this.#sessions, ...this.#episodes].reduce((maximum, item) => {
-      const suffix = Number.parseInt(item.id.match(/(\d+)$/u)?.[1] ?? '0', 10);
+    const receivedCollectors = new Map(snapshot.collectors.map((collector) => [this.#collectorKey(collector), collector]));
+    this.#collectors.forEach((collector, key) => {
+      const received = receivedCollectors.get(key);
+      if (received === undefined || isNewerRevision(collector.revision, collector.writerId, received.revision, received.writerId)) {
+        this.#applyCollector(collector);
+      }
+    });
+    this.#sequence = [...this.#sessions.map((item) => item.id), ...this.#episodes.map((item) => item.id),
+      ...this.#removedEpisodeIds, ...this.#removedSessionIds].reduce((maximum, id) => {
+      const suffix = Number.parseInt(id.match(/(\d+)$/u)?.[1] ?? '0', 10);
       return Math.max(maximum, suffix);
     }, this.#sequence);
   }
 
-  #replaceSession(session: FlywheelCaptureSession): void {
+  #collectorKey(collector: Pick<CollectorSnapshot, 'sessionId' | 'source'>): string {
+    return JSON.stringify([collector.sessionId, collector.source.sourceDeviceId]);
+  }
+
+  #rememberCollector(incoming: CollectorSnapshot): boolean {
+    if (this.#removedSessionIds.has(incoming.sessionId)) return false;
+    const key = this.#collectorKey(incoming);
+    const previous = this.#collectors.get(key);
+    if (previous === undefined || isNewerRevision(incoming.revision, incoming.writerId, previous.revision, previous.writerId)) {
+      this.#collectors.set(key, {
+        ...incoming,
+        acknowledgements: mergeAcknowledgements(previous?.acknowledgements ?? [], incoming.acknowledgements),
+      });
+      return true;
+    }
+    return false;
+  }
+
+  #mergeHandPoseFrames(entries: OperationalSnapshot['handPoseFrames']): void {
+    entries.forEach(([episodeId, frames]) => {
+      if (this.#removedEpisodeIds.has(episodeId)) return;
+      this.#handPoseFrames.set(episodeId, mergeFrames(this.#handPoseFrames.get(episodeId) ?? [], frames));
+    });
+  }
+
+  #forgetEpisodeFrames(episodeId: string): void {
+    this.#removedEpisodeIds.add(episodeId);
+    this.#handPoseFrames.delete(episodeId);
+  }
+
+  #forgetCollectorSession(sessionId: string): void {
+    this.#removedSessionIds.add(sessionId);
+    this.#collectors.forEach((collector, key) => {
+      if (collector.sessionId === sessionId) this.#collectors.delete(key);
+    });
+  }
+
+  #applyCollector(collector: CollectorSnapshot): void {
+    const session = this.#sessions.find((item) => item.id === collector.sessionId);
+    if (session?.kind !== 'humanoid' || session.humanDemonstration === null
+      || !session.humanDemonstration.sourceBindings.some((source) => source.sourceDeviceId === collector.source.sourceDeviceId)) return;
+    const sourceMatches = collector.activeEpisodeId === session.activeEpisodeId;
+    const mergeBinding = (binding: HumanDemonstrationBinding, episodeId: string | null): HumanDemonstrationBinding => ({
+      ...binding,
+      sourceBindings: binding.sourceBindings.map((source) => (
+        source.sourceDeviceId === collector.source.sourceDeviceId && collector.activeEpisodeId === episodeId
+          ? { ...source, ...collector.source }
+          : source
+      )),
+      collectorAcknowledgements: mergeAcknowledgements(binding.collectorAcknowledgements,
+        collector.acknowledgements.filter((ack) => session.episodeIds.includes(ack.episodeId)
+          && (episodeId === null || ack.episodeId === episodeId))),
+    });
+    const mergeStreams = (streams: readonly FlywheelStream[], incoming: readonly FlywheelStream[], recording: boolean): readonly FlywheelStream[] => (
+      streams.map((stream) => {
+        const update = incoming.find((item) => item.id === stream.id);
+        return update === undefined ? stream : { ...stream,
+          bytesWritten: Math.max(stream.bytesWritten, update.bytesWritten),
+          observedRateHz: update.observedRateHz,
+          status: recording ? update.status : stream.status,
+        };
+      })
+    );
+    const humanDemonstration = mergeBinding(session.humanDemonstration, session.activeEpisodeId);
+    this.#sessions = this.#sessions.map((item) => item.id === session.id ? { ...session,
+      humanDemonstration,
+      streams: sourceMatches ? mergeStreams(session.streams, collector.streams, session.activeEpisodeId !== null) : session.streams,
+      errorMessage: humanDemonstration.sourceBindings.every((source) => !source.required || source.state === 'ready' || source.state === 'recording')
+        ? null : session.errorMessage,
+    } : item);
+    this.#episodes = this.#episodes.map((episode) => {
+      if (episode.captureSessionId !== session.id || episode.humanDemonstration === null) return episode;
+      const streams = collector.episodeStreams.find(([id]) => id === episode.id)?.[1] ?? [];
+      return { ...episode,
+        humanDemonstration: mergeBinding(episode.humanDemonstration, episode.id),
+        streams: mergeStreams(episode.streams, streams, episode.status === 'recording'),
+      };
+    });
+    if (collector.metrics !== null) this.#handPoseMetrics.set(session.id, collector.metrics);
+    if (collector.preview !== null) this.#handPosePreviews.set(session.id, collector.preview);
+  }
+
+  #notifyCollector(sessionId: string, sourceDeviceId: string, frames: OperationalSnapshot['handPoseFrames'] = []): void {
+    const session = this.#requireHumanDemonstrationSession(sessionId);
+    const source = session.humanDemonstration.sourceBindings.find((item) => item.sourceDeviceId === sourceDeviceId);
+    if (source === undefined) return;
+    const previous = this.#collectors.get(this.#collectorKey({ sessionId, source }));
+    const episodes = this.#episodes.filter((episode) => episode.captureSessionId === sessionId);
+    const collector: CollectorSnapshot = {
+      sessionId,
+      revision: (previous?.revision ?? 0) + 1,
+      writerId: this.#syncTransport?.clientId ?? 'local',
+      activeEpisodeId: session.activeEpisodeId,
+      source: { sourceDeviceId, state: source.state, lastSeenAtMs: source.lastSeenAtMs, activeEpisodeId: source.activeEpisodeId },
+      acknowledgements: mergeAcknowledgements(previous?.acknowledgements ?? [], [
+        ...session.humanDemonstration.collectorAcknowledgements,
+        ...episodes.flatMap((episode) => episode.humanDemonstration?.collectorAcknowledgements ?? []),
+      ].filter((ack) => ack.sourceDeviceId === sourceDeviceId && ack.state !== 'pending')),
+      streams: session.streams.filter((stream) => stream.sourceDeviceId === sourceDeviceId),
+      episodeStreams: episodes.map((episode) => [episode.id, episode.streams.filter((stream) => stream.sourceDeviceId === sourceDeviceId)]),
+      metrics: source.role === 'xr-hand-tracking' ? this.#handPoseMetrics.get(sessionId) ?? null : null,
+      preview: source.role === 'xr-hand-tracking' ? this.#handPosePreviews.get(sessionId) ?? null : null,
+    };
+    this.#collectors.set(this.#collectorKey(collector), collector);
+    // 장치 알림은 PC의 녹화·검토 상태를 발행하지 않고 새 프레임만 전송한다.
+    if (this.#syncTransport !== null) this.#sendSyncMessage({
+      schemaVersion: 1, type: 'collector-update', senderId: this.#syncTransport.clientId, collector, frames,
+    });
+    this.#listeners.forEach((listener) => listener());
+  }
+
+  #replaceSession(session: FlywheelCaptureSession, sourceDeviceId?: string, frames: OperationalSnapshot['handPoseFrames'] = []): void {
     const updated = { ...session, updatedAtMs: this.#clock.nowMs() };
     this.#sessions = this.#sessions.map((item) => item.id === session.id ? updated : item);
-    this.#notify();
+    if (sourceDeviceId === undefined) this.#notify();
+    else this.#notifyCollector(session.id, sourceDeviceId, frames);
   }
 
   #requireSession(id: string): FlywheelCaptureSession {
