@@ -4,12 +4,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFlywheelQuery } from "@/entities/flywheel";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Chart } from "@/shared/ui/chart";
 import { LineageGraph } from "@/shared/ui/lineage-graph";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Panel } from "@/shared/ui/panel";
 import { Select } from "@/shared/ui/select";
-import { StatTile } from "@/shared/ui/stat-tile";
 import {
   Table,
   TableBody,
@@ -34,6 +32,12 @@ import {
   JsonExportButton,
   StatusBadge,
 } from "./flywheel-page-shared";
+import { formatDateTime } from "./flywheel-page-utils";
+
+const recordTypeLabels: Readonly<Record<string, string>> = {
+  all: '전체', capture: '수집', episode: '에피소드', drive: '주행', intervention: '개입',
+  dataset: '데이터셋', training: '학습', model: '모델', evaluation: '평가', deployment: '배포', inference: '추론',
+};
 
 export function FlywheelOverviewPage() {
   const overview = useFlywheelQuery(loadOverview);
@@ -44,66 +48,31 @@ export function FlywheelOverviewPage() {
     <div className="grid gap-6">
       <PageHeader
         title="Physical AI 플라이휠"
-        description="수집부터 추론까지 데이터와 모델의 순환 상태를 한 화면에서 확인합니다."
+        description="수집 데이터와 주행 운영 지표, 최근 학습·평가·배포를 확인합니다."
       />
       <AsyncState query={overview}>
         {(data) => (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatTile
-                emphasis="primary"
-                label="에피소드"
-                value={String(data.episodeCount)}
-              />
-              <StatTile
-                label="주행 시간"
-                value={data.driveHours.toFixed(1)}
-              />
-              <StatTile
-                label="유효 데이터율"
-                value={`${data.validDataPercent.toFixed(1)}%`}
-              />
-              <StatTile
-                label="작업 성공률"
-                value={`${data.taskSuccessPercent.toFixed(1)}%`}
-              />
-              <StatTile
-                label="자율 비율"
-                value={`${data.autonomyPercent.toFixed(1)}%`}
-              />
-              <StatTile
-                label="km당 개입"
-                value={data.interventionsPerKm.toFixed(2)}
-              />
-              <StatTile
-                label="릴리스 Dataset"
-                value={String(data.releasedDatasetCount)}
-              />
-              <StatTile
-                label="활성 Deployment"
-                value={String(data.activeDeploymentCount)}
-              />
-            </div>
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.7fr)]">
-              <Panel title="플라이휠 상태">
-                <Chart
-                  kind="bar"
-                  data={[
-                    { label: "Valid data", value: data.validDataPercent },
-                    { label: "Task success", value: data.taskSuccessPercent },
-                    { label: "Autonomy", value: data.autonomyPercent },
-                  ]}
-                  accessibleSummary={`유효 데이터 ${data.validDataPercent.toFixed(1)}%, Task 성공 ${data.taskSuccessPercent.toFixed(1)}%, 자율 비율 ${data.autonomyPercent.toFixed(1)}%`}
-                />
-              </Panel>
-              <Panel title="파이프라인 상태">
-                <div className="grid gap-3">
-                  <StatusRow label="학습" query={training} />
-                  <StatusRow label="평가" query={evaluations} />
-                  <StatusRow label="배포" query={deployments} />
-                </div>
-              </Panel>
+            <section aria-label="수집 및 주행 지표" className="grid gap-6 lg:grid-cols-2">
+              <MetricGroup title="수집 데이터" items={[
+                { label: '유효 데이터율', value: `${data.validDataPercent.toFixed(1)}%` },
+                { label: '에피소드', value: `${String(data.episodeCount)}개` },
+                { label: '릴리스 데이터셋', value: `${String(data.releasedDatasetCount)}개` },
+              ]} />
+              <MetricGroup title="주행 운영" items={[
+                { label: '작업 성공률', value: `${data.taskSuccessPercent.toFixed(1)}%` },
+                { label: '자율 비율', value: `${data.autonomyPercent.toFixed(1)}%` },
+                { label: 'km당 개입', value: `${data.interventionsPerKm.toFixed(2)}회` },
+                { label: '주행 시간', value: `${data.driveHours.toFixed(1)}시간` },
+              ]} />
             </section>
+            <Panel title="최근 학습·평가·배포" description={`활성 배포 ${String(data.activeDeploymentCount)}개`}>
+              <div className="divide-y divide-border">
+                <StatusRow label="학습" query={training} detailPath="/mlops/training" />
+                <StatusRow label="평가" query={evaluations} detailPath="/mlops/evaluations" />
+                <StatusRow label="배포" query={deployments} detailPath="/mlops/deployments" />
+              </div>
+            </Panel>
           </>
         )}
       </AsyncState>
@@ -111,10 +80,29 @@ export function FlywheelOverviewPage() {
   );
 }
 
+function MetricGroup({ title, items }: {
+  readonly title: string;
+  readonly items: readonly { readonly label: string; readonly value: string }[];
+}) {
+  return (
+    <Panel title={title}>
+      <dl className="divide-y divide-border">
+        {items.map((item, index) => (
+          <div className="flex items-baseline justify-between gap-4 py-3 first:pt-0 last:pb-0" key={item.label}>
+            <dt className="text-sm text-muted">{item.label}</dt>
+            <dd className={`${index === 0 ? 'text-3xl' : 'text-lg'} font-semibold tabular-nums`}>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
+  );
+}
+
 export function FlywheelExplorerPage() {
   const query = useFlywheelQuery(loadLineage);
   const [params, setParams] = useSearchParams();
-  const type = params.get("type") ?? "all";
+  const requestedType = params.get('type') ?? 'all';
+  const type = Object.hasOwn(recordTypeLabels, requestedType) ? requestedType : 'all';
   const recordTypes = [
     "all",
     "capture",
@@ -131,20 +119,23 @@ export function FlywheelExplorerPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="BigData 탐색기"
-        description="전체 플라이휠 Record를 같은 유형 필터와 상세 링크로 탐색합니다."
+        title="데이터 탐색"
+        description="수집부터 배포까지 기록을 유형별로 찾고 상세 내용을 확인하세요."
       />
       <Panel>
         <Select
           label="레코드 유형"
           value={type}
           options={recordTypes.map((value) => ({
-            label: value === "all" ? "전체 Record" : value,
+            label: recordTypeLabels[value] ?? value,
             value,
           }))}
-          onValueChange={(value) =>
-            setParams(value === "all" ? {} : { type: value })
-          }
+          onValueChange={(value) => {
+            const next = new URLSearchParams(params);
+            if (value === 'all') next.delete('type');
+            else next.set('type', value);
+            setParams(next);
+          }}
         />
       </Panel>
       <AsyncState query={query}>
@@ -153,13 +144,18 @@ export function FlywheelExplorerPage() {
             (node) => type === "all" || node.type === type,
           );
           return (
-            <Panel title={`${String(nodes.length)} records`}>
+            <Panel title={`기록 ${String(nodes.length)}개`}>
               <JsonExportButton
                 fileName="flywheel-records.json"
                 label="탐색 결과 JSON 내보내기"
                 records={nodes}
               />
-              <Table aria-label="플라이휠 레코드 목록">
+              {nodes.length === 0 ? (
+                <div className="mt-4 grid justify-items-start gap-3">
+                  <p className="text-sm text-muted" role="status">선택한 유형의 기록이 없습니다.</p>
+                  <Button onClick={() => { const next = new URLSearchParams(params); next.delete('type'); setParams(next); }} variant="secondary">전체 기록 보기</Button>
+                </div>
+              ) : <Table aria-label="플라이휠 레코드 목록">
                 <TableHeader>
                   <TableRow>
                     <TableHead>레코드</TableHead>
@@ -179,7 +175,7 @@ export function FlywheelExplorerPage() {
                           {node.id}
                         </span>
                       </TableCell>
-                      <TableCell>{node.type}</TableCell>
+                      <TableCell>{recordTypeLabels[node.type] ?? node.type}</TableCell>
                       <TableCell>
                         <StatusBadge status={node.status} />
                       </TableCell>
@@ -195,7 +191,7 @@ export function FlywheelExplorerPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table>}
             </Panel>
           );
         }}
@@ -207,21 +203,40 @@ export function FlywheelExplorerPage() {
 function StatusRow({
   label,
   query,
+  detailPath,
 }: {
   readonly label: string;
+  readonly detailPath: string;
   readonly query: {
     readonly status: string;
-    readonly data?: readonly { readonly status: string }[];
+    readonly data?: readonly { readonly id: string; readonly name: string; readonly status: string; readonly createdAtMs: number }[];
+    readonly retry: () => void;
   };
 }) {
-  const value =
-    query.status === "ready"
-      ? (query.data?.[0]?.status ?? "empty")
-      : query.status;
+  const latest = query.status === 'ready'
+    ? query.data?.reduce<(NonNullable<typeof query.data>)[number] | undefined>(
+      (current, item) => current === undefined || item.createdAtMs > current.createdAtMs ? item : current,
+      undefined,
+    )
+    : undefined;
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[var(--design-radius-control)] bg-layer-base p-3">
+    <div className="grid gap-2 py-4 first:pt-0 last:pb-0 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
       <strong>{label}</strong>
-      <StatusBadge status={value ?? "empty"} />
+      {latest === undefined ? (
+        <p className="text-sm text-muted" role="status">
+          {query.status === 'loading' ? '불러오는 중' : query.status === 'error' ? '최근 기록을 불러오지 못했습니다.' : '아직 실행 기록이 없습니다.'}
+        </p>
+      ) : (
+        <div className="min-w-0">
+          <DetailLink to={`${detailPath}/${latest.id}`}>{latest.name}</DetailLink>
+          <p className="mt-1 text-xs text-muted">생성 {formatDateTime(latest.createdAtMs)}</p>
+        </div>
+      )}
+      <div className="justify-self-start sm:justify-self-end">
+        {query.status === 'error' ? <Button onClick={query.retry} variant="secondary">{label} 다시 불러오기</Button> : latest === undefined ? null : (
+          <StatusBadge status={latest.status} {...(label === '배포' && latest.status === 'active' ? { label: '운영 중' } : {})} />
+        )}
+      </div>
     </div>
   );
 }
@@ -233,7 +248,7 @@ export function FailuresPage() {
     <div className="grid gap-6">
       <PageHeader
         title="실패 및 데이터 공백"
-        description="실패·Intervention 클러스터에서 취약 Task와 환경, 권장 재수집량을 도출합니다."
+        description="실패와 개입 사례를 살펴보고 보완할 작업과 권장 재수집량을 확인하세요."
       />
       <AsyncState query={query}>
         {(items) => (
@@ -258,11 +273,11 @@ export function FailuresPage() {
                                 : "warning"
                             }
                           >
-                            {cluster.severity}
+                            {{ high: '높음', medium: '보통', low: '낮음' }[cluster.severity]}
                           </Badge>
                         ),
                       },
-                      { label: "로봇 유형", value: cluster.affectedRobotType },
+                      { label: '로봇 유형', value: { humanoid: '휴머노이드', quadruped: '사족보행', mobile: '이동형' }[cluster.affectedRobotType] },
                       {
                         label: "권장 재수집",
                         value: `${String(cluster.recommendedCollectionCount)}개 단위`,
@@ -279,7 +294,7 @@ export function FailuresPage() {
                         );
                       }}
                     >
-                      필터로 재수집
+                      재수집 시작
                     </Button>
                     <Button
                       variant="secondary"
@@ -289,7 +304,7 @@ export function FailuresPage() {
                         );
                       }}
                     >
-                      Dataset 구성
+                      데이터셋 구성
                     </Button>
                   </div>
                 </div>
@@ -314,7 +329,7 @@ export function LineagePage() {
       <AsyncState query={query}>
         {(graph) => (
           <>
-            <Panel className="min-w-0 overflow-hidden" title="계보 그래프">
+            <Panel className="min-w-0 overflow-hidden" title="계보 요약" description="유형별로 최대 2개의 기록을 표시합니다. 전체 기록은 데이터 탐색에서 확인하세요.">
               <LineageGraph
                 nodes={
                   selectedType === "all"
@@ -326,10 +341,9 @@ export function LineagePage() {
             <Panel title="그래프 요약">
               <DefinitionGrid
                 items={[
-                  { label: "Nodes", value: String(graph.nodes.length) },
-                  { label: "Edges", value: String(graph.edges.length) },
-                  { label: "Start", value: "Capture Session" },
-                  { label: "End", value: "Inference / Failure" },
+                  { label: '기록', value: `${String(graph.nodes.length)}개` },
+                  { label: '참조 관계', value: `${String(graph.edges.length)}개` },
+                  { label: '데이터 유형', value: `${String(new Set(graph.nodes.map((node) => node.type)).size)}종` },
                 ]}
               />
               <div className="mt-4 flex flex-wrap gap-2">
@@ -342,11 +356,12 @@ export function LineagePage() {
                   "inference",
                 ].map((type) => (
                   <Button
+                    aria-pressed={selectedType === type}
                     key={type}
                     variant={selectedType === type ? "primary" : "secondary"}
                     onClick={() => setSelectedType(type)}
                   >
-                    {type}
+                    {recordTypeLabels[type] ?? type}
                   </Button>
                 ))}
               </div>
