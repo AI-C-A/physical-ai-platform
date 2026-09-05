@@ -5,10 +5,12 @@ import { Badge } from '@/shared/ui/badge';
 import { getButtonClassName } from '@/shared/ui/button';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 
-export function StatusBadge({ status }: { readonly status: string }) {
-  const positive = ['completed', 'passed', 'released', 'succeeded', 'active', 'production', 'approved', 'ready'];
-  const negative = ['failed', 'rejected', 'invalid', 'cancelled', 'error', 'rolled-back'];
-  const warning = ['needs-review', 'quarantined', 'partial', 'rolling-back', 'detected'];
+import { getStatusLabel } from './flywheel-status';
+
+export function StatusBadge({ status, label }: { readonly status: string; readonly label?: string }) {
+  const positive = ['completed', 'passed', 'released', 'succeeded', 'active', 'production', 'approved', 'ready', '저장됨'];
+  const negative = ['failed', 'rejected', 'invalid', 'cancelled', 'error', 'rolled-back', '폐기됨'];
+  const warning = ['needs-review', 'quarantined', 'partial', 'rolling-back', 'detected', '처리 중'];
   const tone = positive.includes(status)
     ? 'positive'
     : negative.includes(status)
@@ -16,7 +18,7 @@ export function StatusBadge({ status }: { readonly status: string }) {
       : warning.includes(status)
         ? 'warning'
         : 'info';
-  return <Badge tone={tone}>{status}</Badge>;
+  return <Badge tone={tone}>{label ?? getStatusLabel(status)}</Badge>;
 }
 
 export function DetailLink({ children, to }: { readonly children: ReactNode; readonly to: string }) {
@@ -72,11 +74,11 @@ export function AsyncState<T>({
 
 export function DefinitionGrid({ items }: { readonly items: readonly { readonly label: string; readonly value: ReactNode }[] }) {
   return (
-    <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
-        <div className="rounded-[var(--design-radius-control)] bg-layer-base p-3" key={item.label}>
-          <dt className="text-xs font-semibold text-muted">{item.label}</dt>
-          <dd className="mt-1 text-sm font-semibold text-foreground">{item.value}</dd>
+        <div className="grid min-w-0 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-baseline gap-3 sm:block" key={item.label}>
+          <dt className="text-sm text-muted">{item.label}</dt>
+          <dd className="min-w-0 break-words text-sm font-semibold text-foreground sm:mt-1">{item.value}</dd>
         </div>
       ))}
     </dl>

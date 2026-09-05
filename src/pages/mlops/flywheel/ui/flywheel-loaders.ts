@@ -3,6 +3,15 @@ import type { FlywheelPort } from '@/entities/flywheel';
 export const loadProjects = (port: FlywheelPort) => port.listProjects();
 export const loadTemplates = (port: FlywheelPort) => port.listTemplates();
 export const loadSessions = (port: FlywheelPort) => port.listSessions();
+export const loadOperationalSessions = (port: FlywheelPort) => port.listOperationalSessions();
+export const loadCollectionOperations = async (port: FlywheelPort) => {
+  const [sessions, episodes] = await Promise.all([
+    port.listOperationalSessions(),
+    port.listEpisodes(),
+  ]);
+  return { sessions, episodes } as const;
+};
+export const loadCatalogCollections = (port: FlywheelPort) => port.listCatalogCollections();
 export const loadEpisodes = (port: FlywheelPort) => port.listEpisodes();
 export const loadDrives = (port: FlywheelPort) => port.listDriveSessions();
 export const loadInterventions = (port: FlywheelPort) => port.listInterventions();
