@@ -3,6 +3,11 @@ import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
 import type { FlywheelPort } from '@/entities/flywheel';
+import {
+  QuestCollectorAdapter,
+  SimulatedWebXrRuntime,
+  type QuestCollectorPort,
+} from '@/entities/hand-pose';
 import type { InterventionQueuePort } from '@/entities/intervention';
 import {
   createUnconfiguredPatrolApiStatus,
@@ -17,7 +22,7 @@ import {
 } from '@/entities/robot-telemetry';
 import type { RobotVideoPort } from '@/entities/robot-video';
 import type { SensorDeviceCatalogPort } from '@/entities/sensor-device';
-import type { RuntimeConfig } from '@/shared/config';
+import type { DataEnvironment, RuntimeConfig } from '@/shared/config';
 import { systemClock, type ClockPort } from '@/shared/lib/clock';
 
 import { InMemoryAnalyticsAdapter } from './in-memory-analytics-adapter';
@@ -26,8 +31,11 @@ import {
   type InMemoryCoreAdapterBundle,
 } from './in-memory-adapter-factories';
 import { AvailableStreamCaptureOperations } from './available-stream-capture-operations';
+import { createBroadcastChannelFlywheelSyncTransport } from './broadcast-channel-flywheel-sync';
+import { InMemoryQuestCollectorBackend } from './quest-collector-backends';
 
 export interface ApplicationServices {
+  readonly dataEnvironment: DataEnvironment;
   readonly clock: ClockPort;
   readonly patrolApiStatus: PatrolApiStatusPort;
   readonly robotCatalog: RobotCatalogPort;
@@ -40,6 +48,7 @@ export interface ApplicationServices {
   readonly datasetRepository: DatasetRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
   readonly flywheel: FlywheelPort;
+  readonly questCollector: QuestCollectorPort;
   readonly interventionQueue: InterventionQueuePort;
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly analytics: AnalyticsPort;
@@ -47,7 +56,7 @@ export interface ApplicationServices {
   dispose(): void;
 }
 
-type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose'>;
+type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose' | 'dataEnvironment'>;
 
 type ExternalAdapterBundle = AdapterBundle & {
   dispose?(): void;
@@ -77,6 +86,7 @@ const adapterServiceNames = [
   'datasetRepository',
   'episodeRepository',
   'flywheel',
+  'questCollector',
   'interventionQueue',
   'robotEventRepository',
   'analytics',
@@ -220,6 +230,7 @@ export function createApplicationServices(
     return {
       clock,
       ...externalBundle,
+      dataEnvironment: 'connected',
       dispose: () => {
         if (disposed) return;
         disposed = true;
@@ -228,7 +239,11 @@ export function createApplicationServices(
     };
   }
 
-  const inMemoryAdapters = createInMemoryAdapterFactories(clock);
+  const flywheelSyncTransport = createBroadcastChannelFlywheelSyncTransport();
+  const inMemoryAdapters = createInMemoryAdapterFactories(
+    clock,
+    flywheelSyncTransport === null ? {} : { flywheelSyncTransport },
+  );
   try {
     const robotCatalog = inMemoryAdapters.factories.robotCatalog();
     const robotOperationalStatus =
@@ -265,6 +280,12 @@ export function createApplicationServices(
       interventionQueue,
       datasetRepository,
     };
+    const questCollectorBackend = new InMemoryQuestCollectorBackend(core.flywheel, clock);
+    const questCollector = new QuestCollectorAdapter({
+      backend: questCollectorBackend,
+      nowMs: () => clock.nowMs(),
+      runtime: new SimulatedWebXrRuntime(),
+    });
     const analytics = new InMemoryAnalyticsAdapter({
       capture: core.captureOperations,
       episodes: core.episodeRepository,
@@ -281,16 +302,22 @@ export function createApplicationServices(
       clock,
       patrolApiStatus: createUnconfiguredPatrolApiStatus(),
       ...core,
+      dataEnvironment: 'simulation',
+      questCollector,
       analytics,
       dispose: () => {
         if (disposed) return;
         disposed = true;
         completedSessionSynchronization.dispose();
+        questCollector.dispose();
+        questCollectorBackend.dispose();
         inMemoryAdapters.dispose();
+        flywheelSyncTransport?.dispose();
       },
     };
   } catch (error: unknown) {
     inMemoryAdapters.dispose();
+    flywheelSyncTransport?.dispose();
     throw error;
   }
 }

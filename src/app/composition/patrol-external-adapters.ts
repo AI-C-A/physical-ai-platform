@@ -34,9 +34,13 @@ export const createPatrolExternalAdapters: ExternalAdapterFactory = (
     robotEventRepository: new PatrolRobotEventRepository({ endpoint }),
     episodeRepository: noData.episodeRepository,
     flywheel: noData.flywheel,
+    questCollector: noData.questCollector,
     interventionQueue: noData.interventionQueue,
     datasetRepository: noData.datasetRepository,
     analytics: noData.analytics,
-    dispose: () => video.dispose(),
+    dispose: () => {
+      video.dispose();
+      noData.questCollector.leaveCollector();
+    },
   };
 };

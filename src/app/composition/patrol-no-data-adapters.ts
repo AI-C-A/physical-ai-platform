@@ -4,6 +4,11 @@ import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
 import { createUnavailableFlywheel, type FlywheelPort } from '@/entities/flywheel';
 import {
+  BrowserWebXrRuntime,
+  QuestCollectorAdapter,
+  type QuestCollectorPort,
+} from '@/entities/hand-pose';
+import {
   createUnavailableInterventionQueue,
   type InterventionQueuePort,
 } from '@/entities/intervention';
@@ -14,6 +19,8 @@ import type {
 } from '@/entities/robot-telemetry';
 import type { SensorDeviceCatalogPort } from '@/entities/sensor-device';
 import { createPageResult } from '@/shared/lib/query';
+
+import { createUnavailableQuestCollectorBackend } from './quest-collector-backends';
 
 const noOpUnsubscribe = (): void => undefined;
 const unavailableMessage = '이 실행 환경에서는 지원하지 않는 작업입니다.';
@@ -26,6 +33,7 @@ interface PatrolNoDataAdapters {
   readonly robotEventRepository: RobotEventRepositoryPort;
   readonly episodeRepository: EpisodeRepositoryPort;
   readonly flywheel: FlywheelPort;
+  readonly questCollector: QuestCollectorPort;
   readonly interventionQueue: InterventionQueuePort;
   readonly datasetRepository: DatasetRepositoryPort;
   readonly analytics: AnalyticsPort;
@@ -114,6 +122,10 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     subscribe: () => noOpUnsubscribe,
   };
   const flywheel = createUnavailableFlywheel();
+  const questCollector = new QuestCollectorAdapter({
+    backend: createUnavailableQuestCollectorBackend(),
+    runtime: new BrowserWebXrRuntime(),
+  });
   const interventionQueue = createUnavailableInterventionQueue();
 
   return {
@@ -124,6 +136,7 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     robotEventRepository,
     episodeRepository,
     flywheel,
+    questCollector,
     interventionQueue,
     datasetRepository,
     analytics,

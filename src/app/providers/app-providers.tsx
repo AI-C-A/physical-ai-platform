@@ -5,6 +5,7 @@ import { CaptureOperationsContext } from '@/entities/capture-session';
 import { DatasetRepositoryContext } from '@/entities/dataset';
 import { EpisodeRepositoryContext } from '@/entities/episode';
 import { FlywheelContext } from '@/entities/flywheel';
+import { QuestCollectorContext } from '@/entities/hand-pose';
 import { InterventionQueueContext } from '@/entities/intervention';
 import {
   PatrolApiStatusContext,
@@ -20,6 +21,7 @@ import { RobotVideoContext } from '@/entities/robot-video';
 import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
 import {
   BrandingContext,
+  DataEnvironmentContext,
   ColorSchemePreferenceProvider,
   MapStylePreferenceProvider,
   type BrandingConfig,
@@ -59,6 +61,7 @@ export function AppProviders({
 
   return (
     <ColorSchemePreferenceProvider>
+      <DataEnvironmentContext.Provider value={services.dataEnvironment}>
       <MapStylePreferenceProvider>
         <BrandingContext.Provider value={branding}>
           <ClockContext.Provider value={services.clock}>
@@ -76,6 +79,7 @@ export function AppProviders({
             >
               <EpisodeRepositoryContext.Provider value={services.episodeRepository}>
                 <FlywheelContext.Provider value={services.flywheel}>
+                <QuestCollectorContext.Provider value={services.questCollector}>
                 <DatasetRepositoryContext.Provider value={services.datasetRepository}>
                   <InterventionQueueContext.Provider value={services.interventionQueue}>
                   <RobotEventRepositoryContext.Provider value={services.robotEventRepository}>
@@ -87,6 +91,7 @@ export function AppProviders({
                   </RobotEventRepositoryContext.Provider>
                   </InterventionQueueContext.Provider>
                 </DatasetRepositoryContext.Provider>
+                </QuestCollectorContext.Provider>
                 </FlywheelContext.Provider>
               </EpisodeRepositoryContext.Provider>
             </CaptureOperationsContext.Provider>
@@ -100,6 +105,7 @@ export function AppProviders({
           </ClockContext.Provider>
         </BrandingContext.Provider>
       </MapStylePreferenceProvider>
+      </DataEnvironmentContext.Provider>
     </ColorSchemePreferenceProvider>
   );
 }

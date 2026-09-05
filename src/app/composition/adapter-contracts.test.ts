@@ -13,7 +13,7 @@ import {
   type ApplicationServices,
 } from './application-services';
 
-type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose'>;
+type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose' | 'dataEnvironment'>;
 
 // fake timer의 system time을 따라가야 timer 기반 Port의 경과 시간이 실제로 전진한다.
 const clock: ClockPort = { nowMs: () => Date.now() };
@@ -66,6 +66,7 @@ function toBundle(services: ApplicationServices): AdapterBundle {
     datasetRepository: services.datasetRepository,
     episodeRepository: services.episodeRepository,
     flywheel: services.flywheel,
+    questCollector: services.questCollector,
     interventionQueue: services.interventionQueue,
     robotEventRepository: services.robotEventRepository,
     analytics: services.analytics,

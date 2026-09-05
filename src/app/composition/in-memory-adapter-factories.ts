@@ -5,7 +5,11 @@ import {
 } from '@/entities/capture-session';
 import { createInMemoryDatasetRepository, type DatasetRepositoryPort } from '@/entities/dataset';
 import { createInMemoryEpisodeRepository, type EpisodeRepositoryPort } from '@/entities/episode';
-import { createInMemoryFlywheel, type FlywheelPort } from '@/entities/flywheel';
+import {
+  createInMemoryFlywheel,
+  type FlywheelPort,
+  type InMemoryFlywheelSyncTransport,
+} from '@/entities/flywheel';
 import {
   createInMemoryInterventionRequests,
   InMemoryInterventionQueue,
@@ -58,8 +62,13 @@ interface OwnedInMemoryAdapterFactories {
   dispose(): void;
 }
 
+interface InMemoryAdapterFactoryOptions {
+  readonly flywheelSyncTransport?: InMemoryFlywheelSyncTransport;
+}
+
 export function createInMemoryAdapterFactories(
   clock: ClockPort,
+  options: InMemoryAdapterFactoryOptions = {},
 ): OwnedInMemoryAdapterFactories {
   const scheduler: Scheduler = {
     ...systemScheduler,
@@ -90,7 +99,9 @@ export function createInMemoryAdapterFactories(
       })),
       datasetRepository: () => createInMemoryDatasetRepository(clock),
       episodeRepository: () => createInMemoryEpisodeRepository(clock),
-      flywheel: () => own(createInMemoryFlywheel(clock)),
+      flywheel: () => own(createInMemoryFlywheel(clock, options.flywheelSyncTransport === undefined
+        ? {}
+        : { syncTransport: options.flywheelSyncTransport })),
       interventionQueue: () => new InMemoryInterventionQueue(
         createInMemoryInterventionRequests(clock),
       ),
