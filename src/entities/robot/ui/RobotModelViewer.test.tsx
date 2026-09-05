@@ -12,6 +12,6 @@ describe('RobotModelViewer', () => {
     expect(modelViewer).toHaveAttribute('camera-orbit', '-135deg 65deg 105%');
     expect(modelViewer).toHaveAttribute('autoplay');
     expect(modelViewer).not.toHaveAttribute('auto-rotate');
-    expect(screen.getByText('Mock Robot')).toHaveClass('text-4xl', 'font-light');
+    expect(screen.getByText('Mock Robot')).toHaveClass('text-xl', 'md:text-4xl', 'md:font-light');
   });
 });

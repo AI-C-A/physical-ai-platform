@@ -16,7 +16,7 @@ export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
       className="flex flex-col"
       role="group"
     >
-      <div className="relative h-52 shrink-0">
+      <div className="relative h-28 shrink-0 md:h-52">
         <ModelViewer
           alt="걷는 사족 보행 로봇 3D 모델"
           autoplay
@@ -47,7 +47,7 @@ export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
         </ModelViewer>
       </div>
       {nickname === null ? null : (
-        <figcaption className="mt-4 truncate text-left text-4xl font-light tracking-tight text-foreground">
+        <figcaption className="mt-2 truncate text-left text-xl font-medium tracking-tight text-foreground md:mt-4 md:text-4xl md:font-light">
           {nickname}
         </figcaption>
       )}
