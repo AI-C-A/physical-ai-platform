@@ -35,6 +35,8 @@ export default defineConfig({
       testMatch: [
         ...commonTestMatch,
         '**/shell-desktop.spec.ts',
+        '**/motion.spec.ts',
+        '**/monitoring-readiness.spec.ts',
       ],
       use: {
         channel: 'chrome',
