@@ -3,6 +3,7 @@ import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 interface ModelViewerAttributes
   extends DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> {
   readonly alt?: string;
+  readonly 'animation-name'?: string;
   readonly autoplay?: boolean;
   readonly 'auto-rotate'?: boolean;
   readonly 'camera-controls'?: boolean;
@@ -23,6 +24,7 @@ interface ModelViewerAttributes
   readonly src?: string;
   readonly 'tone-mapping'?: 'neutral' | 'aces' | 'agx' | 'reinhard' | 'cineon' | 'linear' | 'none';
   readonly 'touch-action'?: 'none' | 'pan-x' | 'pan-y';
+  readonly 'time-scale'?: number;
 }
 
 declare module 'react' {

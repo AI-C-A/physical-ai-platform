@@ -1,0 +1,17 @@
+OpenArm v1 bimanual model
+
+Source: https://github.com/enactic/openarm_mujoco
+Source configuration: v1/openarm_bimanual.xml and its official collision STL/OBJ meshes
+Copyright 2025 Enactic, Inc.
+License: Apache License 2.0 (see openarm-bimanual.LICENSE.txt)
+
+The official MuJoCo assembly was converted to glTF Binary (GLB) using its
+lower-detail simulation/collision meshes for responsive real-time browser
+monitoring. Geometry and material grouping originate from the official
+OpenArm model assets. A six-second application-specific preview animation was
+added using the official joint axes and limits; it is not an upstream motion.
+
+Application derivative: openarm-bimanual-five-finger.glb replaces the visible
+two-finger gripper branches with low-poly palms and five visual digits per hand.
+This five-digit geometry is not official OpenArm hardware and does not represent
+five-finger actuation, collision, or kinematic support.

@@ -1,0 +1,6 @@
+Unitree G1 visual model
+Source: https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/e4049d0a3bfd58d2a3081614e6777d4007e3f86a/unitree_g1/g1.xml
+Revision: e4049d0a3bfd58d2a3081614e6777d4007e3f86a
+License: BSD-3-Clause (see unitree-g1.LICENSE.txt)
+Changes: visual geometry exported to glTF 2.0; collision geometry, physics and actuators omitted; duplicate vertices indexed; Z-up converted to Y-up; source neutral material colors retained. Meshes simplified with meshoptimizer (target ratio 0.15, maximum relative error 0.0005) and vertex attributes quantized with glTF Transform 4.5.0 (KHR_mesh_quantization).
+Reference configuration only. This asset does not represent received body-pose telemetry.
