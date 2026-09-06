@@ -895,6 +895,7 @@ export interface FlywheelPort {
   pairHumanDemonstrationSource(
     input: PairHumanDemonstrationSourceInput,
   ): Promise<HumanDemonstrationPairingResult>;
+  renewHumanDemonstrationPairing(sessionId: string): Promise<HumanoidCaptureSession>;
   updateHumanDemonstrationSource(
     sessionId: string,
     sourceDeviceId: string,

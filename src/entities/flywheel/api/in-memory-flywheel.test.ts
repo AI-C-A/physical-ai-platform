@@ -31,6 +31,42 @@ class InProcessSyncBus {
 describe('InMemoryFlywheel', () => {
   afterEach(() => vi.useRealTimers());
 
+  it('만료 경계에서 연결을 거절하고 새 코드를 Quest에 동기화하며 세션을 보존한다', async () => {
+    let now = 1_800_000_000_000;
+    const clock = { nowMs: () => now };
+    const bus = new InProcessSyncBus();
+    const pc = createInMemoryFlywheel(clock, { syncTransport: bus.createTransport('pc') });
+    const quest = createInMemoryFlywheel(clock, { syncTransport: bus.createTransport('quest') });
+    try {
+      const session = await pc.createHumanDemonstrationSession({
+        projectId: 'project-tiger', siteId: 'site-lab', name: '연결 복구',
+        taskId: 'task-sort', instruction: 'Sort objects',
+        exoskeletonDeviceId: 'exo-1', questDeviceId: 'quest-1',
+        headCameraDeviceId: 'head-1', externalCameraDeviceId: '',
+      });
+      const oldCode = session.humanDemonstration!.pairing.code;
+      const input = { pairingCode: oldCode, sourceDeviceId: 'quest-1', integrationProfileId: 'quest-webxr-hand-pose-v1', capabilities: ['left-hand-pose', 'right-hand-pose'] };
+      now += 30 * 60_000;
+      await expect(quest.pairHumanDemonstrationSource(input)).rejects.toThrow('새 코드 받기');
+      const updated = await pc.renewHumanDemonstrationPairing(session.id);
+      expect(updated.humanDemonstration!.pairing.code).not.toBe(oldCode);
+      expect(updated.humanDemonstration!.pairing.expiresAtMs).toBe(now + 30 * 60_000);
+      expect({ ...updated, updatedAtMs: session.updatedAtMs, humanDemonstration: { ...updated.humanDemonstration, pairing: session.humanDemonstration!.pairing } }).toEqual(session);
+      expect(await quest.getSession(session.id)).toMatchObject({ humanDemonstration: { pairing: updated.humanDemonstration!.pairing } });
+      await expect(quest.pairHumanDemonstrationSource(input)).rejects.toThrow();
+      await expect(quest.pairHumanDemonstrationSource({ ...input, pairingCode: updated.humanDemonstration!.pairing.code })).resolves.toMatchObject({ sessionId: session.id });
+      await expect(pc.renewHumanDemonstrationPairing(session.id)).rejects.toThrow('이미 연결');
+      await quest.updateHumanDemonstrationSource(session.id, 'quest-1', 'ready');
+      await pc.validateSession(session.id);
+      await pc.startSession(session.id);
+      await quest.updateHumanDemonstrationSource(session.id, 'quest-1', 'offline');
+      const reconnect = await pc.renewHumanDemonstrationPairing(session.id);
+      expect(reconnect.status).toBe('active');
+      await expect(pc.startEpisode(session.id)).rejects.toThrow('필수 source 연결');
+      await expect(quest.pairHumanDemonstrationSource({ ...input, pairingCode: reconnect.humanDemonstration!.pairing.code })).resolves.toMatchObject({ sessionId: session.id });
+    } finally { pc.dispose(); quest.dispose(); }
+  });
+
   it('versioned Mock realtime transport로 독립 adapter의 Session과 pairing 상태를 교환한다', async () => {
     const clock = { nowMs: () => 1_800_000_000_000 };
     const bus = new InProcessSyncBus();
@@ -185,7 +221,7 @@ describe('InMemoryFlywheel', () => {
     expect(session.streams.some((stream) => stream.sourceDeviceId === 'quest2-001' && stream.id.includes('rgb'))).toBe(false);
     expect(session.streams.some((stream) => stream.id.includes('sensor-depth'))).toBe(false);
 
-    await expect(port.validateSession(session.id)).rejects.toThrow('필수 collector');
+    await expect(port.validateSession(session.id)).rejects.toThrow('필수 장치 연결 대기 중');
     await expect(port.pairHumanDemonstrationSource({
       pairingCode: session.humanDemonstration.pairing.code,
       sourceDeviceId: 'quest2-001',
@@ -206,7 +242,7 @@ describe('InMemoryFlywheel', () => {
       completenessPercent: 0,
       qualityVerdict: 'not-ready',
     });
-    await expect(port.validateSession(session.id)).rejects.toThrow('필수 collector');
+    await expect(port.validateSession(session.id)).rejects.toThrow('필수 장치 연결 대기 중');
     await port.updateHumanDemonstrationSource(pairing.sessionId, pairing.sourceDeviceId, 'ready');
     expect(await port.getCollectionTelemetry(session.id)).toMatchObject({
       activeEpisodeId: null,

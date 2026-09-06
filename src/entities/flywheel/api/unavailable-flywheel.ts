@@ -18,6 +18,7 @@ export function createUnavailableFlywheel(): FlywheelPort {
     createHumanoidSession: reject,
     createHumanDemonstrationSession: reject,
     pairHumanDemonstrationSource: reject,
+    renewHumanDemonstrationPairing: reject,
     updateHumanDemonstrationSource: reject,
     acknowledgeCollectorCommand: reject,
     reportHandPoseBatch: reject,

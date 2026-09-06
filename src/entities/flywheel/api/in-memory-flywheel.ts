@@ -1002,6 +1002,32 @@ export class InMemoryFlywheel implements FlywheelPort {
     return clone(session);
   }
 
+  async renewHumanDemonstrationPairing(sessionId: string): Promise<HumanoidCaptureSession> {
+    const session = this.#requireHumanDemonstrationSession(sessionId);
+    if (!['draft', 'ready', 'failed', 'active', 'recording'].includes(session.status)) {
+      throw new Error('종료된 세션에서는 연결 코드를 발급할 수 없습니다.');
+    }
+    const source = session.humanDemonstration.sourceBindings.find((item) => item.role === 'xr-hand-tracking');
+    if (source === undefined || ['paired', 'ready', 'recording'].includes(source.state)) {
+      throw new Error('Quest가 이미 연결되어 있습니다. 연결 상태를 확인하세요.');
+    }
+    let code: string;
+    do {
+      this.#sequence += 1;
+      code = String(100_000 + this.#sequence % 900_000);
+    } while (this.#sessions.some((item) => item.kind === 'humanoid' && item.humanDemonstration?.pairing.code === code));
+    const updated: HumanoidCaptureSession = {
+      ...session,
+      updatedAtMs: this.#clock.nowMs(),
+      humanDemonstration: {
+        ...session.humanDemonstration,
+        pairing: { code, expiresAtMs: this.#clock.nowMs() + 30 * 60_000 },
+      },
+    };
+    this.#replaceSession(updated);
+    return clone(updated);
+  }
+
   async pairHumanDemonstrationSource(
     input: PairHumanDemonstrationSourceInput,
   ): Promise<HumanDemonstrationPairingResult> {
@@ -1016,8 +1042,8 @@ export class InMemoryFlywheel implements FlywheelPort {
       throw new Error('유효한 Human Demonstration Session을 찾을 수 없습니다.');
     }
     if (session.humanDemonstration.pairing.expiresAtMs !== null
-      && session.humanDemonstration.pairing.expiresAtMs < now) {
-      throw new Error('페어링 코드가 만료되었습니다. PC에서 새 Session을 만드세요.');
+      && session.humanDemonstration.pairing.expiresAtMs <= now) {
+      throw new Error('연결 코드가 만료되었습니다. PC의 Quest 연결 화면에서 새 코드 받기를 누른 뒤 다시 입력하세요.');
     }
     const source = session.humanDemonstration.sourceBindings.find((item) => item.role === 'xr-hand-tracking');
     if (source === undefined || source.sourceDeviceId !== input.sourceDeviceId) {
@@ -1263,7 +1289,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       if (unavailableRequiredSources.length > 0) {
         const checks = this.#humanDemonstrationPreflight(session);
         this.#replaceSession({ ...session, status: 'draft', preflight: checks });
-        throw new Error('필수 collector를 모두 연결한 뒤 다시 사전점검하세요.');
+        throw new Error('필수 장치 연결 대기 중입니다. 연결되면 자동으로 확인합니다.');
       }
     }
     const updated = {
@@ -1401,6 +1427,9 @@ export class InMemoryFlywheel implements FlywheelPort {
       const active = this.#episodes.find((item) => item.id === session.activeEpisodeId);
       if (active !== undefined) return clone(active);
       throw new Error('동시에 둘 이상의 Episode를 기록할 수 없습니다.');
+    }
+    if (session.humanDemonstration?.sourceBindings.some((source) => source.required && source.state !== 'ready' && source.state !== 'recording')) {
+      throw new Error('필수 source 연결 상태를 확인하세요. 연결이 복구되면 녹화를 시작할 수 있습니다.');
     }
     const sequence = session.episodeIds.length + 1;
     const acknowledgements: readonly CollectorAcknowledgement[] = session.humanDemonstration === null
