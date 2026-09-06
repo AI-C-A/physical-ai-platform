@@ -200,7 +200,6 @@ function MonitoringLayout({
             <div className="flex shrink-0 items-center gap-2">
               <SearchField
                 className="min-w-0 flex-1"
-                controlSize="large"
                 inputRef={searchInputRef}
                 label="로봇 검색"
                 onValueChange={onSearchChange}

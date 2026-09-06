@@ -601,8 +601,10 @@ describe('ControlMonitoringPage', () => {
     expect(robotSearchIcon).toBeInTheDocument();
     expect(robotSearchIcon?.parentElement).toHaveClass('z-10');
     for (const control of [siteSelect, robotSearch]) {
-      expect(control).toHaveClass('ui-field', 'min-h-[var(--layout-control-height-large)]', 'rounded-[var(--design-radius-field)]');
+      expect(control).toHaveClass('ui-field', 'rounded-[var(--design-radius-field)]');
     }
+    expect(siteSelect).toHaveClass('min-h-[var(--layout-control-height-large)]');
+    expect(robotSearch).toHaveClass('min-h-[var(--layout-control-height)]');
     expect(siteSelect).toHaveAttribute('data-surface', 'overlay');
     expect(robotSearch).toHaveAttribute('data-surface', 'default');
     expect(screen.queryByRole('button', { name: '로봇 정보 패널 닫기' }))
