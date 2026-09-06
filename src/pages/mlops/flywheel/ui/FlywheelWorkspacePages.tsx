@@ -1047,7 +1047,7 @@ export function CollectionWorkspacePage() {
                       return (
                         <TableRow className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 p-4 @min-[46rem]:table-row" key={session.id}>
                           <TableCell className="col-span-2 block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
-                            <Link className="block truncate font-semibold hover:underline" title={session.name} to={destination}>{session.name}</Link>
+                            <Link className="block truncate font-semibold hover:underline" title={session.name} to={destination} viewTransition={!needsSetup}>{session.name}</Link>
                             <p className="mt-1 truncate text-xs text-muted" title={session.taskId}>{session.taskId}</p>
                           </TableCell>
                           <TableCell className="block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
@@ -1059,7 +1059,7 @@ export function CollectionWorkspacePage() {
                           </TableCell>
                           <TableCell className="col-span-2 block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
                             <div className="flex items-center justify-end gap-1">
-                              <Link className={getButtonClassName('secondary', 'px-3')} to={destination}>{actionLabel}</Link>
+                              <Link className={getButtonClassName('secondary', 'px-3')} to={destination} viewTransition={!needsSetup}>{actionLabel}</Link>
                               <OperationalSessionActions session={session} />
                             </div>
                           </TableCell>
@@ -1152,7 +1152,7 @@ export function CollectionConnectionPage() {
   const finishClose = () => void navigate({
     pathname: openingConsoleRef.current ? `/mlops/collection/${encodeURIComponent(sessionId)}` : '/mlops/collection',
     search: params.toString(),
-  }, { replace: true });
+  }, { replace: true, viewTransition: openingConsoleRef.current });
 
   if (session !== null && (session.humanDemonstration === null || !['draft', 'ready', 'failed'].includes(session.status))) {
     return <Navigate replace to={`/mlops/collection/${encodeURIComponent(session.id)}`} />;
@@ -1431,7 +1431,7 @@ export function HumanoidCollectionDetailPage() {
                 onAfterClose={() => {
                   if (!leaveAfterExitRef.current) return;
                   leaveAfterExitRef.current = false;
-                  void navigate('/mlops/collection');
+                  void navigate('/mlops/collection', { viewTransition: true });
                 }}
                 title={closeIntent.title}
                 trigger={(
@@ -1454,7 +1454,7 @@ export function HumanoidCollectionDetailPage() {
                 )}
               </Dialog>
               <DeleteOperationalSessionButton
-                onDeleted={() => void navigate('/mlops/collection')}
+                onDeleted={() => void navigate('/mlops/collection', { viewTransition: true })}
                 onOpenChange={setDeleteDialogOpen}
                 open={deleteDialogOpen}
                 session={session}

@@ -18,7 +18,9 @@ import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
 
 import { AppLauncher } from './AppLauncher';
+import { useCollectionPageTransition } from './use-collection-page-transition';
 import './platform-shell.css';
+import './collection-page-transition.css';
 
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
@@ -351,6 +353,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
   const mainContentRef = useRef<HTMLElement>(null);
   const mobileMenuNavigationRef = useRef(false);
   const previousPathnameRef = useRef<string | null>(null);
+  useCollectionPageTransition(location.pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     readSidebarCollapsed,

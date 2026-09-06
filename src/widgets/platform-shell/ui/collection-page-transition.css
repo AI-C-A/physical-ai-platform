@@ -1,0 +1,76 @@
+html[data-collection-page-transition] .platform-shell-content {
+  transition: none;
+}
+
+html[data-collection-page-transition]::view-transition-group(root) {
+  animation: none;
+  overflow: clip;
+}
+
+html[data-collection-page-transition]::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+
+html[data-collection-page-transition]::view-transition-old(root),
+html[data-collection-page-transition]::view-transition-new(root) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  mix-blend-mode: normal;
+  animation-timing-function: var(--design-ease-route);
+  animation-fill-mode: both;
+}
+
+html[data-collection-page-transition="open"]::view-transition-old(root) {
+  z-index: 1;
+  animation-name: collection-page-recede;
+  animation-duration: var(--design-motion-page-enter);
+}
+
+html[data-collection-page-transition="open"]::view-transition-new(root) {
+  z-index: 2;
+  animation-name: collection-page-enter;
+  animation-duration: var(--design-motion-page-enter);
+}
+
+html[data-collection-page-transition="close"]::view-transition-old(root) {
+  z-index: 2;
+  animation-name: collection-page-leave;
+  animation-duration: var(--design-motion-page-exit);
+}
+
+html[data-collection-page-transition="close"]::view-transition-new(root) {
+  z-index: 1;
+  animation-name: collection-page-return;
+  animation-duration: var(--design-motion-page-exit);
+}
+
+@keyframes collection-page-enter {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes collection-page-leave {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes collection-page-recede {
+  from { transform: translateX(0) scale(1); }
+  to { transform: translateX(-8%) scale(0.985); }
+}
+
+@keyframes collection-page-return {
+  from { transform: translateX(-8%) scale(0.985); }
+  to { transform: translateX(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-collection-page-transition]::view-transition-old(root) {
+    animation-name: design-motion-fade-out;
+  }
+
+  html[data-collection-page-transition]::view-transition-new(root) {
+    animation-name: design-motion-fade-in;
+  }
+}

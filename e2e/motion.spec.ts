@@ -5,6 +5,116 @@ import { expect, test } from './playwright-test';
 import { expectApplicationReady } from './browser-assertions';
 import { fillCollectionSetup } from './collection-setup';
 
+for (const width of [1440, 390]) {
+  test(`수집 페이지는 진입·복귀·히스토리에 방향 있는 전환을 적용한다 (${String(width)}px)`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/mlops/collection/new');
+    await expectApplicationReady(page);
+    await fillCollectionSetup(page);
+    await page.getByRole('textbox', { name: '세션 이름' }).fill('페이지 전환 확인');
+    await page.getByRole('button', { name: '세션 생성', exact: true }).click();
+    const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+    await expect(pairing).toHaveText(/^\d{6}$/u);
+    const collector = await page.context().newPage();
+    try {
+      await collector.goto('/collect/quest');
+      await expectApplicationReady(collector);
+      await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
+      await collector.getByRole('button', { name: '세션 연결', exact: true }).click();
+      await collector.getByRole('button', { name: 'MR 모드 시작', exact: true }).click();
+
+      await page.evaluate(() => {
+        const original = document.startViewTransition.bind(document);
+        document.startViewTransition = ((update) => {
+          const transition = original(update);
+          void transition.ready.then(() => {
+            const root = document.documentElement;
+            const direction = root.dataset.collectionPageTransition;
+            if (direction === undefined) return;
+            const animations = document.getAnimations().filter((animation) => (
+              animation instanceof CSSAnimation && animation.animationName.startsWith('collection-page-')
+            ));
+            for (const animation of animations) {
+              animation.pause();
+              animation.currentTime = Number(animation.effect?.getTiming().duration) * 0.45;
+            }
+            root.dataset.collectionMotionSample = direction;
+          }, () => undefined);
+          return transition;
+        }) as typeof document.startViewTransition;
+      });
+
+      const checkTransition = async (direction: 'open' | 'close') => {
+        await expect(page.locator('html')).toHaveAttribute('data-collection-motion-sample', direction);
+        const sample = await page.evaluate(() => {
+          const root = document.documentElement;
+          const oldPage = getComputedStyle(root, '::view-transition-old(root)');
+          const newPage = getComputedStyle(root, '::view-transition-new(root)');
+          const content = document.querySelector('.platform-shell-content');
+          return {
+            oldName: oldPage.animationName,
+            newName: newPage.animationName,
+            duration: newPage.animationDuration,
+            padding: content === null ? null : getComputedStyle(content).paddingLeft,
+            layoutTransition: content === null ? null : getComputedStyle(content).transitionDuration,
+          };
+        });
+        expect(sample.oldName).toBe(direction === 'open' ? 'collection-page-recede' : 'collection-page-leave');
+        expect(sample.newName).toBe(direction === 'open' ? 'collection-page-enter' : 'collection-page-return');
+        expect(sample.duration).toBe(direction === 'open' ? '0.36s' : '0.28s');
+        if (direction === 'close') {
+          expect(sample.padding).toBe(width >= 1024 ? '240px' : '0px');
+          expect(sample.layoutTransition).toBe('0s');
+        }
+        await testInfo.attach(`collection-${direction}-${String(width)}`, {
+          body: await page.screenshot(), contentType: 'image/png',
+        });
+        await page.evaluate(async () => {
+          const transition = document.activeViewTransition;
+          document.getAnimations().forEach((animation) => {
+            if (animation instanceof CSSAnimation && animation.animationName.startsWith('collection-page-')) animation.finish();
+          });
+          await transition?.finished;
+          delete document.documentElement.dataset.collectionMotionSample;
+        });
+        await expect(page.locator('html')).not.toHaveAttribute('data-collection-page-transition');
+      };
+
+      await page.getByRole('button', { name: '수집 콘솔 열기', exact: true }).click();
+      await checkTransition('open');
+      await expect(page.getByRole('heading', { name: '페이지 전환 확인', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
+      await page.getByRole('button', { name: '나중에 계속', exact: true }).click();
+      await checkTransition('close');
+      await expect(page.getByRole('heading', { name: '데이터 수집', exact: true })).toBeVisible();
+      await page.getByRole('link', { name: '페이지 전환 확인', exact: true }).click();
+      await checkTransition('open');
+      await page.goBack();
+      await checkTransition('close');
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.getByRole('link', { name: '페이지 전환 확인', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '페이지 전환 확인', exact: true })).toBeVisible();
+      await expect(page.locator('html')).not.toHaveAttribute('data-collection-page-transition');
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--design-motion-page-enter').trim())).toBe('1ms');
+      await page.goBack();
+      await expect(page.getByRole('heading', { name: '데이터 수집', exact: true })).toBeVisible();
+
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.evaluate(() => { Object.defineProperty(document, 'startViewTransition', { configurable: true, value: undefined }); });
+      await page.getByRole('link', { name: '페이지 전환 확인', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '페이지 전환 확인', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
+      await page.getByRole('button', { name: '나중에 계속', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '데이터 수집', exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    } finally {
+      await collector.close();
+    }
+  });
+}
+
 async function getAnimationDuration(locator: Locator): Promise<string> {
   return locator.evaluate((element) => getComputedStyle(element).animationDuration);
 }

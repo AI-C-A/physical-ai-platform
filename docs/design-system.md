@@ -177,6 +177,10 @@
 
 ## 라우트 Morph 전환
 
+- 데이터 수집 목록(새 수집·Quest 연결 모달 포함)과 전체 화면 수집 콘솔 사이에는 별도의 페이지 계층 전환을 사용한다. 목록은 뒤로 조금 물러나고 콘솔은 오른쪽에서 진입하며, 복귀는 반대 방향으로 진행한다. 세션을 삭제하거나 직접 URL로 진입해도 특정 목록 항목을 필요로 하지 않는다.
+- 해당 `Link`·`navigate`의 `viewTransition` 옵션과 PlatformShell의 `useCollectionPageTransition`을 연결한다. 진입은 `--design-motion-page-enter`(360ms), 복귀는 `--design-motion-page-exit`(280ms), 곡선은 `--design-ease-route`다. 전환 중 본문의 사이드바 여백은 즉시 확정해 snapshot 안에서 본문이 다시 밀리지 않게 한다.
+- 새 수집·Quest 모달 사이의 이동과 검색·필터 변경에는 페이지 전환을 적용하지 않는다. reduced motion에서는 이동·확대를 없애고 1ms 페이드로 줄이며, View Transitions 미지원 브라우저는 일반 탐색을 유지한다.
+
 - 버튼이나 링크에서 전체 화면으로 이어지는 전환은 `@/shared/ui/route-morph`의 `useRouteMorph`를 사용한다.
 - source마다 고유한 ID를 부여하고 `getTriggerProps(to)`를 실제 조작 요소에 펼친다. 목적지의 최상위 표면에는 `useRouteMorphTarget()`이 반환한 props를 적용한다.
 - 전환은 페이지 snapshot을 `object-fit: cover`로 잘라 사용하므로 source와 목적지의 비율이 달라도 콘텐츠를 찌그러뜨리지 않는다.
