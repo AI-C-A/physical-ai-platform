@@ -275,7 +275,7 @@ test('사이드바는 펼침·접힘·모바일에서 press를 공유한다', as
   await pressAndRelease(page.getByRole('link', { name: '이벤트 로그', exact: true }), '0.98');
   await pressAndRelease(page.getByRole('link', { name: '설정', exact: true }), '0.98');
   await page.getByRole('button', { name: '사이드바 접기' }).click();
-  await pressAndRelease(page.getByRole('link', { name: '이벤트 로그', exact: true }), '0.96');
+  await pressAndRelease(page.getByRole('link', { name: '이벤트 로그', exact: true }), '0.98');
   await page.setViewportSize({ width: 768, height: 900 });
   await page.getByRole('button', { name: '업무 메뉴 열기' }).click();
   const mobileLink = page.getByRole('dialog').getByRole('link', { name: '이벤트 로그', exact: true });

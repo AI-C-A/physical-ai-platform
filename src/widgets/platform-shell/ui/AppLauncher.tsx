@@ -2,20 +2,18 @@ import { useRef } from 'react';
 
 import { useBranding } from '@/shared/config';
 import { Button } from '@/shared/ui/button';
-import { cn } from '@/shared/ui/class-names';
 import { Menu } from '@/shared/ui/dropdown';
 import { Icon } from '@/shared/ui/icon';
 
 import type { MiniAppNavigationItem } from './platform-shell';
 
 interface AppLauncherProps {
-  readonly collapsed?: boolean;
   readonly currentMiniApp: MiniAppNavigationItem;
   readonly miniApps: readonly MiniAppNavigationItem[];
   readonly onSelect: (miniApp: MiniAppNavigationItem) => void;
 }
 
-export function AppLauncher({ collapsed = false, currentMiniApp, miniApps, onSelect }: AppLauncherProps) {
+export function AppLauncher({ currentMiniApp, miniApps, onSelect }: AppLauncherProps) {
   const branding = useBranding();
   const pendingNavigation = useRef<MiniAppNavigationItem | null>(null);
 
@@ -24,23 +22,12 @@ export function AppLauncher({ collapsed = false, currentMiniApp, miniApps, onSel
       <Menu.Trigger asChild>
         <Button
           aria-label={`미니앱 전환 · ${currentMiniApp.label}`}
-          className={cn(
-            'shrink-0',
-            collapsed
-              ? 'size-10 p-0 text-muted'
-              : 'min-h-12 max-w-full justify-start gap-2 px-3 py-2 text-left',
-          )}
+          className="min-h-12 max-w-full shrink-0 justify-start gap-2 px-3 py-2 text-left"
           title={`앱 전환 · ${currentMiniApp.label}`}
           variant="ghost"
         >
-          {collapsed ? (
-            <Icon name={currentMiniApp.icon} size="md" />
-          ) : (
-            <>
-              <span className="min-w-0 truncate text-xl font-semibold leading-7">{currentMiniApp.label}</span>
-              <span className="shrink-0 text-muted"><Icon name="chevron-down" size="md" /></span>
-            </>
-          )}
+          <span className="min-w-0 truncate text-xl font-semibold leading-7">{currentMiniApp.label}</span>
+          <span className="shrink-0 text-muted"><Icon name="chevron-down" size="md" /></span>
         </Button>
       </Menu.Trigger>
       <Menu.Content
@@ -54,7 +41,7 @@ export function AppLauncher({ collapsed = false, currentMiniApp, miniApps, onSel
           event.preventDefault();
           onSelect(destination);
         }}
-        side={collapsed ? 'right' : 'bottom'}
+        side="bottom"
       >
         <Menu.Label>
           {branding.productName}

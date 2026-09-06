@@ -363,8 +363,8 @@ describe('PlatformShell', () => {
       screen.getByRole('link', { name: '모니터링' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '미니앱 전환 · 관제' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: '미니앱 전환 · 관제' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '사이드바 펼치기' })
         .parentElement,
@@ -383,7 +383,7 @@ describe('PlatformShell', () => {
     await user.hover(screen.getByRole('link', { name: '모니터링' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('모니터링');
 
-    expect(screen.getByRole('button', { name: '미니앱 전환 · 관제' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '미니앱 전환 · 관제' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '사이드바 펼치기' }));
     expect(screen.getByRole('button', { name: '미니앱 전환 · 관제' })).toBeInTheDocument();
   });

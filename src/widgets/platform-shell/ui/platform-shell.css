@@ -1,0 +1,31 @@
+.platform-shell-sidebar {
+  transition: width var(--design-motion-release) var(--design-ease-standard);
+}
+
+.platform-shell-content {
+  transition: padding-left var(--design-motion-release) var(--design-ease-standard);
+}
+
+.platform-shell-launcher,
+.platform-shell-label {
+  transition: opacity var(--design-motion-fast) var(--design-ease-standard);
+}
+
+.platform-shell-launcher[data-hidden="true"],
+.platform-shell-label[data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.platform-shell-toggle {
+  --ui-press-scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-shell-sidebar,
+  .platform-shell-content,
+  .platform-shell-launcher,
+  .platform-shell-label {
+    transition: none;
+  }
+}

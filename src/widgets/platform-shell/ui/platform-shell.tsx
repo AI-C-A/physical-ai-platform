@@ -18,6 +18,7 @@ import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
 
 import { AppLauncher } from './AppLauncher';
+import './platform-shell.css';
 
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
@@ -172,12 +173,10 @@ function Brand({ compact }: { readonly compact: boolean }) {
 }
 
 function MiniAppHeader({
-  collapsed,
   currentMiniApp,
   miniApps,
   onNavigate,
 }: {
-  readonly collapsed: boolean;
   readonly currentMiniApp: MiniAppNavigationItem;
   readonly miniApps: readonly MiniAppNavigationItem[];
   readonly onNavigate?: () => void;
@@ -186,9 +185,8 @@ function MiniAppHeader({
   const navigate = useNavigate();
 
   return (
-    <div className={cn('flex min-w-0 items-center', collapsed ? 'justify-center' : 'justify-start')}>
+    <div className="flex min-w-0 items-center justify-start">
       <AppLauncher
-        collapsed={collapsed}
         currentMiniApp={currentMiniApp}
         miniApps={miniApps}
         onSelect={(miniApp) => {
@@ -252,11 +250,13 @@ function NavigationGroup({
 }) {
   return (
     <section aria-label={group.label} className="mt-6 min-w-0 first:mt-0">
-      {collapsed ? null : (
-        <h2 className="mb-2 px-3 py-1 text-xs font-medium text-navigation-label">
-          {group.label}
-        </h2>
-      )}
+      <h2
+        aria-hidden={collapsed}
+        className="platform-shell-label mb-2 overflow-hidden whitespace-nowrap px-3 py-1 text-xs font-medium text-navigation-label"
+        data-hidden={collapsed}
+      >
+        {group.label}
+      </h2>
       <div className="grid gap-1">
         {group.items.map((item) => (
           <NavigationLink
@@ -271,10 +271,9 @@ function NavigationGroup({
   );
 }
 
-function getNavigationClassName(isActive: boolean, collapsed: boolean) {
+function getNavigationClassName(isActive: boolean) {
   return cn(
-    'ui-pressable ui-navigation-item ui-focus-inset flex min-h-11 min-w-0 items-center px-3 py-2 text-sm',
-    collapsed ? 'justify-center' : 'ui-pressable--subtle gap-3',
+    'ui-pressable ui-pressable--subtle ui-navigation-item ui-focus-inset flex min-h-11 min-w-0 items-center gap-3 overflow-hidden px-3 py-2 text-sm',
     isActive
       ? 'font-semibold'
       : 'font-normal',
@@ -297,19 +296,19 @@ function NavigationLink({
     <Link
       aria-current={isActive ? 'page' : undefined}
       aria-label={item.label}
-      className={getNavigationClassName(isActive, collapsed)}
+      className={getNavigationClassName(isActive)}
       onClick={onNavigate}
       to={{ pathname: item.path, search: siteSelectionSearch }}
     >
       <span className="shrink-0">
         <Icon name={item.icon} />
       </span>
-      {collapsed ? null : <span className="min-w-0 break-words">{item.label}</span>}
+      <span aria-hidden="true" className="platform-shell-label shrink-0 whitespace-nowrap" data-hidden={collapsed}>
+        {item.label}
+      </span>
     </Link>
   );
-  return collapsed ? (
-    <Tooltip content={item.label} trigger={link} />
-  ) : <div>{link}</div>;
+  return <Tooltip content={item.label} disabled={!collapsed} trigger={link} />;
 }
 
 function SettingsNavigation({
@@ -327,7 +326,7 @@ function SettingsNavigation({
   const link = (
     <NavLink
       aria-label="설정"
-      className={getNavigationClassName(isActive, collapsed)}
+      className={getNavigationClassName(isActive)}
       onClick={onNavigate}
       to={{
         pathname: path,
@@ -337,13 +336,13 @@ function SettingsNavigation({
       <span className="shrink-0">
         <Icon name="settings" />
       </span>
-      {collapsed ? null : <span>설정</span>}
+      <span aria-hidden="true" className="platform-shell-label shrink-0 whitespace-nowrap" data-hidden={collapsed}>
+        설정
+      </span>
     </NavLink>
   );
 
-  return collapsed ? (
-    <Tooltip content="설정" trigger={link} />
-  ) : link;
+  return <Tooltip content="설정" disabled={!collapsed} trigger={link} />;
 }
 
 export function PlatformShell({ miniApps }: PlatformShellProps) {
@@ -467,7 +466,6 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
               >
                 <div className="flex h-full min-h-0 flex-col gap-5">
                   <MiniAppHeader
-                    collapsed={false}
                     currentMiniApp={currentMiniApp}
                     miniApps={miniApps}
                     onNavigate={closeMobileMenuForNavigation}
@@ -495,24 +493,36 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
         {isImmersiveRoute ? null : (
           <aside
-            className={`fixed inset-y-0 left-0 z-30 hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
+            className={`platform-shell-sidebar fixed inset-y-0 left-0 z-30 hidden overflow-x-hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
-            <div className={cn('flex min-w-0 items-center gap-1 pt-1', sidebarCollapsed && 'flex-col')}>
-              <div className={cn('min-w-0', !sidebarCollapsed && 'flex-1')}>
-                <MiniAppHeader
-                  collapsed={sidebarCollapsed}
-                  currentMiniApp={currentMiniApp}
-                  miniApps={miniApps}
-                />
+            <div className="flex min-h-13 min-w-0 items-center pt-1">
+              <div
+                aria-hidden={sidebarCollapsed}
+                className="platform-shell-launcher min-w-0 flex-1 overflow-hidden"
+                data-hidden={sidebarCollapsed}
+                inert={sidebarCollapsed}
+              >
+                <div className="w-46">
+                  <MiniAppHeader
+                    currentMiniApp={currentMiniApp}
+                    miniApps={miniApps}
+                  />
+                </div>
               </div>
               <Button
+                aria-expanded={!sidebarCollapsed}
                 aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-                className="size-10 shrink-0 p-0 text-muted"
+                className="platform-shell-toggle relative size-10 shrink-0 p-0 text-muted"
                 onClick={() => setSidebarCollapsed((current) => !current)}
                 title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
                 variant="ghost"
               >
-                <Icon name={sidebarCollapsed ? 'panel-open' : 'panel-close'} />
+                <span aria-hidden="true" className="platform-shell-label absolute" data-hidden={!sidebarCollapsed}>
+                  <Icon name="panel-open" />
+                </span>
+                <span aria-hidden="true" className="platform-shell-label absolute" data-hidden={sidebarCollapsed}>
+                  <Icon name="panel-close" />
+                </span>
               </Button>
             </div>
             <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
@@ -533,7 +543,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
         <div
           className={isImmersiveRoute
             ? undefined
-            : sidebarCollapsed ? 'lg:pl-14' : 'lg:pl-60'}
+            : cn('platform-shell-content', sidebarCollapsed ? 'lg:pl-14' : 'lg:pl-60')}
         >
           <main
               className={isFullBleedRoute

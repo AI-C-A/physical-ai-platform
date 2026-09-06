@@ -90,12 +90,15 @@ function MonitoringMap({
     map.on('error', onMapError);
     map.on('load', onMapReady);
     map.on('dragstart', onMapDrag);
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(container);
     const loadDeadline = window.setTimeout(() => {
       if (!map.isStyleLoaded()) setMapError(true);
     }, 15_000);
 
     return () => {
       disposed = true;
+      resizeObserver.disconnect();
       window.clearTimeout(loadDeadline);
       map.off('error', onMapError);
       map.off('load', onMapReady);

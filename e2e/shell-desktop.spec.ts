@@ -104,3 +104,89 @@ test('MLOps 상세 화면은 통합된 상위 메뉴를 활성화한다', async 
     ).toHaveAttribute('aria-current', 'page');
   }
 });
+
+for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings']) {
+  test(`${path} 사이드바 전환의 모든 프레임에서 메뉴 좌표와 DOM을 유지한다`, async ({ page }) => {
+    const issues = observeBrowserIssues(page);
+    await page.goto(path);
+    await expectApplicationReady(page);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+    for (const mode of ['collapse', 'expand', 'reverse'] as const) {
+      const frames = await page.locator('aside').evaluate(async (sidebar, mode) => {
+        const toggle = sidebar.querySelector<HTMLButtonElement>('.platform-shell-toggle');
+        const main = document.querySelector('main');
+        const links = Array.from(sidebar.querySelectorAll('a'));
+        const icons = links.map((link) => link.querySelector('svg'));
+        if (!toggle || !main || icons.some((icon) => !icon)) throw new Error('Shell elements missing');
+        const baseline = icons.map((icon) => icon!.getBoundingClientRect());
+        const toggleTop = toggle.getBoundingClientRect().top;
+        const frames: { width: number; mainLeft: number; iconDrift: number; toggleDrift: number; stableNodes: boolean }[] = [];
+        const sample = () => {
+          const bounds = sidebar.getBoundingClientRect();
+          const button = toggle.getBoundingClientRect();
+          frames.push({
+            width: bounds.width,
+            mainLeft: main.getBoundingClientRect().left,
+            iconDrift: Math.max(...icons.map((icon, index) => {
+              const rect = icon!.getBoundingClientRect();
+              const initial = baseline[index]!;
+              return Math.max(Math.abs(rect.x - initial.x), Math.abs(rect.y - initial.y));
+            })),
+            toggleDrift: Math.max(Math.abs(button.top - toggleTop), Math.abs(bounds.right - button.right - 8)),
+            stableNodes: links.every((link, index) => link === sidebar.querySelectorAll('a')[index]),
+          });
+        };
+        sample();
+        toggle.click();
+        const start = performance.now();
+        let reversed = false;
+        await new Promise<void>((resolve) => {
+          const tick = () => {
+            sample();
+            const elapsed = performance.now() - start;
+            if (mode === 'reverse' && elapsed >= 80 && !reversed) {
+              toggle.click();
+              reversed = true;
+            }
+            if (elapsed < 500) requestAnimationFrame(tick);
+            else resolve();
+          };
+          requestAnimationFrame(tick);
+        });
+        return frames;
+      }, mode);
+
+      expect(frames.some((frame) => frame.width > 57 && frame.width < 239)).toBe(true);
+      for (const frame of frames) {
+        expect(frame.stableNodes).toBe(true);
+        expect(frame.iconDrift).toBeLessThan(0.1);
+        expect(frame.toggleDrift).toBeLessThan(0.1);
+        expect(Math.abs(frame.width - frame.mainLeft)).toBeLessThan(0.1);
+      }
+      expect(frames.at(-1)?.width).toBe(mode === 'collapse' ? 56 : 240);
+      if (mode !== 'reverse') {
+        for (let index = 1; index < frames.length; index++) {
+          const delta = frames[index]!.width - frames[index - 1]!.width;
+          expect(mode === 'collapse' ? delta : -delta).toBeLessThanOrEqual(0.1);
+        }
+      }
+
+      const canvas = page.locator('.mapboxgl-canvas');
+      if (await canvas.count()) {
+        expect(await canvas.evaluate((element) => Math.abs(
+          element.getBoundingClientRect().width - element.closest('.mapboxgl-map')!.clientWidth,
+        ))).toBeLessThanOrEqual(1);
+      }
+    }
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: '사이드바 접기', exact: true }).click();
+    await expect(page.getByRole('button', { name: /미니앱 전환/u })).toHaveCount(0);
+    expect(await page.locator('aside').evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      duration: getComputedStyle(element).transitionDuration,
+    }))).toEqual({ width: 56, duration: '0s' });
+    issues.assertNone();
+  });
+}
