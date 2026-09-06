@@ -5,7 +5,7 @@ import './synchronized-player.css';
 import { Button } from '@/shared/ui/button';
 import { Icon } from '@/shared/ui/icon';
 import { Surface } from '@/shared/ui/surface';
-import { FittedMedia } from '@/shared/ui/media-panel';
+import { FittedMedia, MediaStreamPlaceholder, getMediaStreamLabel, type MediaStreamState } from '@/shared/ui/media-panel';
 
 import { SynchronizedMedia } from './SynchronizedMedia';
 
@@ -18,7 +18,7 @@ export interface SynchronizedPlayerSource {
   readonly poster?: string;
   readonly renderMode?: 'rgb' | 'depth';
   readonly src: string;
-  readonly status?: 'live' | 'idle' | 'offline' | 'recorded';
+  readonly status?: MediaStreamState;
 }
 
 const fullBodyKeypoints = [
@@ -127,23 +127,21 @@ interface SynchronizedPlayerProps {
 }
 
 function getSourceStatusLabel(status: NonNullable<SynchronizedPlayerSource['status']>): string {
-  if (status === 'live') return '실시간';
-  if (status === 'recorded') return '기록';
-  if (status === 'offline') return '오프라인';
-  return '대기';
+  return getMediaStreamLabel(status);
 }
 
 function getSourceStatusAriaLabel(status: NonNullable<SynchronizedPlayerSource['status']>): string {
   if (status === 'live') return '실시간 연결';
   if (status === 'recorded') return '기록 영상';
   if (status === 'offline') return '연결 끊김';
-  return '대기';
+  return getMediaStreamLabel(status);
 }
 
 function getSourceStatusDotClassName(status: NonNullable<SynchronizedPlayerSource['status']>): string {
   if (status === 'live') return 'bg-positive';
   if (status === 'recorded') return 'bg-action-primary';
   if (status === 'offline') return 'bg-negative';
+  if (status === 'stale') return 'bg-warning';
   return 'bg-muted';
 }
 
@@ -268,18 +266,8 @@ export function SynchronizedPlayer({
                     data-camera-viewport="true"
                   >
                     {presentation === 'monitoring'
-                      && (source.status === 'idle' || source.status === 'offline') ? (
-                      <div className="absolute inset-0 grid place-items-center bg-media-background text-center">
-                        <div className="grid justify-items-center gap-2 px-4 text-media-foreground-muted">
-                          <Icon name={source.status === 'offline' ? 'wifi-off' : 'radio'} size="md" />
-                          <span className="text-sm font-semibold text-media-foreground-muted">
-                            {source.status === 'offline' ? '소스 연결이 끊겼습니다' : '소스 입력 대기 중'}
-                          </span>
-                          <span className="text-xs">
-                            {source.status === 'offline' ? '연결 및 전원 상태를 확인하세요.' : '녹화가 시작되면 실시간 영상이 표시됩니다.'}
-                          </span>
-                        </div>
-                      </div>
+                      && (source.status === 'idle' || source.status === 'offline' || source.status === 'stale') ? (
+                      <MediaStreamPlaceholder state={source.status} />
                     ) : (
                       <SynchronizedMedia
                         key={`${source.id}:${source.src}:${source.imageSrc ?? ''}`}

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { Badge } from '@/shared/ui/badge';
-import { MediaPanel } from '@/shared/ui/media-panel';
+import { MediaPanel, MediaStreamPlaceholder, getMediaStreamLabel, type MediaStreamState } from '@/shared/ui/media-panel';
 import { readCollectionVisualPalette } from './collection-visual-palette';
 
 import type {
@@ -23,7 +23,8 @@ interface QuestHandPoseViewerProps {
   readonly className?: string;
   readonly handPose?: CollectionHandPoseTelemetry | null;
   readonly streams?: readonly CollectionStreamTelemetry[];
-  readonly streamState?: 'idle' | 'live' | 'recorded';
+  readonly streamState?: MediaStreamState;
+  readonly availability?: Readonly<Record<Handedness, MediaStreamState>>;
 }
 
 const fallbackRadiusMeters = 0.006;
@@ -41,16 +42,19 @@ function handStateLabel(
   stream: CollectionStreamTelemetry | null,
 ): string {
   const observation = pose?.hands[handedness];
+  if (stream?.connectionState === 'offline') return '연결 끊김';
+  if (stream?.connectionState === 'stale') return '수신 지연';
   if (observation?.poseObserved === true) return '추적';
-  if (observation?.sourcePresent === false || stream?.connectionState === 'offline') return '유실';
+  if (observation?.sourcePresent === false) return '유실';
   return stream?.handTracking?.qualityState === 'tracking'
     ? '추적'
     : stream?.handTracking?.qualityState === 'lost' ? '유실' : '부분';
 }
 
-function stateTone(label: string): 'positive' | 'warning' | 'negative' {
+function stateTone(label: string): 'positive' | 'warning' | 'negative' | 'neutral' {
   if (label === '추적') return 'positive';
-  if (label === '부분') return 'warning';
+  if (label === '부분' || label === '수신 지연') return 'warning';
+  if (label === '수신 대기') return 'neutral';
   return 'negative';
 }
 
@@ -60,10 +64,23 @@ function jointKey(handedness: Handedness, name: string): string {
 
 export function QuestHandPoseViewer({
   className,
-  handPose = null,
+  handPose: receivedPose = null,
   streams = [],
   streamState = 'idle',
+  availability,
 }: QuestHandPoseViewerProps) {
+  const leftAvailability = availability?.left ?? (streamState === 'recorded' ? 'recorded' : handStream(streams, 'left')?.connectionState ?? streamState);
+  const rightAvailability = availability?.right ?? (streamState === 'recorded' ? 'recorded' : handStream(streams, 'right')?.connectionState ?? streamState);
+  const handPose = useMemo(() => {
+    if (receivedPose === null) return null;
+    const leftAvailable = leftAvailability === 'live' || leftAvailability === 'recorded';
+    const rightAvailable = rightAvailability === 'live' || rightAvailability === 'recorded';
+    if (leftAvailable && rightAvailable) return receivedPose;
+    return { ...receivedPose, hands: {
+      left: leftAvailable ? receivedPose.hands.left : { sourcePresent: false, poseObserved: false, joints: [] },
+      right: rightAvailable ? receivedPose.hands.right : { sourcePresent: false, poseObserved: false, joints: [] },
+    } };
+  }, [receivedPose, leftAvailability, rightAvailability]);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const updateSceneRef = useRef<(fitCamera: boolean) => void>(() => undefined);
   const [webGlUnavailable, setWebGlUnavailable] = useState(false);
@@ -238,15 +255,18 @@ export function QuestHandPoseViewer({
 
   const leftStream = handStream(streams, 'left');
   const rightStream = handStream(streams, 'right');
-  const leftState = handStateLabel(handPose, 'left', leftStream);
-  const rightState = handStateLabel(handPose, 'right', rightStream);
+  const leftState = leftAvailability === 'live' || leftAvailability === 'recorded' ? handStateLabel(handPose, 'left', streamState === 'recorded' ? null : leftStream) : getMediaStreamLabel(leftAvailability);
+  const rightState = rightAvailability === 'live' || rightAvailability === 'recorded' ? handStateLabel(handPose, 'right', streamState === 'recorded' ? null : rightStream) : getMediaStreamLabel(rightAvailability);
+  const displayState = leftAvailability === 'recorded' ? 'recorded' : leftAvailability === 'live' || rightAvailability === 'live' ? 'live'
+    : leftAvailability === 'stale' || rightAvailability === 'stale' ? 'stale' : leftAvailability === 'offline' || rightAvailability === 'offline' ? 'offline' : 'idle';
+  const unavailable = displayState === 'idle' || displayState === 'offline' || displayState === 'stale' ? displayState : null;
 
   return (
     <MediaPanel
       aria-label="Quest 손 포즈 3D"
       className={className}
       data-hand-pose-viewer
-      data-stream-state={streamState}
+      data-stream-state={displayState}
       title="손 추적"
       status={(
         <div className="flex flex-wrap items-center gap-2">
@@ -257,13 +277,13 @@ export function QuestHandPoseViewer({
     >
 
       <div className="relative min-h-0">
-        <div className="absolute inset-0" ref={canvasHostRef} />
-        {!hasObservedJoints ? (
+        <div className="absolute inset-0" ref={canvasHostRef} hidden={unavailable !== null} />
+        {unavailable !== null ? <MediaStreamPlaceholder state={unavailable} /> : !hasObservedJoints ? (
           <div className="pointer-events-none absolute inset-0 grid place-items-center p-2 text-center">
             <p className="text-xs font-semibold">손 프레임 대기</p>
           </div>
         ) : null}
-        {webGlUnavailable ? (
+        {webGlUnavailable && unavailable === null ? (
           <p className="absolute inset-x-3 bottom-3 rounded-[var(--design-radius-control)] bg-layer-raised p-2 text-xs text-muted" role="status">
             3D 화면을 표시할 수 없습니다. 브라우저의 그래픽 가속 설정을 확인하세요.
           </p>

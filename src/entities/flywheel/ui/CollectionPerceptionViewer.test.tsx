@@ -5,6 +5,14 @@ import { createCollectionVisuals } from '../api/in-memory-collection-visuals';
 import { CollectionPerceptionViewer } from './CollectionPerceptionViewer';
 
 describe('CollectionPerceptionViewer', () => {
+  it.each(['offline', 'stale', 'idle'] as const)('원본이 %s이면 남아 있는 파생 영상을 숨긴다', (streamState) => {
+    const result = createCollectionVisuals(1, 'rbp-head-rgb').headPerception;
+    const { rerender } = render(<CollectionPerceptionViewer result={result} streamState={streamState} />);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Head RGB Depth와 세그멘테이션' })).toHaveAttribute('data-stream-state', streamState);
+    rerender(<CollectionPerceptionViewer result={result} streamState="live" />);
+    expect(screen.getByAltText('Head RGB 상대 깊이')).toBeVisible();
+  });
   it('결과가 없으면 원본 영상을 추론 결과처럼 보여주지 않는다', () => {
     render(<CollectionPerceptionViewer result={null} />);
     expect(screen.getByText('결과 대기')).toBeVisible();

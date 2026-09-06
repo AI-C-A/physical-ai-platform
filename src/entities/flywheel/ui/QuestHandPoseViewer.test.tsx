@@ -32,6 +32,14 @@ function createPose(): CollectionHandPoseTelemetry {
 }
 
 describe('QuestHandPoseViewer', () => {
+  it.each(['offline', 'stale'] as const)('연결 상태 %s에서는 마지막 정상 포즈를 추적으로 표시하지 않는다', (streamState) => {
+    const { rerender } = render(<QuestHandPoseViewer handPose={createPose()} streamState={streamState} />);
+    expect(screen.queryByText('L 추적')).not.toBeInTheDocument();
+    expect(screen.queryByText('R 추적')).not.toBeInTheDocument();
+    expect(screen.getByText(streamState === 'offline' ? 'L 연결 끊김' : 'L 수신 지연')).toBeVisible();
+    rerender(<QuestHandPoseViewer handPose={createPose()} streamState="recorded" />);
+    expect(screen.getByText('L 추적')).toBeVisible();
+  });
   it('손 추적 상태와 뷰만 표시하고 설정과 관절 상세를 노출하지 않는다', () => {
     const { rerender } = render(<QuestHandPoseViewer handPose={createPose()} streamState="live" />);
     const viewer = screen.getByRole('region', { name: 'Quest 손 포즈 3D' });
@@ -61,7 +69,7 @@ describe('QuestHandPoseViewer', () => {
         left: { sourcePresent: true, poseObserved: false, joints: [] },
         right: { sourcePresent: false, poseObserved: false, joints: [] },
       },
-    }} />);
+    }} streamState="live" />);
 
     expect(screen.getByText('L 부분')).toBeInTheDocument();
     expect(screen.getByText('R 유실')).toBeInTheDocument();

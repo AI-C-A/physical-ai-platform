@@ -264,7 +264,7 @@ describe('SynchronizedPlayer', () => {
     );
 
     expect(screen.queryByLabelText('Head RGB')).not.toBeInTheDocument();
-    expect(screen.getByText('오프라인')).toBeVisible();
-    expect(screen.getByText('연결 및 전원 상태를 확인하세요.')).toBeVisible();
+    expect(screen.getAllByText('연결 끊김')).toHaveLength(2);
+    expect(screen.getByText('연결과 전원 상태를 확인하세요.')).toBeVisible();
   });
 });
