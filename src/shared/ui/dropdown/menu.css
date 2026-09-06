@@ -1,0 +1,3 @@
+.design-motion-menu {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
