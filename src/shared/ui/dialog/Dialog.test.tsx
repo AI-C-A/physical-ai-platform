@@ -1,12 +1,52 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { Button } from '@/shared/ui/button';
 
 import { Dialog } from './Dialog';
 
 describe('Dialog', () => {
+  it('Content가 제거된 뒤 닫기 완료를 한 번 알린다', async () => {
+    const user = userEvent.setup();
+    const onAfterClose = vi.fn(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    render(<Dialog title="상세" onAfterClose={onAfterClose} trigger={<Button>열기</Button>} />);
+    await user.click(screen.getByRole('button', { name: '열기' }));
+    expect(onAfterClose).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(onAfterClose).toHaveBeenCalledOnce());
+  });
+
+  it('열린 채 부모가 제거되면 닫기 후 라우팅을 실행하지 않는다', async () => {
+    const onAfterClose = vi.fn();
+    const onCloseAutoFocus = vi.fn();
+    const { unmount } = render(<Dialog open title="상세" onAfterClose={onAfterClose} onCloseAutoFocus={onCloseAutoFocus} />);
+    unmount();
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalled());
+    expect(onAfterClose).not.toHaveBeenCalled();
+  });
+
+  it('처리 중에는 Escape로도 닫히지 않는다', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(<Dialog open cancelDisabled title="처리 중" onOpenChange={onOpenChange} />);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('닫히는 도중 부모가 제거되면 오래된 완료 콜백을 취소한다', async () => {
+    const onAfterClose = vi.fn();
+    const onCloseAutoFocus = vi.fn();
+    const { rerender, unmount } = render(<Dialog open title="상세" onAfterClose={onAfterClose} onCloseAutoFocus={onCloseAutoFocus} />);
+    rerender(<Dialog open={false} title="상세" onAfterClose={onAfterClose} onCloseAutoFocus={onCloseAutoFocus} />);
+    unmount();
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalled());
+    expect(onAfterClose).not.toHaveBeenCalled();
+  });
+
   it('닫힌 뒤 포커스를 trigger로 복귀시킨다', async () => {
     const user = userEvent.setup();
     render(

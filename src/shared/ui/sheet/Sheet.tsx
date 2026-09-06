@@ -2,11 +2,13 @@ import type { ComponentProps, ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 
 import { cn } from '@/shared/ui/class-names';
+import { Button } from '@/shared/ui/button';
 import { Icon } from '@/shared/ui/icon';
 import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 
 interface SheetProps {
   readonly children: ReactNode;
+  readonly hideTitle?: boolean;
   readonly onCloseAutoFocus?: ComponentProps<typeof Dialog.Content>['onCloseAutoFocus'];
   readonly onOpenChange?: (open: boolean) => void;
   readonly open?: boolean;
@@ -14,7 +16,7 @@ interface SheetProps {
   readonly trigger: ReactNode;
 }
 
-export function Sheet({ children, onCloseAutoFocus, onOpenChange, open, title, trigger }: SheetProps) {
+export function Sheet({ children, hideTitle = false, onCloseAutoFocus, onOpenChange, open, title, trigger }: SheetProps) {
   return (
     <Dialog.Root
       {...(onOpenChange === undefined ? {} : { onOpenChange })}
@@ -32,9 +34,11 @@ export function Sheet({ children, onCloseAutoFocus, onOpenChange, open, title, t
           onCloseAutoFocus={onCloseAutoFocus}
         >
           <div className="flex items-center justify-between gap-4">
-            <Dialog.Title className="font-bold text-foreground">{title}</Dialog.Title>
-            <Dialog.Close className="rounded p-2 text-sm hover:bg-action-secondary-hover" aria-label="메뉴 닫기">
-              <Icon name="close" />
+            <Dialog.Title className={hideTitle ? 'sr-only' : 'font-bold text-foreground'}>{title}</Dialog.Title>
+            <Dialog.Close asChild>
+              <Button aria-label="메뉴 닫기" className="ml-auto size-11 shrink-0 p-0" variant="ghost">
+                <Icon name="close" />
+              </Button>
             </Dialog.Close>
           </div>
           <div className="mt-5 min-h-0 flex-1">{children}</div>
