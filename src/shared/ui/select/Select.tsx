@@ -2,6 +2,7 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 
 import { cn } from '@/shared/ui/class-names';
 import { Icon, type IconName } from '@/shared/ui/icon';
+import { getFieldClassName, type FieldSize, type FieldSurface } from '@/shared/ui/input';
 import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 
 export interface SelectOption {
@@ -11,8 +12,8 @@ export interface SelectOption {
 
 interface SelectProps {
   readonly className?: string;
-  readonly contentClassName?: string;
-  readonly itemClassName?: string;
+  readonly controlSize?: FieldSize;
+  readonly surface?: FieldSurface;
   readonly leadingIcon?: IconName;
   readonly label: string;
   readonly value: string;
@@ -21,13 +22,12 @@ interface SelectProps {
   readonly placeholder?: string;
   readonly onValueChange: (value: string) => void;
   readonly showLabel?: boolean;
-  readonly triggerClassName?: string;
 }
 
 export function Select({
   className,
-  contentClassName,
-  itemClassName,
+  controlSize = 'default',
+  surface = 'default',
   leadingIcon,
   label,
   value,
@@ -36,12 +36,11 @@ export function Select({
   placeholder,
   onValueChange,
   showLabel = true,
-  triggerClassName,
 }: SelectProps) {
   return (
-    <div className={cn('grid min-w-40 gap-1.5', className)}>
+    <div className={cn('ui-field-group grid min-w-40 gap-1.5', className)}>
       {showLabel ? (
-        <span className="text-sm font-medium text-foreground">
+        <span className="ui-field-label text-sm font-medium">
           {label}
         </span>
       ) : null}
@@ -53,9 +52,10 @@ export function Select({
         <SelectPrimitive.Trigger
           aria-label={label}
           className={cn(
-            'flex min-h-[var(--layout-control-height)] w-full items-center justify-between gap-3 rounded-[var(--design-radius-control)] border border-border bg-layer-base px-3 py-2 text-left text-sm text-foreground disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-muted',
-            triggerClassName,
+            getFieldClassName(controlSize, surface),
+            'ui-pressable ui-pressable--subtle flex items-center justify-between gap-3 text-left',
           )}
+          data-surface={surface}
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
             {leadingIcon === undefined ? null : (
@@ -63,7 +63,7 @@ export function Select({
             )}
             <SelectPrimitive.Value placeholder={placeholder} />
           </span>
-          <SelectPrimitive.Icon aria-hidden="true">
+          <SelectPrimitive.Icon aria-hidden="true" className="design-motion-disclosure">
             <Icon name="chevron-down" />
           </SelectPrimitive.Icon>
         </SelectPrimitive.Trigger>
@@ -71,8 +71,7 @@ export function Select({
           <SelectPrimitive.Content
             aria-label={`${label} 선택`}
             className={cn(
-              'z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[var(--design-radius-control)] border-0 p-1 text-foreground',
-              contentClassName,
+              'design-motion-select ui-menu-surface z-[var(--design-z-popover)] max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1.5rem)] overflow-hidden',
               getFloatingSurfaceClassName(),
             )}
             collisionPadding={12}
@@ -83,8 +82,7 @@ export function Select({
               {options.map((option) => (
                 <SelectPrimitive.Item
                   className={cn(
-                    'relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-sm text-foreground outline-none data-[highlighted]:bg-action-secondary-hover data-[disabled]:opacity-50',
-                    itemClassName,
+                    'ui-pressable ui-pressable--subtle ui-menu-item relative flex select-none items-center py-2 pr-9 pl-3 text-sm',
                   )}
                   key={option.value}
                   value={option.value}

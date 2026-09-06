@@ -9,13 +9,13 @@ import { Button } from '@/shared/ui/button';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
+import { getOverlaySurfaceClassName } from '@/shared/ui/surface';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './control-monitoring.css';
 import { getRobotMapLocation, type FleetMapLocation, type RobotMapLocation } from '../model/monitoring-map-locations';
 
-export const mapOverlaySurfaceClassName =
-  'border-0 bg-surface-muted/[0.88] shadow-xl backdrop-blur-xl';
+const mapOverlaySurfaceClassName = getOverlaySurfaceClassName();
 
 function MonitoringMap({
   fleetLocations,

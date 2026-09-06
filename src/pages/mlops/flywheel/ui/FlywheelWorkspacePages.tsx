@@ -1106,7 +1106,6 @@ export function CollectionWorkspacePage() {
               <div className="grid min-w-0 gap-3 @min-[30rem]:grid-cols-2 @min-[58rem]:grid-cols-[minmax(14rem,1.5fr)_repeat(3,minmax(0,1fr))]">
                 <Input
                   className="min-w-0 flex-1"
-                  inputClassName="text-base sm:text-sm"
                   label="수집 검색"
                   leadingIcon="search"
                   onChange={(event) => setFilter('q', event.target.value)}

@@ -74,12 +74,12 @@ describe('Select', () => {
     );
   });
 
-  it('열린 목록과 항목에 화면별 표면 스타일을 적용한다', async () => {
+  it('overlay와 큰 조작 영역을 선택해도 열린 메뉴는 공통 표면을 유지한다', async () => {
     const user = userEvent.setup();
     render(
       <Select
-        contentClassName="rounded-2xl border-0 bg-white/80 shadow-none backdrop-blur-none"
-        itemClassName="rounded-xl"
+        surface="overlay"
+        controlSize="large"
         label="사이트"
         onValueChange={vi.fn()}
         options={[{ label: '판교', value: 'pangyo' }]}
@@ -88,18 +88,19 @@ describe('Select', () => {
     );
 
     const trigger = screen.getByRole('combobox', { name: '사이트' });
+    expect(trigger).toHaveAttribute('data-surface', 'overlay');
+    expect(trigger).toHaveClass('min-h-[var(--layout-control-height-large)]');
     trigger.focus();
     await user.keyboard('{ArrowDown}');
 
     expect(screen.getByRole('listbox', { name: '사이트 선택' })).toHaveClass(
-      'rounded-2xl',
-      'border-0',
+      'ui-menu-surface',
       'bg-layer-floating',
       'shadow-lg',
       'backdrop-blur-[var(--design-backdrop-blur-floating)]',
     );
     expect(screen.getByRole('option', { name: '판교' })).toHaveClass(
-      'rounded-xl',
+      'ui-menu-item',
     );
   });
 });

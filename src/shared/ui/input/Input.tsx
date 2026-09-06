@@ -1,11 +1,14 @@
-import { useId, type InputHTMLAttributes, type Ref } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
 
 import { cn } from '@/shared/ui/class-names';
 import { Icon, type IconName } from '@/shared/ui/icon';
+import { getFieldClassName, type FieldSize, type FieldSurface } from './field-styles';
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   readonly leadingIcon?: IconName;
-  readonly inputClassName?: string;
+  readonly controlSize?: FieldSize;
+  readonly surface?: FieldSurface;
+  readonly endAdornment?: ReactNode;
   readonly inputRef?: Ref<HTMLInputElement>;
   readonly label: string;
   readonly error?: string;
@@ -16,9 +19,11 @@ export function Input({
   'aria-describedby': describedBy,
   'aria-invalid': invalid,
   className,
+  controlSize = 'default',
+  surface = 'default',
+  endAdornment,
   error,
   id,
-  inputClassName,
   inputRef,
   label,
   leadingIcon,
@@ -30,8 +35,8 @@ export function Input({
   const errorId = `${inputId}-error`;
 
   return (
-    <div className={cn('grid gap-1.5 text-sm font-medium text-foreground', className)}>
-      <label className={showLabel ? undefined : 'sr-only'} htmlFor={inputId}>{label}</label>
+    <div className={cn('ui-field-group grid gap-1.5 text-sm font-medium', className)}>
+      <label className={cn('ui-field-label', !showLabel && 'sr-only')} htmlFor={inputId}>{label}</label>
       <span className="relative">
         {leadingIcon === undefined ? null : (
           <span
@@ -45,14 +50,16 @@ export function Input({
           aria-describedby={[describedBy, error === undefined ? undefined : errorId].filter(Boolean).join(' ') || undefined}
           aria-invalid={error === undefined ? invalid : true}
           className={cn(
-            'min-h-[var(--layout-control-height)] w-full rounded-[var(--design-radius-control)] border border-border bg-layer-base px-3 py-2 font-normal text-foreground placeholder:text-muted disabled:cursor-not-allowed disabled:bg-surface-muted',
+            getFieldClassName(controlSize, surface),
             leadingIcon === undefined ? undefined : 'pl-9',
-            inputClassName,
+            endAdornment && 'pr-11',
           )}
+          data-surface={surface}
           id={inputId}
           ref={inputRef}
           {...props}
         />
+        {endAdornment ? <span className="absolute inset-y-0 right-1 flex items-center">{endAdornment}</span> : null}
       </span>
       {error === undefined ? null : (
         <span className="font-normal text-negative" id={errorId}>

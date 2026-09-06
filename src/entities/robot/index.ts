@@ -33,6 +33,7 @@ export {
   useRobotOperationalStatuses,
 } from './model/use-robot-operational-status';
 export type { RobotCatalogPort, RobotQuery } from './model/robot-catalog';
+export { RobotCatalogAccessError } from './model/robot-catalog';
 export { PatrolApiStatusCheckError } from './model/patrol-api-status';
 export type { PatrolApiStatusPort } from './model/patrol-api-status';
 export type {

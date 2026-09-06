@@ -13,7 +13,7 @@ import {
 import { Button, getButtonClassName } from '@/shared/ui/button';
 import { ColorSchemeArea } from '@/shared/ui/color-scheme';
 import { Icon } from '@/shared/ui/icon';
-import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Sheet } from '@/shared/ui/sheet';
 
@@ -100,12 +100,10 @@ function ConfigurationSheet({
       )}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <Input
+        <SearchField
           label="로봇 검색"
-          leadingIcon="search"
-          onChange={(event) => setSearch(event.target.value)}
+          onValueChange={(value) => setSearch(value)}
           placeholder="이름, ID 또는 기체 번호"
-          role="searchbox"
           showLabel={false}
           value={search}
         />
