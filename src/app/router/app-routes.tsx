@@ -2,6 +2,7 @@ import { lazy, type PropsWithChildren } from 'react';
 import {
   Navigate,
   useLocation,
+  useViewTransitionState,
   type RouteObject,
 } from 'react-router-dom';
 
@@ -116,6 +117,21 @@ function MonitoringMorphRoute({ children }: PropsWithChildren) {
   );
 }
 
+function PlatformShellRoute() {
+  const transitioning = useViewTransitionState('/*');
+  const collectionTransition = useViewTransitionState('/mlops/collection/:sessionId');
+  const monitoringTransition = useViewTransitionState('/control/monitoring/:monitorId');
+
+  return (
+    <RouteMorphProvider>
+      <PlatformShell
+        miniApps={MINI_APP_REGISTRY}
+        navigationTransition={transitioning && !collectionTransition && !monitoringTransition}
+      />
+    </RouteMorphProvider>
+  );
+}
+
 export const APP_ROUTES: RouteObject[] = [
   {
     path: ROUTE_PATHS.collectQuest,
@@ -124,11 +140,7 @@ export const APP_ROUTES: RouteObject[] = [
   },
   {
     path: ROUTE_PATHS.root,
-    element: (
-      <RouteMorphProvider>
-        <PlatformShell miniApps={MINI_APP_REGISTRY} />
-      </RouteMorphProvider>
-    ),
+    element: <PlatformShellRoute />,
     errorElement: <RouteErrorBoundary />,
     children: [
       {

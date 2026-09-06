@@ -1,0 +1,46 @@
+[data-sidebar-page-transition] .platform-shell-content {
+  view-transition-name: sidebar-page;
+}
+
+:root:has([data-sidebar-page-transition]) {
+  view-transition-name: none;
+}
+
+:root:has([data-sidebar-page-transition])::view-transition,
+:root:has([data-sidebar-page-transition])::view-transition-group(*),
+:root:has([data-sidebar-page-transition])::view-transition-image-pair(*),
+:root:has([data-sidebar-page-transition])::view-transition-old(*),
+:root:has([data-sidebar-page-transition])::view-transition-new(*) {
+  pointer-events: none;
+}
+
+::view-transition-group(sidebar-page) {
+  animation: none;
+}
+
+::view-transition-old(sidebar-page),
+::view-transition-new(sidebar-page) {
+  width: 100%;
+  height: 100%;
+  object-fit: none;
+  object-position: top left;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(sidebar-page) {
+  animation: sidebar-page-out var(--design-motion-navigation-exit) var(--design-ease-exit) both;
+}
+
+::view-transition-new(sidebar-page) {
+  animation: sidebar-page-in var(--design-motion-navigation-enter) var(--design-motion-navigation-exit) var(--design-ease-enter) both;
+}
+
+@keyframes sidebar-page-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes sidebar-page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

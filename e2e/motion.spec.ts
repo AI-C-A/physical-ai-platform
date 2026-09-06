@@ -6,6 +6,138 @@ import { expectApplicationReady } from './browser-assertions';
 import { fillCollectionSetup } from './collection-setup';
 
 for (const width of [1440, 390]) {
+  test(`사이드바 메뉴는 본문만 전환하고 재선택·모바일 닫기·히스토리를 유지한다 (${String(width)}px)`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/mlops/collection?siteId=site-lab');
+    await expectApplicationReady(page);
+    await page.evaluate(() => {
+      const original = document.startViewTransition.bind(document);
+      document.startViewTransition = ((update) => {
+        const transition = original(update);
+        void transition.ready.then(() => {
+          const animations = document.getAnimations().filter((animation) => (
+            animation instanceof CSSAnimation && animation.animationName.startsWith('sidebar-page-')
+          ));
+          if (animations.length === 0) return;
+          for (const animation of animations) {
+            animation.pause();
+            animation.currentTime = 140;
+          }
+          document.documentElement.dataset.sidebarMotionCount = String(Number(document.documentElement.dataset.sidebarMotionCount ?? 0) + 1);
+        }, () => undefined);
+        return transition;
+      }) as typeof document.startViewTransition;
+    });
+    const selectMenu = async (name: string) => {
+      if (width < 1024) {
+        await page.getByRole('button', { name: '업무 메뉴 열기', exact: true }).click();
+        await page.getByRole('dialog').getByRole('link', { name, exact: true }).click();
+      } else {
+        await page.getByRole('link', { name, exact: true }).click();
+      }
+    };
+    const finishTransition = async () => {
+      await page.evaluate(async () => {
+        const transition = document.activeViewTransition;
+        for (const animation of document.getAnimations()) {
+          if (animation instanceof CSSAnimation && animation.animationName.startsWith('sidebar-page-')) animation.finish();
+        }
+        await transition?.finished;
+      });
+      await expect(page.locator('[data-sidebar-page-transition]')).toHaveCount(0);
+    };
+    const fixedSurface = width >= 1024 ? page.locator('.platform-shell-sidebar') : page.locator('header').first();
+    const originalBounds = await fixedSurface.boundingBox();
+
+    if (width < 1024) {
+      await page.getByRole('button', { name: '업무 메뉴 열기', exact: true }).click();
+      const sheet = page.getByRole('dialog');
+      await sheet.evaluate((element) => {
+        element.addEventListener('animationstart', (event) => {
+          if ((event as AnimationEvent).animationName !== 'design-motion-sheet-out') return;
+          element.getAnimations().forEach((animation) => { animation.pause(); animation.currentTime = 70; });
+        });
+      });
+      await sheet.getByRole('link', { name: '데이터 카탈로그', exact: true }).click();
+      await expect(sheet).toHaveAttribute('data-state', 'closed');
+      await expect.poll(() => sheet.evaluate((element) => element.getAnimations().some((animation) => animation.playState === 'paused'))).toBe(true);
+      await expect(page).toHaveURL('/mlops/collection?siteId=site-lab');
+      await sheet.evaluate((element) => element.getAnimations().forEach((animation) => animation.finish()));
+    } else {
+      const link = page.getByRole('link', { name: '데이터 카탈로그', exact: true });
+      await link.focus();
+      await link.press('Enter');
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '1');
+    await expect(page).toHaveURL('/mlops/catalog?siteId=site-lab');
+    expect(await fixedSurface.boundingBox()).toEqual(originalBounds);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const styles = await page.evaluate(() => {
+      const root = document.documentElement;
+      const oldPage = getComputedStyle(root, '::view-transition-old(sidebar-page)');
+      const newPage = getComputedStyle(root, '::view-transition-new(sidebar-page)');
+      return {
+        oldDuration: oldPage.animationDuration,
+        newDuration: newPage.animationDuration,
+        newDelay: newPage.animationDelay,
+        oldOpacity: oldPage.opacity,
+        rootAnimation: getComputedStyle(root, '::view-transition-new(root)').animationName,
+        pageTransform: newPage.transform,
+      };
+    });
+    expect(styles).toEqual({ oldDuration: '0.09s', newDuration: '0.15s', newDelay: '0.09s', oldOpacity: '0', rootAnimation: 'none', pageTransform: 'none' });
+    await testInfo.attach(`sidebar-page-${String(width)}`, { body: await page.screenshot(), contentType: 'image/png' });
+    await finishTransition();
+    await expect(page.getByRole('main')).toBeFocused();
+
+    await selectMenu('데이터 카탈로그');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('[data-sidebar-page-transition]')).toHaveCount(0);
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '1');
+    await page.goBack();
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '2');
+    await finishTransition();
+    await page.goForward();
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '3');
+    await finishTransition();
+
+    if (width >= 1024) {
+      await page.getByRole('button', { name: '사이드바 접기', exact: true }).click();
+      await expect(page.locator('.platform-shell-sidebar')).toHaveCSS('width', '56px');
+    }
+    await selectMenu('데이터셋');
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '4');
+    await finishTransition();
+    if (width >= 1024) {
+      await expect(page.getByRole('link', { name: '데이터셋', exact: true })).toHaveAttribute('aria-current', 'page');
+    }
+
+    let completedTransitions = 4;
+    if (width >= 1024) {
+      await selectMenu('수집');
+      await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '5');
+      await selectMenu('데이터 카탈로그');
+      await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', '6');
+      await finishTransition();
+      await expect(page).toHaveURL('/mlops/catalog?siteId=site-lab');
+      completedTransitions = 6;
+    }
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await selectMenu('설정');
+    await expect(page).toHaveURL('/mlops/settings?siteId=site-lab');
+    await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', String(completedTransitions + 1));
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::view-transition-new(sidebar-page)').animationDuration)).toBe('0.001s');
+    await finishTransition();
+    await page.evaluate(() => { Object.defineProperty(document, 'startViewTransition', { configurable: true, value: undefined }); });
+    await selectMenu('수집');
+    await expect(page).toHaveURL('/mlops/collection?siteId=site-lab');
+    await expect(page.locator('[data-sidebar-page-transition]')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+for (const width of [1440, 390]) {
   test(`수집 페이지는 진입·복귀·히스토리에 방향 있는 전환을 적용한다 (${String(width)}px)`, async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width, height: 900 });

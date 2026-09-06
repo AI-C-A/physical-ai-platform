@@ -426,9 +426,9 @@ describe('PlatformShell', () => {
     expect(screen.queryByRole('dialog', {
       name: 'ROBOT Army TIGER+ 메뉴',
     })).not.toBeInTheDocument();
-    expect(screen.getByTestId('current-location')).toHaveTextContent(
+    await waitFor(() => expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/mlops/settings',
-    );
+    ));
     await waitFor(() => expect(screen.getByRole('main')).toHaveFocus());
   });
 

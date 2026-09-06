@@ -177,6 +177,10 @@
 
 ## 라우트 Morph 전환
 
+- 사이드바의 동급 업무·설정 메뉴와 미니앱 전환은 본문에만 fade-through를 적용한다. 기존 본문은 90ms에 사라지고 다음 본문이 이어서 150ms 동안 나타난다. 두 본문의 글자가 겹치지 않으며 사이드바와 모바일 헤더의 위치는 고정된다.
+- `PlatformShellRoute`는 Router의 전환 상태가 활성화된 동안에만 본문을 `sidebar-page` snapshot으로 분리한다. 수집 콘솔·관제 모핑에는 이 이름을 부여하지 않는다. 같은 경로 재선택에는 전환을 생략하고 모바일 업무 메뉴는 Sheet가 닫힌 다음 탐색한다. 빠른 재선택과 히스토리는 Router가 전환 수명을 관리한다.
+- 사이드바 전환의 시간은 `--design-motion-navigation-exit/enter` 토큰으로 관리한다. reduced motion에서는 각각 1ms로 줄이며 View Transitions 미지원 환경은 일반 탐색으로 동작한다.
+
 - 데이터 수집 목록(새 수집·Quest 연결 모달 포함)과 전체 화면 수집 콘솔 사이에는 별도의 페이지 계층 전환을 사용한다. 목록은 뒤로 조금 물러나고 콘솔은 오른쪽에서 진입하며, 복귀는 반대 방향으로 진행한다. 세션을 삭제하거나 직접 URL로 진입해도 특정 목록 항목을 필요로 하지 않는다.
 - 해당 `Link`·`navigate`의 `viewTransition` 옵션과 PlatformShell의 `useCollectionPageTransition`을 연결한다. 진입은 `--design-motion-page-enter`(360ms), 복귀는 `--design-motion-page-exit`(280ms), 곡선은 `--design-ease-route`다. 전환 중 본문의 사이드바 여백은 즉시 확정해 snapshot 안에서 본문이 다시 밀리지 않게 한다.
 - 새 수집·Quest 모달 사이의 이동과 검색·필터 변경에는 페이지 전환을 적용하지 않는다. reduced motion에서는 이동·확대를 없애고 1ms 페이드로 줄이며, View Transitions 미지원 브라우저는 일반 탐색을 유지한다.

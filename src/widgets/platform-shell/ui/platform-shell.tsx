@@ -1,10 +1,13 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import {
   Link,
   NavLink,
   Outlet,
+  createPath,
+  resolvePath,
   useLocation,
   useNavigate,
+  type To,
 } from 'react-router-dom';
 
 import { useBranding } from '@/shared/config';
@@ -21,6 +24,7 @@ import { AppLauncher } from './AppLauncher';
 import { useCollectionPageTransition } from './use-collection-page-transition';
 import './platform-shell.css';
 import './collection-page-transition.css';
+import './sidebar-page-transition.css';
 
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
@@ -52,6 +56,16 @@ export interface MiniAppNavigationItem {
 
 interface PlatformShellProps {
   readonly miniApps: readonly MiniAppNavigationItem[];
+  readonly navigationTransition?: boolean;
+}
+
+function deferMobileNavigation(event: MouseEvent<HTMLAnchorElement>, to: To, onNavigate?: (to: To) => void): void {
+  if (
+    onNavigate === undefined || event.defaultPrevented || event.button !== 0
+    || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+  ) return;
+  event.preventDefault();
+  onNavigate(to);
 }
 
 function getMatchingNavigationPath(
@@ -148,6 +162,7 @@ function Brand({ compact }: { readonly compact: boolean }) {
         pathname: '/control/monitoring',
         search: siteSelectionSearch,
       }}
+      viewTransition={location.pathname !== '/control/monitoring'}
     >
       {branding.logo === null ? (
         <span
@@ -181,7 +196,7 @@ function MiniAppHeader({
 }: {
   readonly currentMiniApp: MiniAppNavigationItem;
   readonly miniApps: readonly MiniAppNavigationItem[];
-  readonly onNavigate?: () => void;
+  readonly onNavigate?: (to: To) => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -192,11 +207,12 @@ function MiniAppHeader({
         currentMiniApp={currentMiniApp}
         miniApps={miniApps}
         onSelect={(miniApp) => {
-          void navigate({
+          const destination = {
             pathname: miniApp.homePath,
             search: getSiteSelectionSearch(location.search),
-          });
-          onNavigate?.();
+          };
+          if (onNavigate !== undefined) onNavigate(destination);
+          else void navigate(destination, { viewTransition: true });
         }}
       />
     </div>
@@ -210,7 +226,7 @@ function InnerNavigation({
 }: {
   readonly collapsed: boolean;
   readonly items: MiniAppNavigationItem['items'];
-  readonly onNavigate?: () => void;
+  readonly onNavigate?: (to: To) => void;
 }) {
   return (
     <nav
@@ -248,7 +264,7 @@ function NavigationGroup({
 }: {
   readonly collapsed: boolean;
   readonly group: MiniAppNavigationGroup;
-  readonly onNavigate?: () => void;
+  readonly onNavigate?: (to: To) => void;
 }) {
   return (
     <section aria-label={group.label} className="mt-6 min-w-0 first:mt-0">
@@ -289,18 +305,20 @@ function NavigationLink({
 }: {
   readonly collapsed: boolean;
   readonly item: MiniAppNavigationChild;
-  readonly onNavigate?: () => void;
+  readonly onNavigate?: (to: To) => void;
 }) {
   const location = useLocation();
   const siteSelectionSearch = getSiteSelectionSearch(location.search);
   const isActive = isNavigationItemActive(location.pathname, item);
+  const destination = { pathname: item.path, search: siteSelectionSearch };
   const link = (
     <Link
       aria-current={isActive ? 'page' : undefined}
       aria-label={item.label}
       className={getNavigationClassName(isActive)}
-      onClick={onNavigate}
-      to={{ pathname: item.path, search: siteSelectionSearch }}
+      onClick={(event) => deferMobileNavigation(event, destination, onNavigate)}
+      to={destination}
+      viewTransition={location.pathname !== item.path}
     >
       <span className="shrink-0">
         <Icon name={item.icon} />
@@ -319,21 +337,20 @@ function SettingsNavigation({
   path,
 }: {
   readonly collapsed: boolean;
-  readonly onNavigate?: () => void;
+  readonly onNavigate?: (to: To) => void;
   readonly path: string;
 }) {
   const location = useLocation();
   const siteSelectionSearch = getSiteSelectionSearch(location.search);
   const isActive = location.pathname === path;
+  const destination = { pathname: path, search: siteSelectionSearch };
   const link = (
     <NavLink
       aria-label="설정"
       className={getNavigationClassName(isActive)}
-      onClick={onNavigate}
-      to={{
-        pathname: path,
-        search: siteSelectionSearch,
-      }}
+      onClick={(event) => deferMobileNavigation(event, destination, onNavigate)}
+      to={destination}
+      viewTransition={!isActive}
     >
       <span className="shrink-0">
         <Icon name="settings" />
@@ -347,18 +364,21 @@ function SettingsNavigation({
   return <Tooltip content="설정" disabled={!collapsed} trigger={link} />;
 }
 
-export function PlatformShell({ miniApps }: PlatformShellProps) {
+export function PlatformShell({ miniApps, navigationTransition = false }: PlatformShellProps) {
   const branding = useBranding();
   const location = useLocation();
+  const navigate = useNavigate();
   const mainContentRef = useRef<HTMLElement>(null);
   const mobileMenuNavigationRef = useRef(false);
+  const pendingMobileDestinationRef = useRef<To | null>(null);
   const previousPathnameRef = useRef<string | null>(null);
   useCollectionPageTransition(location.pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     readSidebarCollapsed,
   );
-  const closeMobileMenuForNavigation = () => {
+  const closeMobileMenuForNavigation = (to: To) => {
+    pendingMobileDestinationRef.current = to;
     mobileMenuNavigationRef.current = true;
     setMobileMenuOpen(false);
   };
@@ -433,7 +453,10 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background text-foreground">
+      <div
+        className="min-h-screen bg-background text-foreground"
+        data-sidebar-page-transition={navigationTransition ? '' : undefined}
+      >
         <a
           className={cn(
             'sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--design-radius-control)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:ring-2 focus:ring-focus',
@@ -453,6 +476,15 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                   if (!mobileMenuNavigationRef.current) return;
                   event.preventDefault();
                   mobileMenuNavigationRef.current = false;
+                  const destination = pendingMobileDestinationRef.current;
+                  pendingMobileDestinationRef.current = null;
+                  if (destination !== null) {
+                    const next = resolvePath(destination, location.pathname);
+                    void navigate(destination, {
+                      replace: createPath(next) === createPath(location),
+                      viewTransition: next.pathname !== location.pathname,
+                    });
+                  }
                   mainContentRef.current?.focus();
                 }}
                 onOpenChange={(open) => {

@@ -39,6 +39,8 @@
   --design-motion-route: 550ms;
   --design-motion-page-enter: 360ms;
   --design-motion-page-exit: 280ms;
+  --design-motion-navigation-exit: 90ms;
+  --design-motion-navigation-enter: 150ms;
   --design-motion-press: 180ms;
   --design-motion-release: 280ms;
   --design-motion-enter: 280ms;
@@ -87,6 +89,8 @@
     --design-motion-route: 1ms;
     --design-motion-page-enter: 1ms;
     --design-motion-page-exit: 1ms;
+    --design-motion-navigation-exit: 1ms;
+    --design-motion-navigation-enter: 1ms;
     --design-motion-press: 1ms;
     --design-motion-release: 1ms;
     --design-motion-enter: 1ms;
