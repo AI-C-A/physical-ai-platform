@@ -636,63 +636,63 @@ function CollectionStreamsSection({ telemetry, questConnection }: {
   const derived = streams.filter((stream) => stream.origin === 'derived');
   const questStreams = required.filter((stream) => stream.streamId === 'quest-hand-left' || stream.streamId === 'quest-hand-right');
 
-  const renderStream = (stream: CollectionStreamTelemetry, showDeviceId = true) => (
-    <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 text-xs" key={stream.streamId}>
-      <div className="min-w-0">
-        <StatusIndicator
-          className="max-w-full text-xs"
-          label={stream.displayName}
-          tone={streamHealthTone(stream)}
-          title={stream.displayName}
-        />
-        {!showDeviceId || stream.sourceDeviceId == null ? null : <p className="mt-1 wrap-anywhere font-mono text-xs text-muted">{stream.sourceDeviceId}</p>}
-        <p className="mt-1 break-words text-xs leading-relaxed tabular-nums text-muted">
-          {stream.lastSampleAtMs === null ? '수신 기록 없음' : `${formatRelativeTime(stream.lastSampleAtMs)} 수신`}
+  const renderStream = (stream: CollectionStreamTelemetry) => (
+    <details className="collection-disclosure collection-stream text-xs" key={stream.streamId}>
+      <summary aria-label={`${stream.displayName} ${stream.origin === 'derived' ? '처리 상세' : '수신 상세'}`}>
+      <span className="min-w-0">
+        <span className="block break-words leading-relaxed text-foreground">{stream.displayName}</span>
+        <span className="mt-1 block break-words text-xs leading-relaxed tabular-nums text-warning empty:hidden">
           {stream.droppedFrameCount + stream.missingSampleCount === 0
             ? ''
-            : ` · 프레임 손실 ${String(stream.droppedFrameCount)} · 샘플 누락 ${String(stream.missingSampleCount)}`}
-          {stream.handTracking === null || stream.handTracking === undefined || (stream.handTracking.validJointCount === 25 && stream.handTracking.consecutiveMissingMs === 0)
+            : `프레임 손실 ${String(stream.droppedFrameCount)} · 샘플 누락 ${String(stream.missingSampleCount)}`}
+        </span>
+        <span className="mt-1 block break-words text-xs leading-relaxed tabular-nums text-warning empty:hidden">
+          {stream.handTracking == null || (stream.handTracking.validJointCount === 25 && stream.handTracking.consecutiveMissingMs === 0)
             ? ''
-            : ` · 유효 관절 ${String(stream.handTracking.validJointCount)}/25 · 연속 누락 ${String(stream.handTracking.consecutiveMissingMs)} ms`}
-        </p>
-      </div>
-      <div className="text-right">
-        <p className={`text-xs font-semibold ${streamHealthTone(stream) === 'positive' ? 'text-positive' : streamHealthTone(stream) === 'warning' ? 'text-warning' : streamHealthTone(stream) === 'negative' ? 'text-negative' : 'text-muted'}`}>
+            : `유효 관절 ${String(stream.handTracking.validJointCount)}/25 · 연속 누락 ${String(stream.handTracking.consecutiveMissingMs)} ms`}
+        </span>
+        {stream.lastSampleAtMs === null || stream.driftMs === null || telemetry === null || Math.abs(stream.driftMs) <= telemetry.sync.toleranceMs ? null : (
+          <span className="mt-1 block text-xs tabular-nums text-warning">시간 차이 {stream.driftMs.toFixed(1)} ms · 허용 범위 초과</span>
+        )}
+      </span>
+      <span className="text-right">
+        <span className={`block text-xs font-semibold ${streamHealthTone(stream) === 'positive' ? 'text-positive' : streamHealthTone(stream) === 'warning' ? 'text-warning' : streamHealthTone(stream) === 'negative' ? 'text-negative' : 'text-muted'}`}>
           {streamHealthLabel(stream)}
-        </p>
-        <p className="text-xs tabular-nums text-muted">{rateLabel(stream)}</p>
-      </div>
-      {stream.origin === 'derived' ? null : (
-        <p className={`col-span-2 text-xs tabular-nums ${stream.lastSampleAtMs !== null && stream.driftMs !== null && telemetry !== null && Math.abs(stream.driftMs) > telemetry.sync.toleranceMs ? 'text-warning' : 'text-muted'}`}>
+        </span>
+        {stream.origin === 'derived' ? null : <span className="block text-xs tabular-nums text-muted">{rateLabel(stream)}</span>}
+      </span>
+      </summary>
+        <div className="flex flex-col gap-2 pb-3 text-muted">
+          {stream.sourceDeviceId == null ? null : <p className="wrap-anywhere">장치 <span className="font-mono">{stream.sourceDeviceId}</span></p>}
+          <p>{stream.lastSampleAtMs === null ? '수신 기록 없음' : `${formatRelativeTime(stream.lastSampleAtMs)} 수신`}</p>
+          {stream.origin === 'derived' ? null : <p className={`text-xs tabular-nums ${stream.lastSampleAtMs !== null && stream.driftMs !== null && telemetry !== null && Math.abs(stream.driftMs) > telemetry.sync.toleranceMs ? 'text-warning' : 'text-muted'}`}>
           {stream.lastSampleAtMs === null || stream.driftMs === null ? '시간 차이 확인 전' : `시간 차이 ${stream.driftMs.toFixed(1)} ms`}
-        </p>
-      )}
-      <CollectionStreamTimeline stream={stream} telemetry={telemetry} />
-    </div>
+          </p>}
+          <CollectionStreamTimeline stream={stream} telemetry={telemetry} />
+        </div>
+    </details>
   );
 
   return (
     <section aria-label="Sensor stream 상태" className="border-t border-border py-4">
       <div className="mb-5 text-xs" aria-label="동기화 요약">
         <p className="font-semibold">{syncLabel(telemetry)}</p>
-        {telemetry === null ? null : <p className="mt-1 leading-relaxed tabular-nums text-muted">{telemetry.sync.maxDriftMs === null ? '시간 차이 확인 전' : `최대 시간 차이 ${telemetry.sync.maxDriftMs.toFixed(1)} ms`} · 허용 {telemetry.sync.toleranceMs} ms</p>}
+        {telemetry === null || telemetry.sync.state === 'unavailable' ? null : <p className="mt-1 leading-relaxed tabular-nums text-muted">{telemetry.sync.maxDriftMs === null ? '시간 차이 확인 전' : `최대 시간 차이 ${telemetry.sync.maxDriftMs.toFixed(1)} ms`} · 허용 {telemetry.sync.toleranceMs} ms</p>}
       </div>
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">필수 수집 소스</h2>
-        <span className="text-xs text-muted">관측 / 목표</span>
+        <span className="text-xs text-muted">수신 / 목표</span>
       </div>
-      {telemetry === null || telemetry.timeline.tracks.length === 0 ? null : <p className="mb-2 text-xs text-muted">최근 {telemetry.timeline.windowMs / 1_000}초 · 경고 구간은 누락·지연</p>}
       <div className="collection-stream-list grid divide-y divide-border">
         {questStreams.length === 0 && questConnection == null ? null : (
           <section aria-label="Quest 손 추적 장치" className="py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold">Quest 손 추적</h3>
-                {questStreams[0]?.sourceDeviceId == null ? null : <p className="mt-1 wrap-anywhere font-mono text-xs text-muted">{questStreams[0].sourceDeviceId}</p>}
               </div>
               {questConnection}
             </div>
-            {questStreams.map((stream) => renderStream(stream, false))}
+            {questStreams.map((stream) => renderStream(stream))}
           </section>
         )}
         {required.filter((stream) => !questStreams.includes(stream)).map((stream) => renderStream(stream))}
@@ -701,33 +701,36 @@ function CollectionStreamsSection({ telemetry, questConnection }: {
       </div>
       {[
         { label: '선택 소스', streams: optional },
-        { label: '파생 소스', streams: derived },
+        { label: '파생 데이터', streams: derived },
       ].filter((group) => group.streams.length > 0).map((group) => (
-        <section className="mt-5" key={group.label}>
-          <h3 className="mb-2 text-sm font-semibold">{group.label} <span className="ml-1 text-xs font-normal tabular-nums text-muted">{group.streams.length}</span></h3>
+        <details className="collection-disclosure mt-4 border-t border-border pt-2" key={group.label}>
+          <summary className="text-sm">{group.label} {group.streams.length}
+            {group.streams.some((stream) => ['warning', 'negative'].includes(streamHealthTone(stream))) ? <span className="ml-auto text-xs font-normal text-warning">확인 필요</span> : null}
+          </summary>
           <div className="collection-stream-list grid divide-y divide-border">{group.streams.map((stream) => renderStream(stream))}</div>
-        </section>
+        </details>
       ))}
     </section>
   );
 }
 
 function CollectorCommandStatus({ binding }: { readonly binding: HumanDemonstrationBinding }) {
+  if (binding.collectorAcknowledgements.length === 0) return null;
+  const acknowledgements = binding.collectorAcknowledgements.slice(-6);
+  const pendingCount = acknowledgements.filter((acknowledgement) => acknowledgement.state !== 'acknowledged').length;
   return (
-      <section aria-label="Collector 명령 응답" className="pb-2">
-        <h3 className="text-sm font-semibold">Collector 명령 응답</h3>
-        {binding.collectorAcknowledgements.length === 0 ? (
-          <p className="mt-1 text-xs text-muted">Episode command 대기 중</p>
-        ) : (
+      <details className="collection-disclosure border-t border-border pt-2">
+        <summary className="text-sm">녹화 명령 응답{pendingCount === 0 ? null : <span className="ml-auto text-xs font-normal text-warning">미확인 {pendingCount}건</span>}</summary>
+        <section aria-label="Collector 명령 응답" className="pb-2">
           <ul className="mt-2 grid gap-1 text-xs text-muted">
-            {binding.collectorAcknowledgements.slice(-6).map((acknowledgement) => (
+            {acknowledgements.map((acknowledgement) => (
               <li className="wrap-anywhere" key={`${acknowledgement.episodeId}-${acknowledgement.sourceDeviceId}-${acknowledgement.command}`}>
                 {acknowledgement.sourceDeviceId} · {acknowledgement.command === 'start' ? '시작' : '정지'} · {acknowledgement.state === 'acknowledged' ? '확인 완료' : acknowledgement.state === 'rejected' ? '거절됨' : '응답 대기'}
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      </details>
   );
 }
 
@@ -1520,10 +1523,6 @@ export function HumanoidCollectionDetailPage() {
                 id="collection-details"
                 tabIndex={-1}
               >
-                <header className="mb-3 flex shrink-0 items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold">{detailsTab === 'session' ? '세션 정보' : detailsTab === 'sources' ? '수집 상태' : '문제'}</h2>
-                  <Button id="collection-details-close" aria-label="수집 상세 닫기" aria-controls="collection-details" aria-expanded={true} title="수집 상세 닫기" className="size-10 shrink-0 p-0" variant="ghost" onClick={closeDetails}><Icon name="close" /></Button>
-                </header>
                 <div className="collection-inspector-tabs">
                 <RailTabPanel value="session" labelledBy="collection-tab-session" forceMount hidden={detailsTab !== 'session'}>
                   <section aria-label="세션 정보">
@@ -1547,12 +1546,42 @@ export function HumanoidCollectionDetailPage() {
                         </dd>
                       </div>
                     </dl> : null}
-                      <dl className={`collection-session-fields text-xs ${hasRecording ? 'border-t border-border pt-4' : ''}`}>
-                        <div><dt>세션 ID</dt><dd className="font-mono">{session.id}</dd></div>
-                        <div><dt>작업</dt><dd className="font-mono">{session.taskId}</dd></div>
-                        <div><dt>{session.humanDemonstration === null ? '로봇' : '참여자'}</dt><dd className="font-mono">{session.humanDemonstration?.participantId ?? session.robotId}</dd></div>
-                        <div><dt>{session.humanDemonstration === null ? '센서' : '외골격 장치'}</dt><dd className="font-mono">{session.humanDemonstration?.exoskeletonDeviceId ?? session.sensorPresetId}</dd></div>
+                    <section className="border-t border-border pt-4" aria-label="수집 설정">
+                      <h3 className="text-sm font-semibold">수집 설정</h3>
+                      <dl className="collection-session-fields text-xs">
+                        <div><dt>수집 방식</dt><dd>{session.humanDemonstration === null ? '로봇 시연' : '사람 시연'}</dd></div>
+                        <div><dt>작업 ID</dt><dd className="font-mono">{session.taskId}</dd></div>
+                        <div><dt>프로젝트 ID</dt><dd className="font-mono">{session.projectId}</dd></div>
+                        <div><dt>현장 ID</dt><dd className="font-mono">{session.siteId}</dd></div>
                       </dl>
+                    </section>
+                    <section className="mt-4 border-t border-border pt-4" aria-label="참여자와 장치">
+                      <h3 className="text-sm font-semibold">{session.humanDemonstration === null ? '수집 장치' : '참여자와 장치'}</h3>
+                      <dl className="collection-session-fields text-xs">
+                        <div><dt>{session.humanDemonstration === null ? '로봇' : '참여자'}</dt><dd className="font-mono">{session.humanDemonstration?.participantId ?? session.robotId ?? '미지정'}</dd></div>
+                        {session.humanDemonstration === null ? <>
+                          <div><dt>센서 장치</dt><dd className="font-mono">{session.sensorDeviceId ?? '미지정'}</dd></div>
+                          <div><dt>센서 프리셋</dt><dd className="font-mono">{session.sensorPresetId}</dd></div>
+                        </> : <>
+                          {session.humanDemonstration.exoskeletonDeviceId && <div><dt>외골격 장치</dt><dd className="font-mono">{session.humanDemonstration.exoskeletonDeviceId}</dd></div>}
+                          {session.humanDemonstration.sourceBindings.filter((source) => source.role !== 'exoskeleton').map((source) => (
+                            <div key={`${source.role}-${source.sourceDeviceId}`}>
+                              <dt>{source.role === 'xr-hand-tracking' ? '손 추적 장치' : source.role === 'head-camera' ? '헤드 카메라' : '외부 카메라'}</dt>
+                              <dd className="font-mono">{source.sourceDeviceId}</dd>
+                            </div>
+                          ))}
+                        </>}
+                      </dl>
+                    </section>
+                    <section className="mt-4 border-t border-border pt-4" aria-label="세션 기록">
+                      <h3 className="text-sm font-semibold">세션 기록</h3>
+                      <dl className="collection-session-fields text-xs">
+                        <div><dt>세션 ID</dt><dd className="font-mono">{session.id}</dd></div>
+                        <div><dt>생성 시각</dt><dd>{formatDateTime(session.createdAtMs)}</dd></div>
+                        <div><dt>시작 시각</dt><dd>{session.startedAtMs === null ? '시작 전' : formatDateTime(session.startedAtMs)}</dd></div>
+                        {session.stoppedAtMs === null ? null : <div><dt>종료 시각</dt><dd>{formatDateTime(session.stoppedAtMs)}</dd></div>}
+                      </dl>
+                    </section>
                   </section>
                 </RailTabPanel>
                 <RailTabPanel value="sources" labelledBy="collection-tab-sources">

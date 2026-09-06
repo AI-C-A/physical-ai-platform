@@ -100,8 +100,8 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByText('더보기')).not.toBeInTheDocument();
     const sessionInfo = screen.getByRole('region', { name: '세션 정보' });
     expect(sessionInfo).toBeVisible();
-    const detailsToggle = screen.getByRole('button', { name: '수집 상세 닫기' });
-    expect(detailsToggle.closest('aside')).toHaveAttribute('id', 'collection-details');
+    const detailsToggle = screen.getByRole('tab', { name: '세션 정보' });
+    expect(screen.queryByRole('button', { name: '수집 상세 닫기' })).not.toBeInTheDocument();
     await user.click(detailsToggle);
     expect(sessionInfo).not.toBeVisible();
     expect(screen.getByRole('region', { name: '실시간 수집 카메라' })).toBeVisible();
@@ -136,6 +136,13 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(within(sessionInfo).getByText(/task-sort-fruit/u)).toBeVisible();
     expect(within(sessionInfo).getByText('robot-003')).toBeVisible();
     expect(within(sessionInfo).getByText('preset-humanoid-default')).toBeVisible();
+    expect(within(sessionInfo).getByText('sensor-rig-001')).toBeVisible();
+    expect(within(sessionInfo).getByText('로봇 시연')).toBeVisible();
+    expect(within(sessionInfo).getByText('project-tiger')).toBeVisible();
+    expect(within(sessionInfo).getByText('site-lab')).toBeVisible();
+    expect(within(sessionInfo).getByText('생성 시각')).toBeVisible();
+    expect(within(sessionInfo).getByText('시작 시각')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: '세션 정보' })).not.toBeInTheDocument();
     expect(screen.queryByText('저장한 Episode 0개')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '세션 정보' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '세션 정보 닫기' })).not.toBeInTheDocument();
@@ -278,7 +285,7 @@ describe('HumanoidCollectionDetailPage', () => {
       await screen.findByRole('heading', { name: 'Minimal collection' });
       await waitFor(() => expect(getTelemetry).toHaveBeenCalled());
       const details = screen.getByRole('complementary', { name: '수집 상세' });
-      const detailsToggle = screen.getByRole('button', { name: '수집 상세 닫기' });
+      const detailsToggle = screen.getByRole('tab', { name: '세션 정보' });
       await user.click(detailsToggle);
       expect(details).not.toBeVisible();
       expect(screen.getAllByRole('tab')).toHaveLength(3);
@@ -411,12 +418,15 @@ describe('HumanoidCollectionDetailPage', () => {
     await user.click(screen.getByRole('tab', { name: '세션 정보' }));
     const sessionInfo = screen.getByRole('region', { name: '세션 정보' });
     expect(within(sessionInfo).queryByText('Collector 명령 응답')).not.toBeInTheDocument();
+    for (const value of ['사람 시연', 'exoskeleton-001', 'quest2-001', 'rbp-headcam-001', 'external-camera-001', '시작 전']) {
+      expect(within(sessionInfo).getByText(value)).toBeVisible();
+    }
     await user.click(screen.getByRole('tab', { name: '수집 상태' }));
     const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
     expect(within(sources).getAllByText('quest2-001').length).toBeGreaterThan(0);
-    const commands = screen.getByRole('region', { name: 'Collector 명령 응답' });
-    expect(within(commands).getByText('Episode command 대기 중')).toBeVisible();
-    expect(document.querySelector('.collection-inspector details')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Collector 명령 응답' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Episode command 대기 중')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '수집 상태' })).not.toBeInTheDocument();
     expect(preview).toBeVisible();
     expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -425,7 +435,7 @@ describe('HumanoidCollectionDetailPage', () => {
     port.dispose();
   });
 
-  it('수집 상태에서 소스와 시간 차이·누락 구간을 같은 행에 표시한다', async () => {
+  it('수집 상태는 이상 징후를 먼저 보여주고 수신 상세와 선택·파생 소스를 펼쳐 확인한다', async () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     try {
@@ -471,7 +481,12 @@ describe('HumanoidCollectionDetailPage', () => {
       const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
       expect(within(sources).getByText('최대 시간 차이 37.0 ms · 허용 20 ms')).toBeVisible();
       const drift = within(sources).getByText('시간 차이 37.0 ms');
+      expect(drift).not.toBeVisible();
+      expect(within(sources).getByText('시간 차이 37.0 ms · 허용 범위 초과')).toBeVisible();
+      const disclosure = drift.closest('details') as HTMLDetailsElement;
+      await user.click(within(disclosure).getByLabelText('Left Hand Pose · Quest 수신 상세'));
       expect(drift).toHaveClass('text-warning');
+      expect(drift).toBeVisible();
       expect(within(drift.parentElement as HTMLElement).getByRole('img', { name: /최근 10초 수신 기록 · 왼손 샘플 누락/u })).toBeVisible();
       expect(within(sources).getAllByText('시간 차이 확인 전').length).toBeGreaterThan(0);
       expect(within(sources).getByText(/프레임 손실 3 · 샘플 누락 7/u)).toBeVisible();
@@ -479,9 +494,10 @@ describe('HumanoidCollectionDetailPage', () => {
       expect(within(sources).queryByRole('button', { name: /전체 소스 상세/u })).not.toBeInTheDocument();
       for (const group of [
         { label: '선택 소스', streams: snapshot.streams.filter((stream) => !stream.required && stream.origin !== 'derived') },
-        { label: '파생 소스', streams: snapshot.streams.filter((stream) => stream.origin === 'derived') },
+        { label: '파생 데이터', streams: snapshot.streams.filter((stream) => stream.origin === 'derived') },
       ]) {
-        expect(within(sources).getByRole('heading', { name: `${group.label} ${String(group.streams.length)}` })).toBeVisible();
+        for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).not.toBeVisible();
+        await user.click(within(sources).getByText(`${group.label} ${String(group.streams.length)}`));
         for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       }

@@ -171,6 +171,7 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await controls.getByRole('button', { name: 'Episode 녹화 시작', exact: true }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'recording');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('녹화 중');
+    await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
     await expect(bindings).toContainText('quest2-001 · 시작 · 확인 완료');
     await expect(page.getByRole('region', { name: 'Quest 손 포즈 3D' }).locator('canvas')).toBeVisible();
     await openCollectionDetails(page, '세션 정보');
@@ -181,6 +182,7 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await controls.getByRole('button', { name: 'Episode 녹화 정지' }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'review');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('검토 대기');
+    await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
     await expect(bindings).toContainText('quest2-001 · 정지 · 확인 완료');
     const recordedCamera = page.getByRole('region', { name: '기록된 Episode 카메라' });
     await expect(recordedCamera.locator('figure')).toHaveCount(2);
@@ -188,6 +190,7 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await expect(playback).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Episode 재생 위치' })).toBeEnabled();
     await openCollectionDetails(page, '수집 상태');
+    await page.getByRole('region', { name: 'Sensor stream 상태' }).locator('.collection-stream > summary').first().click();
     await expect(page.getByRole('region', { name: 'Sensor stream 상태' }).getByRole('img', { name: /최근 10초 수신 기록/u }).first()).toBeVisible();
     await expect(controls.getByRole('button', { name: '녹화본 저장' })).toBeInViewport();
     await openCollectionDetails(page, '세션 정보');
@@ -931,17 +934,26 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       const connectionBox = await connection.boundingBox();
       expect(connectionBox?.height).toBeGreaterThanOrEqual(40);
       await connection.press('Enter');
+      await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
       await expect(page.getByRole('region', { name: 'Collector 명령 응답' })).toBeVisible();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       const connectionScreenshot = testInfo.outputPath(`inline-connection-${String(viewport.width)}.png`);
       await page.screenshot({ path: connectionScreenshot });
       await testInfo.attach(`inline-connection-${String(viewport.width)}`, { path: connectionScreenshot, contentType: 'image/png' });
-      await expect(inspector.locator('details')).toHaveCount(0);
       const sources = page.getByRole('region', { name: 'Sensor stream 상태' });
+      const headSource = sources.locator('summary').filter({ hasText: 'Head RGB · RBP Camera' });
+      await headSource.focus();
+      await headSource.press('Enter');
+      await expect(headSource.locator('..')).toHaveAttribute('open', '');
+      await expect(headSource.locator('..').getByText('rbp-headcam-001', { exact: true })).toBeVisible();
+      await headSource.press('Enter');
+      await expect(headSource.locator('..')).not.toHaveAttribute('open');
       await expect(sources.getByText('Head RGB · RBP Camera', { exact: true })).toHaveCount(1);
       await expect(sources.getByRole('button', { name: /전체 소스 상세/u })).toHaveCount(0);
-      for (const label of ['선택 소스', '파생 소스']) {
-        await expect(sources.getByRole('heading', { name: new RegExp(label, 'u') })).toBeVisible();
+      for (const label of ['선택 소스', '파생 데이터']) {
+        const disclosure = sources.locator('summary').filter({ hasText: label });
+        await expect(disclosure).toBeVisible();
+        await disclosure.click();
       }
       await expect(sources.getByText('External RGB · Full body', { exact: true })).toBeVisible();
       await expect(sources.getByText('Head Semantic', { exact: true })).toBeVisible();
@@ -1020,7 +1032,7 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
     await expect(page.getByRole('heading', { name: sessionName })).toBeVisible();
 
     const controls = page.getByRole('region', { name: '수집 작업 컨트롤' });
-    const summary = page.getByRole('button', { name: '수집 상세 닫기' });
+    const summary = page.getByRole('tab', { name: '세션 정보' });
     const sessionTab = page.getByRole('tab', { name: '세션 정보' });
     const sessionInfo = page.getByRole('region', { name: '세션 정보' });
     const camera = page.getByRole('region', { name: '실시간 수집 카메라' });
@@ -1040,6 +1052,25 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
       }
       if (originalViewport !== null) await page.setViewportSize(originalViewport);
     };
+    await expect(inspector.getByRole('button', { name: '수집 상세 닫기' })).toHaveCount(0);
+    await expect(inspector.getByRole('heading', { name: '세션 정보', exact: true })).toHaveCount(0);
+    await expect(sessionInfo.getByText('quest2-001', { exact: true })).toBeVisible();
+    await expect(sessionInfo.getByText('rbp-headcam-001', { exact: true })).toBeVisible();
+    await expect(sessionInfo.getByText('생성 시각', { exact: true })).toBeVisible();
+    if (testInfo.project.name === 'chrome-1440') {
+      for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+        await page.setViewportSize(viewport);
+        for (const name of ['세션 정보', '수집 상태']) {
+          await openCollectionDetails(page, name);
+          await inspector.scrollIntoViewIfNeeded();
+          const path = testInfo.outputPath(`inspector-${name}-${String(viewport.width)}.png`);
+          await page.screenshot({ path });
+          await testInfo.attach(`inspector-${name}-${String(viewport.width)}`, { path, contentType: 'image/png' });
+        }
+      }
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await openCollectionDetails(page, '세션 정보');
+    }
     await expect(inspector.getByRole('region', { name: '작업 지시' })).toBeVisible();
     await expect(controls.locator('[data-episode-summary]')).toBeVisible();
     await expect(inspector.locator('[data-episode-summary]')).toHaveCount(0);
