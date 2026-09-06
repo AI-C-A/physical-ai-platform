@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
@@ -9,12 +9,19 @@ export function TooltipProvider({ children }: PropsWithChildren) {
 
 interface TooltipProps {
   readonly content: ReactNode;
+  readonly disabled?: boolean;
   readonly trigger: ReactNode;
 }
 
-export function Tooltip({ content, trigger }: TooltipProps) {
+export function Tooltip({ content, disabled = false, trigger }: TooltipProps) {
+  const [open, setOpen] = useState(false);
+  if (disabled && open) setOpen(false);
+
   return (
-    <TooltipPrimitive.Root>
+    <TooltipPrimitive.Root
+      onOpenChange={(nextOpen) => setOpen(!disabled && nextOpen)}
+      open={!disabled && open}
+    >
       <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
