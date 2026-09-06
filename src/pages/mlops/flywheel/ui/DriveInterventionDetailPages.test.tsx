@@ -60,9 +60,9 @@ describe('주행·개입의 기록 표시', () => {
     expect(getInterventionTimelineMarkers({ ...item, controlReturnedAtMs: null, endMs: null }).map((marker) => marker.label)).toEqual(['기록 시작']);
   });
 
-  it('실제 주행에는 예시 영상이나 가상 좌표를 표시하지 않고 연결된 개입으로 이동한다', async () => {
+  it.each(['physical', 'simulation'] as const)('%s 주행에 연결된 영상이 없으면 대기 상태와 개입 링크를 표시한다', async (environment) => {
     const { port, session } = await fixture();
-    vi.spyOn(port, 'getSession').mockResolvedValue({ ...session, provenance: { ...session.provenance, environment: 'physical' } });
+    vi.spyOn(port, 'getSession').mockResolvedValue({ ...session, provenance: { ...session.provenance, environment } });
     const { container } = renderDetail(port, '/mlops/drives/drive-001');
     expect(await screen.findByText('경로 좌표가 연결되지 않아 지도 궤적을 표시할 수 없습니다.')).toBeVisible();
     expect(screen.getByText('이 주행의 녹화 영상이 연결되지 않았습니다.')).toBeVisible();

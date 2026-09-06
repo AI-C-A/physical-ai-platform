@@ -53,6 +53,7 @@ const SitesPage = lazy(async () => ({
 }));
 const CollectionPage = lazy(async () => ({ default: (await FlywheelPages()).CollectionWorkspacePage }));
 const NewCollectionPage = lazy(async () => ({ default: (await FlywheelPages()).NewHumanoidCollectionPage }));
+const CollectionConnectionPage = lazy(async () => ({ default: (await FlywheelPages()).CollectionConnectionPage }));
 const CollectionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCollectionDetailPage }));
 const ReviewPage = lazy(async () => ({ default: (await FlywheelPages()).ReviewWorkspacePage }));
 const OperationsPage = lazy(async () => ({ default: (await FlywheelPages()).OperationsWorkspacePage }));
@@ -167,8 +168,14 @@ export const APP_ROUTES: RouteObject[] = [
         path: ROUTE_PATHS.controlSettings,
         element: <SettingsPage showMapStyleSettings />,
       },
-      { path: ROUTE_PATHS.mlopsCollection, element: <CollectionPage /> },
-      { path: ROUTE_PATHS.mlopsNewCollection, element: <NewCollectionPage /> },
+      {
+        path: ROUTE_PATHS.mlopsCollection,
+        element: <CollectionPage />,
+        children: [
+          { path: 'new', element: <NewCollectionPage /> },
+          { path: ':sessionId/setup', element: <CollectionConnectionPage /> },
+        ],
+      },
       { path: ROUTE_PATHS.mlopsCollectionDetail, element: <CollectionDetailPage /> },
       { path: ROUTE_PATHS.mlopsReview, element: <ReviewPage /> },
       { path: ROUTE_PATHS.mlopsOperations, element: <OperationsPage /> },

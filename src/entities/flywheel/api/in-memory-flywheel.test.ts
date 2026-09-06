@@ -349,8 +349,10 @@ describe('InMemoryFlywheel', () => {
     await port.startSession(first.id);
     await port.startSession(otherRobot.id);
 
-    await expect(port.startSession(sameRobot.id)).rejects.toThrow('robot 1 active');
-    await expect(port.startSession(sameRobot.id)).rejects.toThrow(`/mlops/collection/${first.id}`);
+    await expect(port.startSession(sameRobot.id)).rejects.toMatchObject({
+      name: 'SessionConflictError',
+      sessionId: first.id,
+    });
     expect((await port.listOperationalSessions()).filter((item) => item.status === 'active')).toHaveLength(2);
     port.dispose();
   });

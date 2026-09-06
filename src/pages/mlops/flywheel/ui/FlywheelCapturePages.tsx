@@ -14,7 +14,6 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { Panel } from "@/shared/ui/panel";
 import { Select } from "@/shared/ui/select";
 import { StatTile } from "@/shared/ui/stat-tile";
-import { SynchronizedPlayer } from "@/shared/ui/synchronized-player";
 import { Timeline } from "@/shared/ui/timeline";
 import { formatBytes } from '@/shared/lib/format';
 import { downloadTextFile } from '@/shared/lib/record-export';
@@ -30,33 +29,11 @@ import {
 import {
   formatDuration,
   formatDateTime,
-  VIDEO_SOURCE,
 } from "./flywheel-page-utils";
 import { getEpisodeStorageLabel, getEpisodeTimelineMarkers } from './episode-presentation';
 import { getStatusLabel } from './flywheel-status';
 import { createEpisodeExportRecord } from './flywheel-export-records';
 import { getDriveTimelineMarkers, getInterventionTimelineMarkers } from './drive-record-presentation';
-
-const sources = [
-  {
-    id: "camera-head",
-    label: "헤드 카메라",
-    poster: "/assets/interventions/ambiguous-grasp-target.png",
-    src: VIDEO_SOURCE,
-  },
-  {
-    id: "camera-left",
-    label: "왼손 카메라",
-    poster: "/assets/interventions/person-in-work-zone.png",
-    src: VIDEO_SOURCE,
-  },
-  {
-    id: "camera-right",
-    label: "오른손 카메라",
-    poster: "/assets/interventions/path-blocked.png",
-    src: VIDEO_SOURCE,
-  },
-];
 
 export function FlywheelEpisodeDetailPage() {
   const { episodeId = "" } = useParams();
@@ -93,10 +70,7 @@ export function FlywheelEpisodeDetailPage() {
             />
             {exportStatus ? <p className={`text-sm ${exportError ? 'text-negative' : 'text-muted'}`} role={exportError ? 'alert' : 'status'}>{exportStatus}</p> : null}
             <Panel title="동기 멀티뷰">
-              {episode.provenance.environment === 'simulation' ? <>
-                <p className="mb-4 text-sm text-muted">시뮬레이션 예시 영상입니다. 기록 정보에는 이 에피소드의 수집 결과가 표시됩니다.</p>
-                <SynchronizedPlayer sources={sources} />
-              </> : <p className="text-sm text-muted">이 에피소드의 재생 영상이 연결되지 않았습니다. 아래에서 기록 정보를 확인하세요.</p>}
+              <p className="text-sm text-muted">이 에피소드의 재생 영상이 연결되지 않았습니다. 아래에서 기록 정보를 확인하세요.</p>
             </Panel>
             <Panel title="영상 / 상태 / 동작 타임라인">
               <Timeline
@@ -180,12 +154,7 @@ export function DriveDetailPage() {
               <p className="mt-4 text-sm text-muted">경로 좌표가 연결되지 않아 지도 궤적을 표시할 수 없습니다.</p>
             </Panel>
             <Panel title="주행 영상">
-              {session?.provenance.environment === 'simulation' ? (
-                <>
-                  <p className="mb-4 text-sm text-muted">시뮬레이션 예시 영상입니다. 이 주행의 녹화 영상은 아직 연결되지 않았습니다.</p>
-                  <SynchronizedPlayer sources={sources.slice(0, 2)} />
-                </>
-              ) : <p className="text-sm text-muted">이 주행의 녹화 영상이 연결되지 않았습니다.</p>}
+              <p className="text-sm text-muted">이 주행의 녹화 영상이 연결되지 않았습니다.</p>
             </Panel>
             <Panel title="주행과 개입 기록">
               <Timeline

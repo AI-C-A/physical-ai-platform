@@ -2,6 +2,7 @@
 import type { ClockPort } from '@/shared/lib/clock';
 import { createCollectionVisuals } from './in-memory-collection-visuals';
 import { isEpisodeTransferComplete } from '../model/episode-transfer';
+import { SessionConflictError } from '../model/session-conflict-error';
 
 import type {
   AnnotationTask,
@@ -1319,10 +1320,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       return session.robotId !== null && item.robotId === session.robotId;
     });
     if (conflict !== undefined) {
-      const resourceId = session.kind === 'humanoid' && session.humanDemonstration !== null
-        ? session.humanDemonstration.exoskeletonDeviceId
-        : session.robotId;
-      throw new Error(`${resourceId ?? '수집 장치'}은(는) "${conflict.name}" 세션에서 사용 중입니다. /mlops/collection/${conflict.id}`);
+      throw new SessionConflictError(conflict.id);
     }
     const now = this.#clock.nowMs();
     if (session.kind === 'humanoid') {

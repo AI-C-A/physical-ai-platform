@@ -68,6 +68,16 @@ it('필수 원본 전송을 기다리는 동안 검토 작업을 숨기고 정�
     expect(controls).toHaveAttribute('data-collection-state', 'review');
     expect(within(controls).getByRole('button', { name: '다시 녹화' })).toBeEnabled();
     expect(screen.getByRole('group', { name: 'Episode 재생 컨트롤' })).toBeVisible();
+    const liveSnapshot = await port.getCollectionTelemetry(session.id);
+    if (liveSnapshot === null) throw new Error('Missing telemetry fixture');
+    vi.spyOn(port, 'getCollectionTelemetry').mockImplementation(() => Promise.resolve({
+      ...liveSnapshot,
+      observedAtMs: clock.nowMs(),
+      connectionState: 'live',
+      streams: liveSnapshot.streams.map((stream) => ({
+        ...stream, connectionState: 'live', lastSampleAtMs: clock.nowMs(),
+      })),
+    }));
     await act(async () => {
       fireEvent.click(within(controls).getByRole('button', { name: '녹화본 저장' }));
       await vi.advanceTimersByTimeAsync(0);

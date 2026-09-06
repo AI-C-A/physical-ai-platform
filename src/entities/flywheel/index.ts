@@ -1,5 +1,6 @@
 export { FlywheelContext, useFlywheelPort, useFlywheelQuery } from './model/flywheel-context';
 export { isEpisodeTransferComplete } from './model/episode-transfer';
+export { SessionConflictError } from './model/session-conflict-error';
 export {
   getEffectiveCollectionConnectionState,
   useCollectionTelemetry,

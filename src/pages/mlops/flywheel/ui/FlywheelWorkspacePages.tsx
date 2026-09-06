@@ -11,13 +11,16 @@ import {
 import {
   Link,
   Navigate,
+  Outlet,
   useNavigate,
+  useOutletContext,
   useParams,
   useSearchParams,
 } from 'react-router-dom';
 
 import {
   CollectionPerceptionViewer,
+  SessionConflictError,
   HumanoidRigViewer,
   isEpisodeTransferComplete,
   loadCollectionBodyPoseViewer,
@@ -34,8 +37,6 @@ import {
   type HumanDemonstrationBinding,
   type HumanoidCaptureSession,
 } from '@/entities/flywheel';
-import { getExecutionEnvironmentLabel } from '@/shared/domain';
-import { useDataEnvironment } from '@/shared/config';
 import { formatBytes, formatRelativeTime } from '@/shared/lib/format';
 import { downloadTextFile } from '@/shared/lib/record-export';
 import { Button, getButtonClassName } from '@/shared/ui/button';
@@ -43,13 +44,14 @@ import { ColorSchemeArea } from '@/shared/ui/color-scheme';
 import { Dialog } from '@/shared/ui/dialog';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { Icon } from '@/shared/ui/icon';
-import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { PageHeader } from '@/shared/ui/page-header';
 import { PlaybackBar } from '@/shared/ui/playback-bar';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Select } from '@/shared/ui/select';
 import { StatusIndicator, type StatusIndicatorTone } from '@/shared/ui/status-indicator';
 import { StickyActionBar } from '@/shared/ui/sticky-action-bar';
+import { Surface } from '@/shared/ui/surface';
 import {
   Table,
   TableBody,
@@ -58,8 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/ui/table';
-import { Textarea } from '@/shared/ui/textarea';
-import { Tabs, type TabItem } from '@/shared/ui/tabs';
+import { Tabs, RailTabs, RailTabList, RailTab, RailTabPanel, type TabItem } from '@/shared/ui/tabs';
 import {
   SynchronizedPlayer,
   type SynchronizedPlayerSource,
@@ -73,7 +74,6 @@ import {
 } from './flywheel-loaders';
 import {
   AsyncState,
-  DetailLink,
 } from './flywheel-page-shared';
 import { formatDateTime, formatDuration, VIDEO_SOURCE } from './flywheel-page-utils';
 import './collection-workspace.css';
@@ -81,8 +81,13 @@ import {
   getCloseIntent,
   type CollectionWorkspaceState,
 } from './collection-close-intent';
-import { validateCollectionSetup, type CollectionSetupErrors } from './collection-setup-validation';
+export { NewHumanoidCollectionPage } from './NewCollectionDialog';
+import type { CollectionSetupContext } from './NewCollectionDialog';
 import { createCollectionSessionExportRecord } from './flywheel-export-records';
+import { QuestPairingPanel } from './QuestPairingPanel';
+import { useAutomaticPreflight } from './use-automatic-preflight';
+import { collectionPreviewState } from './collection-preview-state';
+import type { MediaStreamState } from '@/shared/ui/media-panel';
 
 const QuestHandPoseViewer = lazy(async () => ({
   default: (await loadQuestHandPoseViewer()).QuestHandPoseViewer,
@@ -164,11 +169,11 @@ function getCollectionWorkspaceState(
 function getWorkspaceStateLabel(state: CollectionWorkspaceState, episode: FlywheelEpisode | null = null): string {
   if (state === 'finalizing' && episode !== null && !isEpisodeTransferComplete(episode)) return '원본 전송 중';
   const labels: Readonly<Record<CollectionWorkspaceState, string>> = {
-    prepare: '사전점검이 필요합니다',
+    prepare: '장치 연결 확인 중',
     'episode-ready': '녹화 준비 완료',
     recording: '녹화 중',
     finalizing: '파일 확정 중',
-    review: '녹화본 검토 대기',
+    review: '검토 중',
     processing: '세션 처리 중',
     attention: '확인 필요',
   };
@@ -192,16 +197,6 @@ function workspaceTone(state: CollectionWorkspaceState): StatusIndicatorTone {
   return 'neutral';
 }
 
-function defaultSessionName(): string {
-  const date = new Intl.DateTimeFormat('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date());
-  return `휴머노이드 수집 ${date}`;
-}
 
 function useNow(intervalMs = 1_000): number {
   const [now, setNow] = useState(() => Date.now());
@@ -227,13 +222,6 @@ function RecordingElapsedTime({ episode }: { readonly episode: FlywheelEpisode }
   const now = useNow();
   const elapsedMs = (episode.endedAtMs ?? now) - episode.startedAtMs;
   return <span className="tabular-nums text-foreground">{formatRecordingDuration(elapsedMs)}</span>;
-}
-
-function PairingCountdown({ expiresAtMs }: { readonly expiresAtMs: number | null }) {
-  const now = useNow();
-  if (expiresAtMs === null) return <span>만료 시각 없음</span>;
-  const remainingMs = Math.max(0, expiresAtMs - now);
-  return <span>{remainingMs === 0 ? '만료됨' : `${formatRecordingDuration(remainingMs)} 후 만료`}</span>;
 }
 
 function CollectionWorkspaceLiveStatus({
@@ -309,51 +297,33 @@ function getRecordingSummary(
   return { label: '저장 상태 확인 불가', detail: '저장소의 수신 정보가 연결되지 않았습니다.', tone: 'neutral' as const };
 }
 
-function MultimodalTimeline({ telemetry }: { readonly telemetry: CollectionTelemetrySnapshot | null }) {
-  const windowMs = telemetry?.timeline.windowMs ?? 10_000;
-  const tracks = telemetry?.timeline.tracks ?? [];
+function CollectionStreamTimeline({ stream, telemetry }: {
+  readonly stream: CollectionStreamTelemetry;
+  readonly telemetry: CollectionTelemetrySnapshot | null;
+}) {
+  const track = telemetry?.timeline.tracks.find((item) => item.streamId === stream.streamId);
+  if (track === undefined || telemetry === null || stream.origin === 'derived') return null;
+  const windowMs = telemetry.timeline.windowMs;
+  const anomalies = track.anomalies.map((anomaly) => anomaly.label).join(', ');
   return (
-    <section
-      aria-label="최근 10초 멀티모달 타임라인"
-      className="grid min-h-[7rem] content-center gap-2 rounded-[var(--design-radius-surface)] bg-layer-base px-3 py-3"
-      data-multimodal-timeline
+    <div
+      aria-label={`${stream.displayName} 최근 ${String(windowMs / 1_000)}초 수신 기록${anomalies === '' ? '' : ` · ${anomalies}`}`}
+      className={`relative col-span-2 h-1.5 overflow-hidden rounded-[var(--design-radius-round)] ${stream.lastSampleAtMs === null || !stream.required ? 'bg-status-neutral-background' : 'bg-status-positive-background'}`}
+      role="img"
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 text-xs leading-4 text-muted">
-        <span className="font-semibold text-foreground">멀티모달 동기화 · 최근 10초</span>
-        <span>필수 소스의 누락과 drift만 강조합니다</span>
-      </header>
-      {tracks.length === 0 ? (
-        <p className="text-xs text-muted">timeline 데이터를 기다리는 중입니다.</p>
-      ) : tracks.map((track) => {
-        const stream = telemetry?.streams.find((item) => item.streamId === track.streamId);
-        const optional = stream?.required === false;
+      {track.anomalies.map((anomaly, index) => {
+        const left = Math.max(0, Math.min(100, (anomaly.startOffsetMs + windowMs) / windowMs * 100));
+        const right = Math.max(0, Math.min(100, (anomaly.endOffsetMs + windowMs) / windowMs * 100));
         return (
-        <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_5rem] items-center gap-2" key={track.streamId}>
-          <span className="break-words text-xs font-medium text-muted">{track.label}</span>
-          <div className={`relative h-2 overflow-hidden rounded-[var(--design-radius-round)] ${optional ? 'bg-status-neutral-background' : 'bg-status-positive-background'}`}>
-            {track.anomalies.map((anomaly, index) => {
-              const left = Math.max(0, Math.min(100, (anomaly.startOffsetMs + windowMs) / windowMs * 100));
-              const right = Math.max(0, Math.min(100, (anomaly.endOffsetMs + windowMs) / windowMs * 100));
-              return (
-                <span
-                  aria-label={anomaly.label}
-                  className={`absolute inset-y-0 ${optional ? 'bg-status-neutral-foreground' : anomaly.severity === 'critical' ? 'bg-negative' : 'bg-warning'}`}
-                  key={`${anomaly.kind}-${String(index)}`}
-                  style={{ left: `${String(left)}%`, width: `${String(Math.max(1.5, right - left))}%` }}
-                  title={anomaly.label}
-                />
-              );
-            })}
-          </div>
-          <span className={`text-right text-xs font-semibold ${optional ? 'text-muted' : track.health === 'healthy' ? 'text-positive' : track.health === 'degraded' ? 'text-warning' : 'text-negative'}`}>
-            {optional
-              ? track.health === 'healthy' ? '선택 · 정상' : '선택 · 미사용'
-              : track.health === 'healthy' ? '정상' : track.health === 'degraded' ? '경고' : '단절'}
-          </span>
-        </div>
+          <span
+            className={`absolute inset-y-0 ${anomaly.severity === 'critical' ? 'bg-negative' : 'bg-warning'}`}
+            key={`${anomaly.kind}-${String(index)}`}
+            style={{ left: `${String(left)}%`, width: `${String(Math.max(1.5, right - left))}%` }}
+            title={anomaly.label}
+          />
         );
       })}
-    </section>
+    </div>
   );
 }
 
@@ -366,6 +336,7 @@ function HumanoidCollectionPreview({
   poseKind = 'rig',
   handPose,
   telemetry = null,
+  previewStates,
 }: {
   readonly ariaLabel: string;
   readonly cameraSources: readonly SynchronizedPlayerSource[];
@@ -375,10 +346,15 @@ function HumanoidCollectionPreview({
   readonly poseKind?: 'rig' | 'quest-hands';
   readonly handPose?: CollectionHandPoseTelemetry | null;
   readonly telemetry?: CollectionTelemetrySnapshot | null;
+  readonly previewStates: Readonly<Record<string, MediaStreamState>>;
 }) {
   const robotState = telemetry?.streams.find((stream) => (
     stream.streamId === 'robot-state' || stream.streamId === 'exoskeleton-state'
   )) ?? null;
+  const leftState = previewStates['quest-hand-left'] ?? 'idle';
+  const rightState = previewStates['quest-hand-right'] ?? 'idle';
+  const handState = leftState === 'recorded' ? 'recorded' : leftState === 'live' || rightState === 'live' ? 'live'
+    : leftState === 'stale' || rightState === 'stale' ? 'stale' : leftState === 'offline' || rightState === 'offline' ? 'offline' : 'idle';
   return (
     <section
       aria-label={ariaLabel}
@@ -398,7 +374,7 @@ function HumanoidCollectionPreview({
 
       {poseKind === 'quest-hands' ? (
         <div className="collection-perception min-h-0 min-w-0 overflow-hidden">
-          <CollectionPerceptionViewer result={telemetry?.headPerception ?? null} />
+          <CollectionPerceptionViewer result={telemetry?.headPerception ?? null} streamState={previewStates['rbp-head-rgb'] ?? 'idle'} />
         </div>
       ) : null}
       <div
@@ -410,11 +386,8 @@ function HumanoidCollectionPreview({
             <QuestHandPoseViewer
               handPose={handPose === undefined ? telemetry?.handPose ?? null : handPose}
               streams={telemetry?.streams ?? []}
-              streamState={cameraSources.some((source) => source.status === 'recorded')
-                ? 'recorded'
-                : telemetry?.connectionState === 'live'
-                  ? 'live'
-                  : 'idle'}
+              streamState={handState}
+              availability={{ left: leftState, right: rightState }}
             />
           </Suspense>
         ) : (
@@ -456,6 +429,7 @@ function SessionCollectionPreview({
   playbackPositionMs,
   replayEpisodeId,
   telemetry,
+  previewStates,
 }: {
   readonly ariaLabel: string;
   readonly cameraSources: readonly SynchronizedPlayerSource[];
@@ -465,6 +439,7 @@ function SessionCollectionPreview({
   readonly playbackPositionMs: number;
   readonly replayEpisodeId: string | null;
   readonly telemetry: CollectionTelemetrySnapshot | null;
+  readonly previewStates: Readonly<Record<string, MediaStreamState>>;
 }) {
   const port = useFlywheelPort();
   const [replayHandPose, setReplayHandPose] = useState<{
@@ -493,6 +468,7 @@ function SessionCollectionPreview({
       cameraTitle={cameraTitle}
       poseKind={humanDemonstration ? 'quest-hands' : 'rig'}
       telemetry={telemetry}
+      previewStates={previewStates}
       {...(humanDemonstration && replayEpisodeId !== null ? { handPose: displayedReplayPose } : {})}
       {...(replayEpisodeId === null ? {} : { playbackPlaying, playbackPositionMs })}
     />
@@ -505,13 +481,13 @@ function streamHealthLabel(stream: CollectionStreamTelemetry): string {
     if (stream.processingStatus === 'completed') return '파생 처리 완료';
     return '파생 처리 대기';
   }
+  if (stream.connectionState === 'offline') return '연결 끊김';
+  if (stream.connectionState === 'stale') return '수신 지연';
   if (stream.handTracking !== null && stream.handTracking !== undefined) {
     if (stream.handTracking.qualityState === 'tracking') return '추적 정상';
     if (stream.handTracking.qualityState === 'partial') return '부분 관측';
     return '추적 유실';
   }
-  if (stream.connectionState === 'offline') return '오프라인';
-  if (stream.connectionState === 'stale') return '지연';
   if (stream.health === 'healthy') return '정상';
   if (stream.health === 'degraded') return '저하';
   return '단절';
@@ -523,13 +499,13 @@ function streamHealthTone(stream: CollectionStreamTelemetry): 'positive' | 'warn
     if (stream.processingStatus === 'completed') return 'positive';
     return 'neutral';
   }
+  if (stream.connectionState === 'offline') return stream.required ? 'negative' : 'neutral';
+  if (stream.connectionState === 'stale') return 'warning';
   if (stream.handTracking !== null && stream.handTracking !== undefined) {
     if (stream.handTracking.qualityState === 'tracking') return 'positive';
     if (stream.handTracking.qualityState === 'partial') return 'warning';
     return 'negative';
   }
-  if (stream.connectionState === 'offline') return stream.required ? 'negative' : 'neutral';
-  if (stream.connectionState === 'stale') return 'warning';
   if (stream.health === 'healthy') return 'positive';
   if (stream.health === 'degraded') return 'warning';
   return 'negative';
@@ -565,75 +541,57 @@ function issueGuidance(issueId: string): string {
 
 function getCollectionIssues({
   actionError,
+  conflictingSessionId = null,
   preflight,
   refreshError,
   telemetry,
   effectiveConnectionState,
+  monitoring = true,
 }: {
   readonly actionError: string | null;
+  readonly conflictingSessionId?: string | null;
   readonly preflight: readonly FlywheelPreflightCheck[];
   readonly refreshError: string | null;
   readonly telemetry: CollectionTelemetrySnapshot | null;
   readonly effectiveConnectionState: CollectionTelemetryConnectionState;
+  readonly monitoring?: boolean;
 }) {
-  const failedChecks = preflight.filter((check) => check.state === 'failed');
+  const failedChecks = monitoring ? preflight.filter((check) => check.state === 'failed') : [];
   const criticalIssues = telemetry?.qualityIssues.filter((issue) => issue.severity === 'critical') ?? [];
   const warnings = telemetry?.qualityIssues.filter((issue) => issue.severity !== 'critical') ?? [];
-  const unhealthySources = telemetry?.streams.filter((stream) => (
+  const unhealthySources = monitoring ? telemetry?.streams.filter((stream) => (
     stream.required && stream.origin !== 'derived' && streamHealthTone(stream) !== 'positive'
     && !criticalIssues.some((issue) => issue.streamId === stream.streamId)
-  )) ?? [];
-  const connectionProblem = refreshError !== null || (telemetry !== null && effectiveConnectionState !== 'live');
+  )) ?? [] : [];
+  const connectionProblem = refreshError !== null || (monitoring && telemetry !== null && effectiveConnectionState !== 'live');
   const operationalCount = Number(actionError !== null) + Number(connectionProblem)
     + failedChecks.length + criticalIssues.length + unhealthySources.length;
   return {
-    actionError, refreshError, effectiveConnectionState, failedChecks, criticalIssues,
+    actionError, conflictingSessionId, refreshError, effectiveConnectionState, failedChecks, criticalIssues,
     warnings, unhealthySources, connectionProblem, operationalCount,
     count: operationalCount + warnings.length,
   };
 }
 
-function CollectionIssuesSection({ issues, onOpenDetails, expanded = false }: {
+function CollectionIssuesSection({ issues }: {
   readonly issues: ReturnType<typeof getCollectionIssues>;
-  readonly onOpenDetails: () => void;
-  readonly expanded?: boolean;
 }) {
   const {
-    actionError, refreshError, effectiveConnectionState, failedChecks, criticalIssues,
-    warnings, unhealthySources, connectionProblem, operationalCount, count,
+    actionError, conflictingSessionId, refreshError, effectiveConnectionState, failedChecks, criticalIssues,
+    warnings, unhealthySources, connectionProblem, count,
   } = issues;
   if (count === 0) {
-    return expanded ? <p className="py-4 text-sm text-muted">현재 확인할 문제가 없습니다.</p> : null;
-  }
-
-  if (!expanded) {
-    if (operationalCount === 0) return null;
-    const urgent = actionError !== null || failedChecks.length > 0 || criticalIssues.length > 0;
-    const firstCheck = failedChecks[0];
-    const message = actionError
-      ?? (connectionProblem
-        ? refreshError ?? (effectiveConnectionState === 'offline' ? '수집 장치 연결 끊김' : '수집 상태 갱신 지연')
-        : null)
-      ?? (firstCheck === undefined ? null : `${firstCheck.label} · ${firstCheck.detail}`)
-      ?? criticalIssues[0]?.message
-      ?? (unhealthySources[0] === undefined ? null : `${unhealthySources[0].displayName} · ${streamHealthLabel(unhealthySources[0])}. 장치 연결과 수신 상태를 확인하세요.`)
-      ?? '';
-    return (
-      <section aria-label="현재 문제와 조치" className="collection-issue-notice flex shrink-0 items-start gap-3 rounded-[var(--design-radius-control)] bg-layer-base p-3" data-operational-issues>
-        <span className={`mt-0.5 shrink-0 ${urgent ? 'text-negative' : 'text-warning'}`}><Icon name={connectionProblem ? 'wifi-off' : 'events'} /></span>
-        <div className="collection-issue-body min-w-0 flex-1">
-          <div className="break-words text-xs leading-relaxed" role={urgent ? 'alert' : 'status'}>{actionError === null ? message : <MessageNotice message={actionError} />}</div>
-          <a className={getButtonClassName('secondary', 'mt-2')} href="#collection-details" onClick={onOpenDetails}>문제 확인<Icon name="chevron-right" /></a>
-        </div>
-      </section>
-    );
+    return <p className="py-4 text-sm text-muted">현재 확인할 문제가 없습니다.</p>;
   }
 
   return (
     <section aria-label="현재 문제와 조치" className="grid shrink-0 gap-2" data-operational-issues>
       {actionError === null ? null : (
         <div className="rounded-[var(--design-radius-control)] bg-status-negative-background px-3 py-2 text-sm text-status-negative-foreground" role="alert">
-          <MessageNotice message={actionError} />
+          <span>{actionError}</span>
+          {conflictingSessionId === null ? null : (
+            <Link className="ml-1 underline" to={`/mlops/collection/${encodeURIComponent(conflictingSessionId)}`}>사용 중인 세션 열기</Link>
+          )}
           <p className="mt-1 text-xs">원인을 해결한 뒤 다시 시도하세요.</p>
         </div>
       )}
@@ -667,14 +625,18 @@ function CollectionIssuesSection({ issues, onOpenDetails, expanded = false }: {
   );
 }
 
-function CollectionStreamsSection({ telemetry }: { readonly telemetry: CollectionTelemetrySnapshot | null }) {
+function CollectionStreamsSection({ telemetry, questConnection }: {
+  readonly telemetry: CollectionTelemetrySnapshot | null;
+  readonly questConnection?: ReactNode;
+}) {
   const streams = telemetry?.streams ?? [];
   const required = streams.filter((stream) => stream.required && stream.origin !== 'derived');
   const optional = streams.filter((stream) => !stream.required && stream.origin !== 'derived');
   const derived = streams.filter((stream) => stream.origin === 'derived');
+  const questStreams = required.filter((stream) => stream.streamId === 'quest-hand-left' || stream.streamId === 'quest-hand-right');
 
-  const renderStream = (stream: CollectionStreamTelemetry) => (
-    <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1 text-xs" key={stream.streamId}>
+  const renderStream = (stream: CollectionStreamTelemetry, showDeviceId = true) => (
+    <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 text-xs" key={stream.streamId}>
       <div className="min-w-0">
         <StatusIndicator
           className="max-w-full text-xs"
@@ -682,6 +644,7 @@ function CollectionStreamsSection({ telemetry }: { readonly telemetry: Collectio
           tone={streamHealthTone(stream)}
           title={stream.displayName}
         />
+        {!showDeviceId || stream.sourceDeviceId == null ? null : <p className="mt-1 wrap-anywhere font-mono text-xs text-muted">{stream.sourceDeviceId}</p>}
         <p className="mt-1 break-words text-xs leading-relaxed tabular-nums text-muted">
           {stream.lastSampleAtMs === null ? '수신 기록 없음' : `${formatRelativeTime(stream.lastSampleAtMs)} 수신`}
           {stream.droppedFrameCount + stream.missingSampleCount === 0
@@ -698,17 +661,40 @@ function CollectionStreamsSection({ telemetry }: { readonly telemetry: Collectio
         </p>
         <p className="text-xs tabular-nums text-muted">{rateLabel(stream)}</p>
       </div>
+      {stream.origin === 'derived' ? null : (
+        <p className={`col-span-2 text-xs tabular-nums ${stream.lastSampleAtMs !== null && stream.driftMs !== null && telemetry !== null && Math.abs(stream.driftMs) > telemetry.sync.toleranceMs ? 'text-warning' : 'text-muted'}`}>
+          {stream.lastSampleAtMs === null || stream.driftMs === null ? '시간 차이 확인 전' : `시간 차이 ${stream.driftMs.toFixed(1)} ms`}
+        </p>
+      )}
+      <CollectionStreamTimeline stream={stream} telemetry={telemetry} />
     </div>
   );
 
   return (
     <section aria-label="Sensor stream 상태" className="border-t border-border py-4">
+      <div className="mb-5 text-xs" aria-label="동기화 요약">
+        <p className="font-semibold">{syncLabel(telemetry)}</p>
+        {telemetry === null ? null : <p className="mt-1 leading-relaxed tabular-nums text-muted">{telemetry.sync.maxDriftMs === null ? '시간 차이 확인 전' : `최대 시간 차이 ${telemetry.sync.maxDriftMs.toFixed(1)} ms`} · 허용 {telemetry.sync.toleranceMs} ms</p>}
+      </div>
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">필수 수집 소스</h2>
         <span className="text-xs text-muted">관측 / 목표</span>
       </div>
+      {telemetry === null || telemetry.timeline.tracks.length === 0 ? null : <p className="mb-2 text-xs text-muted">최근 {telemetry.timeline.windowMs / 1_000}초 · 경고 구간은 누락·지연</p>}
       <div className="collection-stream-list grid divide-y divide-border">
-        {required.map(renderStream)}
+        {questStreams.length === 0 && questConnection == null ? null : (
+          <section aria-label="Quest 손 추적 장치" className="py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold">Quest 손 추적</h3>
+                {questStreams[0]?.sourceDeviceId == null ? null : <p className="mt-1 wrap-anywhere font-mono text-xs text-muted">{questStreams[0].sourceDeviceId}</p>}
+              </div>
+              {questConnection}
+            </div>
+            {questStreams.map((stream) => renderStream(stream, false))}
+          </section>
+        )}
+        {required.filter((stream) => !questStreams.includes(stream)).map((stream) => renderStream(stream))}
         {telemetry !== null ? null : <p className="py-3 text-xs text-muted">장치의 수신 상태를 기다리고 있습니다.</p>}
         {telemetry === null || required.length > 0 ? null : <p className="py-3 text-xs text-muted">필수 수집 소스가 없습니다. 세션의 장치 구성을 확인하세요.</p>}
       </div>
@@ -716,47 +702,19 @@ function CollectionStreamsSection({ telemetry }: { readonly telemetry: Collectio
         { label: '선택 소스', streams: optional },
         { label: '파생 소스', streams: derived },
       ].filter((group) => group.streams.length > 0).map((group) => (
-        <details className="collection-inline-details" key={group.label}>
-          <summary>{group.label} · {String(group.streams.length)}개</summary>
-          <div className="collection-stream-list grid divide-y divide-border">{group.streams.map(renderStream)}</div>
-        </details>
+        <section className="mt-5" key={group.label}>
+          <h3 className="mb-2 text-sm font-semibold">{group.label} <span className="ml-1 text-xs font-normal tabular-nums text-muted">{group.streams.length}</span></h3>
+          <div className="collection-stream-list grid divide-y divide-border">{group.streams.map((stream) => renderStream(stream))}</div>
+        </section>
       ))}
     </section>
   );
 }
 
-function sourceRoleLabel(role: HumanDemonstrationBinding['sourceBindings'][number]['role']): string {
-  if (role === 'xr-hand-tracking') return 'XR Hand Pose';
-  if (role === 'head-camera') return 'RBP Head Camera';
-  if (role === 'external-scene-camera') return 'External Camera';
-  return 'Exoskeleton';
-}
-
-function SourceBindingsSection({ binding }: { readonly binding: HumanDemonstrationBinding }) {
+function CollectorCommandStatus({ binding }: { readonly binding: HumanDemonstrationBinding }) {
   return (
-      <section aria-label="Human Demonstration source bindings" className="pb-2 pt-3">
-        <p className="break-words text-xs leading-relaxed text-muted">Profile · {binding.profile.id}</p>
-      <dl className="collection-source-bindings mt-4 grid gap-4 text-xs">
-        {binding.sourceBindings.map((source) => (
-          <div className="min-w-0" key={source.sourceDeviceId}>
-            <dt className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-semibold">{sourceRoleLabel(source.role)}</span>
-            <StatusIndicator
-              className="text-xs"
-              label={source.state === 'recording' ? '녹화 중' : source.state === 'ready' ? '준비' : source.state === 'paired' ? '페어링 완료' : source.state === 'pending' ? '연결 대기' : source.state === 'stale' ? '갱신 지연' : source.required ? '오프라인' : '미사용'}
-              tone={source.state === 'recording' || source.state === 'ready'
-                ? 'positive'
-                : source.state === 'paired' || source.state === 'pending' || source.state === 'stale'
-                  ? 'warning'
-                  : source.required ? 'negative' : 'neutral'}
-            />
-            </dt>
-            <dd className="mt-2 grid gap-1 break-words font-mono leading-relaxed text-muted"><span>{source.sourceDeviceId}</span><span>{source.integrationProfileId}</span></dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-4 border-t border-border pt-3">
-        <p className="text-xs font-semibold">Collector 명령 응답</p>
+      <section aria-label="Collector 명령 응답" className="pb-2">
+        <h3 className="text-sm font-semibold">Collector 명령 응답</h3>
         {binding.collectorAcknowledgements.length === 0 ? (
           <p className="mt-1 text-xs text-muted">Episode command 대기 중</p>
         ) : (
@@ -768,24 +726,7 @@ function SourceBindingsSection({ binding }: { readonly binding: HumanDemonstrati
             ))}
           </ul>
         )}
-      </div>
       </section>
-  );
-}
-
-function MessageNotice({ message }: { readonly message: string }) {
-  const path = message.match(/\/mlops\/collection\/[^\s]+/u)?.[0] ?? null;
-  const label = path === null ? message : message.replace(path, '').trim();
-  return (
-    <span>
-      {label}
-      {path === null ? null : (
-        <>
-          {' '}
-          <Link className="underline" to={path}>사용 중인 세션 열기</Link>
-        </>
-      )}
-    </span>
   );
 }
 
@@ -807,6 +748,7 @@ function DeleteOperationalSessionButton({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialogOpen = open ?? internalOpen;
+  const deletedRef = useRef(false);
   const setDialogOpen = (nextOpen: boolean): void => {
     if (open === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -817,8 +759,8 @@ function DeleteOperationalSessionButton({
     setError(null);
     try {
       await port.deleteOperationalSession(session.id);
+      deletedRef.current = true;
       setDialogOpen(false);
-      onDeleted?.();
     } catch {
       setError('세션을 삭제하지 못했습니다. 다시 시도해 주세요.');
     } finally {
@@ -847,6 +789,12 @@ function DeleteOperationalSessionButton({
         if (nextOpen) setError(null);
       }}
       open={dialogOpen}
+      cancelDisabled={pending}
+      onAfterClose={() => {
+        if (!deletedRef.current) return;
+        deletedRef.current = false;
+        onDeleted?.();
+      }}
       title={`${session.name} 세션을 삭제하시겠습니까?`}
       {...(trigger === undefined && open === undefined
         ? { trigger: <Button disabled={pending} variant="danger">세션 삭제</Button> }
@@ -934,6 +882,7 @@ function sessionRequiredSourceLabel(session: HumanoidCaptureSession): {
 }
 
 export function CollectionWorkspacePage() {
+  const createLinkRef = useRef<HTMLAnchorElement>(null);
   const query = useFlywheelQuery(loadCollectionOperations);
   const now = useNow();
   const [params, setParams] = useSearchParams();
@@ -942,6 +891,8 @@ export function CollectionWorkspacePage() {
   const profileFilter = params.get('profile') ?? 'all';
   const siteFilter = params.get('collectionSite') ?? 'all';
   const sort = params.get('sort') ?? 'priority';
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const advancedFilterCount = Number(profileFilter !== 'all') + Number(siteFilter !== 'all') + Number(sort !== 'priority');
   const [exportStatus, setExportStatus] = useState('');
   const [exportError, setExportError] = useState(false);
   const setFilter = (key: string, value: string): void => {
@@ -954,11 +905,11 @@ export function CollectionWorkspacePage() {
   };
   const unavailable = query.status === 'error' && query.message.includes('지원하지 않는');
   const isEmpty = query.status === 'ready' && query.data.sessions.length === 0;
-  const hasFilters = search.length > 0 || stateFilter !== 'all' || profileFilter !== 'all' || siteFilter !== 'all';
+  const hasFilters = search.length > 0 || stateFilter !== 'all' || advancedFilterCount > 0;
   const resetFilters = (): void => {
     setParams((current) => {
       const next = new URLSearchParams(current);
-      for (const key of ['q', 'state', 'profile', 'collectionSite']) next.delete(key);
+      for (const key of ['q', 'state', 'profile', 'collectionSite', 'sort']) next.delete(key);
       return next;
     }, { replace: true });
   };
@@ -967,10 +918,9 @@ export function CollectionWorkspacePage() {
     <div className="@container grid min-w-0 gap-6">
       <PageHeader
         title="데이터 수집"
-        {...(isEmpty ? {} : { description: '진행 중인 세션과 녹화 상태를 확인하세요.' })}
         actions={isEmpty ? undefined : unavailable
           ? <Button disabled title="수집 장치 연결을 먼저 설정해야 합니다.">새 수집</Button>
-          : <Link className={getButtonClassName('primary')} to="/mlops/collection/new">새 수집</Link>}
+          : <Link ref={createLinkRef} className={getButtonClassName('primary')} to={{ pathname: '/mlops/collection/new', search: params.toString() }}>새 수집</Link>}
       />
       {query.status === 'loading' ? <QueryFeedback kind="loading" /> : null}
       {query.status === 'error' ? (
@@ -989,18 +939,7 @@ export function CollectionWorkspacePage() {
               <h2 className="text-xl font-bold text-balance" id="collection-empty-title">진행 중인 수집이 없습니다</h2>
               <p className="text-sm leading-relaxed text-muted">새 세션에서 장치를 연결하고 녹화를 시작하세요.</p>
             </div>
-            <Link className={getButtonClassName('primary')} to="/mlops/collection/new">새 수집</Link>
-          </div>
-          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 border-t border-border pt-3">
-            <details className="min-w-0 flex-1 text-sm">
-              <summary className="min-h-[var(--layout-control-height)] cursor-pointer content-center rounded-[var(--design-radius-control)] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">수집 절차 안내</summary>
-              <ol aria-label="데이터 수집 절차" className="grid list-decimal gap-2 py-3 pl-5 leading-6 text-muted">
-                <li>작업 지시와 사용할 장치를 지정합니다.</li>
-                <li>장치 연결을 확인하고 에피소드를 녹화합니다.</li>
-                <li>녹화본을 검토해 저장하면 데이터 카탈로그에서 확인할 수 있습니다.</li>
-              </ol>
-            </details>
-            <Link className={getButtonClassName('ghost')} to="/mlops/catalog">저장한 데이터 보기</Link>
+            <Link ref={createLinkRef} className={getButtonClassName('primary')} to={{ pathname: '/mlops/collection/new', search: params.toString() }}>새 수집</Link>
           </div>
         </section>
       ) : null}
@@ -1012,15 +951,19 @@ export function CollectionWorkspacePage() {
               : sessionEpisodes.find((episode) => episode.id === session.activeEpisodeId) ?? null;
             const quality = episodeQualitySummary(sessionEpisodes);
             const required = sessionRequiredSourceLabel(session);
-            const state = getCollectionWorkspaceState(session, activeEpisode);
+            const workspaceState = getCollectionWorkspaceState(session, activeEpisode);
+            const needsConnection = session.humanDemonstration !== null
+              && required.tone !== 'positive'
+              && (workspaceState === 'prepare' || workspaceState === 'episode-ready' || workspaceState === 'recording');
+            const state = needsConnection && workspaceState === 'episode-ready' ? 'prepare' : workspaceState;
             return {
               session,
               activeEpisode,
               needsAttention: quality.needsReview
                 || state === 'attention'
-                || ((state === 'recording' || state === 'episode-ready') && required.tone !== 'positive'),
+                || needsConnection,
+              needsConnection,
               quality,
-              required,
               state,
             };
           });
@@ -1057,39 +1000,93 @@ export function CollectionWorkspacePage() {
             }
             return right.session.updatedAtMs - left.session.updatedAtMs;
           });
+          const stateOptions = [
+            { label: '전체', count: counts.all, value: 'all' },
+            { label: '확인 필요', count: counts.attention, value: 'attention' },
+            { label: '녹화 중', count: counts.recording, value: 'recording' },
+            ...(counts.review > 0 || stateFilter === 'review' ? [{ label: '검토 대기', count: counts.review, value: 'review' }] : []),
+            ...(counts.processing > 0 || stateFilter === 'processing' ? [{ label: '처리 중', count: counts.processing, value: 'processing' }] : []),
+            ...(stateFilter === 'prepare' || stateFilter === 'episode-ready' ? [{
+              label: stateFilter === 'prepare' ? '준비 중' : '녹화 준비',
+              count: rows.filter((row) => row.state === stateFilter).length,
+              value: stateFilter,
+            }] : []),
+          ];
+          const listContent = (
+            <>
+              <p className="sr-only" role="status">전체 {rows.length}개 중 {sorted.length}개 표시</p>
+              {exportStatus ? <p className={`text-sm ${exportError ? 'text-negative' : 'text-muted'}`} role={exportError ? 'alert' : 'status'}>{exportStatus}</p> : null}
+              {sorted.length === 0 ? (
+                <QueryFeedback kind="filtered-empty" message={search.trim() ? `‘${search.trim()}’ 검색 결과가 없습니다. 검색·필터를 초기화해 전체 세션을 확인하세요.` : '선택한 조건의 세션이 없습니다. 검색·필터를 초기화해 전체 세션을 확인하세요.'} />
+              ) : (
+                <Table aria-label="운영 중인 휴머노이드 수집 세션" className="block w-full text-start text-sm @min-[46rem]:table @min-[46rem]:table-fixed">
+                  <TableHeader className="sr-only text-muted @min-[46rem]:not-sr-only @min-[46rem]:table-header-group">
+                    <TableRow>
+                      <TableHead className="w-[36%] px-4 py-2 text-start font-medium">세션·작업</TableHead>
+                      <TableHead className="w-[25%] px-4 py-2 text-start font-medium">상태</TableHead>
+                      <TableHead className="w-[15%] px-4 py-2 text-start font-medium">최근 갱신</TableHead>
+                      <TableHead className="px-4 py-2 text-end font-medium"><span className="sr-only">다음 작업</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="block divide-y divide-border @min-[46rem]:table-row-group">
+                    {sorted.map(({ activeEpisode, needsAttention, needsConnection, quality, session, state }) => {
+                      const canConnectInModal = session.humanDemonstration !== null && (session.status === 'draft' || session.status === 'ready');
+                      const needsSetup = canConnectInModal && (session.status === 'draft' || needsConnection);
+                      const sessionPath = `/mlops/collection/${encodeURIComponent(session.id)}${needsSetup ? '/setup' : ''}`;
+                      const destination = { pathname: sessionPath, search: needsSetup ? params.toString() : '' };
+                      const statusLabel = needsConnection && state !== 'recording' ? '장치 연결 필요'
+                        : quality.needsReview && state === 'episode-ready' ? quality.label
+                          : getWorkspaceStateLabel(state, activeEpisode);
+                      const statusTone = needsAttention && state !== 'recording' ? 'warning' : workspaceTone(state);
+                      const actionLabel = needsConnection && state !== 'recording' ? canConnectInModal ? '장치 연결' : '장치 확인'
+                        : listActionLabel(state === 'recording' ? state : needsAttention ? 'attention' : state);
+                      return (
+                        <TableRow className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 p-4 @min-[46rem]:table-row" key={session.id}>
+                          <TableCell className="col-span-2 block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
+                            <Link className="block truncate font-semibold hover:underline" title={session.name} to={destination}>{session.name}</Link>
+                            <p className="mt-1 truncate text-xs text-muted" title={session.taskId}>{session.taskId}</p>
+                          </TableCell>
+                          <TableCell className="block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
+                            <StatusIndicator label={statusLabel} tone={statusTone} />
+                            {state === 'recording' && needsConnection ? <p className="mt-1 text-xs text-warning">장치 연결 확인 필요</p> : null}
+                          </TableCell>
+                          <TableCell className="block min-w-0 text-end text-xs text-muted @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3 @min-[46rem]:text-start">
+                            <time dateTime={new Date(session.updatedAtMs).toISOString()} title={formatDateTime(session.updatedAtMs)}>{formatRelativeTime(session.updatedAtMs, now)}</time>
+                          </TableCell>
+                          <TableCell className="col-span-2 block min-w-0 @min-[46rem]:table-cell @min-[46rem]:px-4 @min-[46rem]:py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <Link className={getButtonClassName('secondary', 'px-3')} to={destination}>{actionLabel}</Link>
+                              <OperationalSessionActions session={session} />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </>
+          );
           return (
-            <div className="grid min-w-0 gap-6">
-              <section aria-label="수집 운영 요약" className="grid grid-cols-2 gap-3 @min-[46rem]:grid-cols-5">
-                {([
-                  { label: '전체 세션', count: counts.all, value: 'all', tone: 'neutral' },
-                  { label: '녹화 중', count: counts.recording, value: 'recording', tone: counts.recording > 0 ? 'positive' : 'neutral' },
-                  { label: '확인 필요', count: counts.attention, value: 'attention', tone: counts.attention > 0 ? 'negative' : 'neutral' },
-                  { label: '검토 대기', count: counts.review, value: 'review', tone: counts.review > 0 ? 'warning' : 'neutral' },
-                  { label: '처리 중', count: counts.processing, value: 'processing', tone: counts.processing > 0 ? 'info' : 'neutral' },
-                ] satisfies readonly { label: string; count: number; value: string; tone: StatusIndicatorTone }[]).map(({ label, count, value, tone }) => (
-                  <Button
-                    aria-label={`${label} ${String(count)}개`}
-                    aria-pressed={stateFilter === value}
-                    className={`min-w-0 justify-start whitespace-normal px-4 py-4 ${value === 'all' ? 'col-span-2 @min-[46rem]:col-span-1' : ''} ${stateFilter === value ? 'ring-2 ring-inset ring-focus' : ''}`}
-                    key={value}
-                    onClick={() => setFilter('state', value)}
-                    variant="secondary"
-                  >
-                    <span className="flex w-full items-center justify-between gap-3 text-start @min-[46rem]:grid">
-                      <StatusIndicator className="text-xs" label={label} tone={tone} />
-                      <span className="text-2xl font-bold tabular-nums">{count}</span>
-                    </span>
-                  </Button>
-                ))}
-              </section>
-              <section aria-labelledby="collection-list-title" className="grid min-w-0 gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <h2 className="text-base font-bold" id="collection-list-title">진행 중인 세션</h2>
-                  <p className="text-sm tabular-nums text-muted" role="status">전체 {rows.length}개 중 {sorted.length}개 표시</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="ghost" disabled={sorted.length === 0} onClick={() => {
+            <section aria-labelledby="collection-list-title" className="grid min-w-0 gap-3">
+              <h2 className="sr-only" id="collection-list-title">수집 세션</h2>
+              <div className="flex min-w-0 items-center gap-2">
+                <SearchField
+                  className="min-w-0 flex-1"
+                  label="수집 검색"
+                  showLabel={false}
+                  onValueChange={(value) => setFilter('q', value)}
+                  placeholder="세션 또는 작업 검색"
+                  value={search}
+                />
+                <Button aria-controls="collection-filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} variant="secondary">
+                  필터{advancedFilterCount > 0 ? ` · ${String(advancedFilterCount)}` : ''}
+                </Button>
+                <Dropdown label="수집 목록 메뉴" trigger={<Button className="size-10 min-h-0 shrink-0 p-0" variant="ghost"><Icon name="more" /></Button>} items={[{
+                  label: '수집 세션 JSON 내보내기',
+                  disabled: sorted.length === 0,
+                  icon: <Icon name="download" />,
+                  onSelect: () => {
                     try {
                       downloadTextFile('collection-sessions.json', JSON.stringify(sorted.map(({ session }) => createCollectionSessionExportRecord(session)), null, 2), 'application/json');
                       setExportStatus(`현재 표시된 세션 ${String(sorted.length)}개의 기록 정보를 내보냈습니다.`);
@@ -1098,512 +1095,109 @@ export function CollectionWorkspacePage() {
                       setExportStatus('기록 정보를 내보내지 못했습니다. 다시 시도하세요.');
                       setExportError(true);
                     }
-                  }}><Icon name="download" />수집 세션 JSON 내보내기</Button>
-                  <Link className={getButtonClassName('ghost')} to="/mlops/catalog">저장된 데이터 보기<Icon name="chevron-right" /></Link>
-                </div>
+                  },
+                }]} />
               </div>
-              {exportStatus ? <p className={`text-sm ${exportError ? 'text-negative' : 'text-muted'}`} role={exportError ? 'alert' : 'status'}>{exportStatus}</p> : null}
-              <div className="grid min-w-0 gap-3 @min-[30rem]:grid-cols-2 @min-[58rem]:grid-cols-[minmax(14rem,1.5fr)_repeat(3,minmax(0,1fr))]">
-                <Input
-                  className="min-w-0 flex-1"
-                  label="수집 검색"
-                  leadingIcon="search"
-                  onChange={(event) => setFilter('q', event.target.value)}
-                  placeholder="세션, 작업, 로봇 또는 참여자"
-                  value={search}
-                />
-                <Select
-                  label="상태 필터"
-                  onValueChange={(value) => setFilter('state', value)}
-                  options={[
-                    { label: '전체 상태', value: 'all' },
-                    { label: '녹화 중', value: 'recording' },
-                    { label: '확인 필요', value: 'attention' },
-                    { label: '검토 대기', value: 'review' },
-                    { label: '처리 중', value: 'processing' },
-                    { label: '사전점검 필요', value: 'prepare' },
-                    { label: '녹화 준비 완료', value: 'episode-ready' },
-                  ]}
-                  className="min-w-0"
-                  value={stateFilter}
-                />
-                <Select
-                  label="센서 프로필"
-                  onValueChange={(value) => setFilter('profile', value)}
-                  options={[
+              <div hidden={!filtersOpen} id="collection-filters">
+                <div className="grid gap-3 border-b border-border pb-4 sm:grid-cols-3">
+                  <Select label="센서 프로필" className="min-w-0" value={profileFilter} onValueChange={(value) => setFilter('profile', value)} options={[
                     { label: '전체 프로필', value: 'all' },
                     ...profileOptions.map((profile) => ({ label: profile, value: profile })),
-                  ]}
-                  className="min-w-0"
-                  value={profileFilter}
-                />
-                <Select
-                  label="수집 장소"
-                  onValueChange={(value) => setFilter('collectionSite', value)}
-                  options={[
+                  ]} />
+                  <Select label="수집 장소" className="min-w-0" value={siteFilter} onValueChange={(value) => setFilter('collectionSite', value)} options={[
                     { label: '전체 장소', value: 'all' },
                     ...siteOptions.map((site) => ({ label: site, value: site })),
-                  ]}
-                  className="min-w-0"
-                  value={siteFilter}
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Select className="w-44" label="세션 정렬" showLabel={false} value={sort} onValueChange={(value) => setFilter('sort', value)} options={[
-                  { label: '진행 상태 우선', value: 'priority' },
-                  { label: '최근 갱신 순', value: 'recent' },
-                  { label: '세션 이름순', value: 'name' },
-                ]} />
-                {hasFilters ? <Button onClick={resetFilters} variant="ghost"><Icon name="close" />검색·필터 초기화</Button> : null}
-              </div>
-              {sorted.length === 0 ? (
-                <div className="rounded-[var(--design-radius-surface)] bg-layer-raised">
-                  <QueryFeedback kind="filtered-empty" message={search.trim() ? `‘${search.trim()}’ 검색 결과가 없습니다. 검색·필터를 초기화해 전체 세션을 확인하세요.` : '선택한 조건의 세션이 없습니다. 검색·필터를 초기화해 전체 세션을 확인하세요.'} />
+                  ]} />
+                  <Select label="세션 정렬" className="min-w-0" value={sort} onValueChange={(value) => setFilter('sort', value)} options={[
+                    { label: '진행 상태 우선', value: 'priority' },
+                    { label: '최근 갱신 순', value: 'recent' },
+                    { label: '세션 이름순', value: 'name' },
+                  ]} />
                 </div>
-              ) : (
-              <Table aria-label="운영 중인 휴머노이드 수집 세션" className="block w-full text-start text-sm @min-[58rem]:table @min-[58rem]:table-fixed">
-                <TableHeader className="sr-only bg-surface-muted text-muted @min-[58rem]:not-sr-only @min-[58rem]:table-header-group">
-                  <TableRow>
-                    <TableHead className="w-[33%] px-4 py-3 text-start font-semibold">세션·작업</TableHead>
-                    <TableHead className="w-[23%] px-4 py-3 text-start font-semibold">현재 단계</TableHead>
-                    <TableHead className="w-[24%] px-4 py-3 text-start font-semibold">소스·품질</TableHead>
-                    <TableHead className="px-4 py-3 text-start font-semibold">다음 작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="block divide-y divide-border @min-[58rem]:table-row-group">
-                  {sorted.map(({ activeEpisode, needsAttention, quality, required, session, state }) => {
-                    return (
-                      <TableRow className="grid gap-4 p-4 @min-[30rem]:grid-cols-2 @min-[58rem]:table-row" key={session.id}>
-                        <TableCell className="block min-w-0 @min-[30rem]:col-span-2 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
-                          <div className="break-words font-semibold">
-                          <DetailLink to={`/mlops/collection/${session.id}`}>
-                            {session.name}
-                          </DetailLink>
-                          </div>
-                          <p className="mt-1 break-words text-xs leading-relaxed text-muted">
-                            {session.taskId} · {sessionSubjectLabel(session)}
-                          </p>
-                          <p className="mt-2 text-xs leading-relaxed text-muted">
-                            {getExecutionEnvironmentLabel(session.provenance.environment)} · <time dateTime={new Date(session.updatedAtMs).toISOString()} title={formatDateTime(session.updatedAtMs)}>{formatRelativeTime(session.updatedAtMs, now)} 갱신</time>
-                          </p>
-                        </TableCell>
-                        <TableCell className="block min-w-0 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
-                          <p aria-hidden="true" className="mb-2 text-xs text-muted @min-[58rem]:hidden">현재 단계</p>
-                          <StatusIndicator label={getWorkspaceStateLabel(state, activeEpisode)} tone={workspaceTone(state)} />
-                          <p className="mt-1 break-words text-xs leading-relaxed text-muted">{activeEpisode?.name ?? '녹화 중인 Episode 없음'}</p>
-                        </TableCell>
-                        <TableCell className="block min-w-0 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
-                          <p aria-hidden="true" className="mb-2 text-xs text-muted @min-[58rem]:hidden">소스·품질</p>
-                          <div className="grid gap-2">
-                            <StatusIndicator label={required.label} tone={required.tone} />
-                            <StatusIndicator label={quality.label} tone={quality.tone} />
-                          </div>
-                        </TableCell>
-                        <TableCell className="block min-w-0 @min-[30rem]:col-span-2 @min-[58rem]:table-cell @min-[58rem]:px-4 @min-[58rem]:py-5">
-                          <div className="flex items-center justify-between gap-2">
-                          <Link className={getButtonClassName('secondary', 'px-2')} to={`/mlops/collection/${session.id}`}>
-                            {listActionLabel(needsAttention ? 'attention' : state)}
-                            <Icon name="chevron-right" />
-                          </Link>
-                          <OperationalSessionActions session={session} />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              )}
-              </section>
-            </div>
+              </div>
+              <Tabs
+                aria-label="수집 상태 필터"
+                value={stateFilter}
+                onValueChange={(value) => setFilter('state', value)}
+                actions={hasFilters ? <Button onClick={resetFilters} variant="ghost" className="px-1 text-xs">검색·필터 초기화</Button> : undefined}
+                items={stateOptions.map((option) => ({ ...option, content: listContent }))}
+              />
+            </section>
           );
         })() : null}
+      <Outlet context={{ restoreCreateFocus: () => createLinkRef.current?.focus() }} />
     </div>
   );
 }
 
-function sourceBindingStatus(source: HumanDemonstrationBinding['sourceBindings'][number]): {
-  readonly label: string;
-  readonly tone: StatusIndicatorTone;
-} {
-  if (source.state === 'recording') return { label: '녹화 중', tone: 'positive' };
-  if (source.state === 'ready') return { label: '준비', tone: 'positive' };
-  if (source.state === 'paired') return { label: '페어링 완료', tone: 'warning' };
-  if (source.state === 'stale') return { label: '갱신 지연', tone: 'warning' };
-  if (source.state === 'pending') return { label: '연결 대기', tone: 'warning' };
-  return source.required
-    ? { label: source.state === 'error' ? '오류' : '오프라인', tone: 'negative' }
-    : { label: source.state === 'error' ? '오류' : '미사용', tone: source.state === 'error' ? 'warning' : 'neutral' };
-}
-
-function SetupSourceRow({
-  source,
-}: {
-  readonly source: HumanDemonstrationBinding['sourceBindings'][number];
-}) {
-  const status = sourceBindingStatus(source);
-  return (
-    <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-2.5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-semibold">{sourceRoleLabel(source.role)}</p>
-          <span className="text-xs text-muted">{source.required ? '필수' : '선택'}</span>
-        </div>
-        <p className="mt-0.5 truncate text-xs text-muted">
-          {source.sourceDeviceId}
-          {source.lastSeenAtMs === null ? ' · 수신 기록 없음' : ` · ${formatRelativeTime(source.lastSeenAtMs)} 확인`}
-        </p>
-      </div>
-      {status.tone === 'positive' ? <span className="text-sm text-muted">{status.label}</span> : <StatusIndicator label={status.label} tone={status.tone} />}
-    </div>
-  );
-}
-
-function NewCollectionReadinessStage({
-  session,
-}: {
-  readonly session: HumanoidCaptureSession;
-}) {
-  const telemetryQuery = useCollectionTelemetry(session.id);
-  const telemetry = telemetryQuery.status === 'ready' ? telemetryQuery.data : null;
-  const binding = session.humanDemonstration;
-  if (binding === null) return null;
-  const requiredSources = binding.sourceBindings.filter((source) => source.required);
-  const readySources = requiredSources.filter((source) => {
-    const status = sourceBindingStatus(source);
-    return status.tone === 'positive';
-  });
-  const allRequiredReady = readySources.length === requiredSources.length;
-  const cameraSources = humanDemonstrationCameraSources
-    .filter((source) => source.id !== 'external-fullbody-rgb'
-      || binding.sourceBindings.some((item) => (
-        item.role === 'external-scene-camera'
-        && (item.state === 'ready' || item.state === 'recording')
-      )))
-    .map((source) => {
-      const stream = telemetry?.streams.find((item) => item.streamId === source.id);
-      return {
-        ...source,
-        meta: stream === undefined
-          ? source.meta
-          : `${stream.observedRateHz?.toFixed(1) ?? '—'}/${stream.expectedRateHz?.toFixed(0) ?? '—'} FPS`,
-        status: stream?.connectionState === 'live' ? 'live' as const : 'offline' as const,
-      };
-    });
-
-  return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3 overflow-hidden p-4" aria-label="장치 준비 상태">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold">
-            {allRequiredReady ? '필수 장치 준비 완료' : `필수 장치 ${String(readySources.length)}/${String(requiredSources.length)} 준비`}
-          </h2>
-        </div>
-        <StatusIndicator
-          label={session.status === 'ready' ? '사전점검 완료' : allRequiredReady ? '사전점검 실행 가능' : '장치 연결 필요'}
-          tone={allRequiredReady ? 'positive' : 'warning'}
-        />
-      </header>
-
-      <div className="grid divide-y divide-border border-y border-border xl:grid-cols-2 xl:gap-x-4" data-readiness-sources>
-        {binding.sourceBindings.map((source) => <SetupSourceRow key={source.sourceDeviceId} source={source} />)}
-      </div>
-
-      {allRequiredReady ? (
-        <div className="min-h-0 overflow-hidden">
-          <HumanoidCollectionPreview
-            ariaLabel="연결된 수집 장비 미리보기"
-            cameraSources={cameraSources}
-            cameraTitle="연결된 장치 미리보기"
-            poseKind="quest-hands"
-            telemetry={telemetry}
-          />
-        </div>
-      ) : (
-        <div className="grid min-h-0 place-items-center px-6 text-center">
-          <p className="text-sm text-muted">장치 미리보기 대기</p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-export function NewHumanoidCollectionPage() {
-  const port = useFlywheelPort();
-  const dataEnvironment = useDataEnvironment();
+export function CollectionConnectionPage() {
+  const { sessionId = '' } = useParams();
   const navigate = useNavigate();
-  const [name, setName] = useState(defaultSessionName);
-  const [taskId, setTaskId] = useState('');
-  const [instruction, setInstruction] = useState('');
-  const [exoskeletonDeviceId, setExoskeletonDeviceId] = useState('');
-  const [questDeviceId, setQuestDeviceId] = useState('');
-  const [headCameraDeviceId, setHeadCameraDeviceId] = useState('');
-  const [externalCameraDeviceId, setExternalCameraDeviceId] = useState('');
-  const [exampleLoaded, setExampleLoaded] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<CollectionSetupErrors>({});
-  const submissionRef = useRef(false);
-  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const loadCreatedSession = useCallback((flywheelPort: ReturnType<typeof useFlywheelPort>) => (
-    createdSessionId === null
-      ? Promise.resolve(null)
-      : flywheelPort.getSession(createdSessionId)
-  ), [createdSessionId]);
-  const createdSessionQuery = useFlywheelQuery(loadCreatedSession);
-  const createdSession = createdSessionQuery.status === 'ready'
-    && createdSessionQuery.data?.kind === 'humanoid'
-    ? createdSessionQuery.data
-    : null;
-  const binding = createdSession?.humanDemonstration ?? null;
-  const pairingCode = binding?.pairing.code ?? null;
-  const requiredSources = binding?.sourceBindings.filter((source) => source.required) ?? [];
-  const requiredSourcesReady = requiredSources.length > 0 && requiredSources.every((source) => (
-    source.state === 'ready' || source.state === 'recording'
-  ));
-  const submitLabel = createdSession === null
-    ? '세션 생성'
-    : !requiredSourcesReady
-      ? binding?.sourceBindings.some((source) => source.role === 'xr-hand-tracking' && source.state === 'paired')
-        ? 'Quest MR 준비 대기'
-        : 'Quest 페어링 대기'
-      : createdSession.status === 'ready'
-        ? '수집 콘솔 열기'
-        : '사전점검 실행';
+  const [params] = useSearchParams();
+  const context = useOutletContext<CollectionSetupContext | undefined>();
+  const openingConsoleRef = useRef(false);
+  const [dialogOpen, setDialogOpen] = useState(true);
+  const loadSession = useCallback((flywheelPort: ReturnType<typeof useFlywheelPort>) => (
+    flywheelPort.getSession(sessionId)
+  ), [sessionId]);
+  const query = useFlywheelQuery(loadSession);
+  const session = query.status === 'ready' && query.data?.kind === 'humanoid' ? query.data : null;
+  useAutomaticPreflight(session);
+  const quest = session?.humanDemonstration?.sourceBindings.find((source) => source.role === 'xr-hand-tracking');
+  const questReady = quest?.state === 'ready' || quest?.state === 'recording';
+  const finishClose = () => void navigate({
+    pathname: openingConsoleRef.current ? `/mlops/collection/${encodeURIComponent(sessionId)}` : '/mlops/collection',
+    search: params.toString(),
+  }, { replace: true });
+
+  if (session !== null && (session.humanDemonstration === null || !['draft', 'ready', 'failed'].includes(session.status))) {
+    return <Navigate replace to={`/mlops/collection/${encodeURIComponent(session.id)}`} />;
+  }
 
   return (
-    <ColorSchemeArea
-      className="flex h-dvh min-h-0 flex-col overflow-hidden"
-      layer="base"
-      scheme="dark"
+    <Dialog open={dialogOpen} title="Quest 연결" cancelLabel="목록으로"
+      onOpenChange={setDialogOpen}
+      onAfterClose={finishClose}
+      onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        if (!openingConsoleRef.current) context?.restoreCreateFocus();
+      }}
+      actions={session === null || !questReady ? undefined : (
+        <Button disabled={query.refreshError !== null} onClick={() => {
+          openingConsoleRef.current = true;
+          setDialogOpen(false);
+        }}>수집 콘솔 열기</Button>
+      )}
     >
-      <header
-        className="grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-3 text-foreground sm:px-4"
-        data-collection-header
-      >
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-bold sm:text-lg">새 데이터 수집</h1>
-          <p className="truncate text-xs text-muted">
-            {createdSession === null
-              ? `1. 작업과 장치 설정${dataEnvironment === 'simulation' ? ' · 시뮬레이션' : ''}`
-              : `${requiredSourcesReady ? '3. 사전점검' : '2. 장치 연결'} · ${getExecutionEnvironmentLabel(createdSession.provenance.environment)}`}
-          </p>
-        </div>
-        <Link
-          aria-label="수집 설정 취소"
-          className={getButtonClassName('ghost', 'size-10 min-h-0 shrink-0 p-0')}
-          title="수집 설정 취소"
-          to="/mlops/collection"
-        >
-          <Icon name="close" size="md" />
-        </Link>
-      </header>
-      <div
-        className={createdSession === null
-          ? 'grid min-h-0 flex-1 overflow-hidden'
-          : 'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.5fr)]'}
-        data-capture-setup
-      >
-        <aside
-          aria-label="새 수집 세션 설정"
-          className="min-h-0 bg-layer-raised"
-        >
-          <form
-              className="flex h-full min-h-0 flex-col"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (submissionRef.current) return;
-                if (createdSession !== null) {
-                  if (!requiredSourcesReady) return;
-                  if (createdSession.status === 'ready') {
-                    void navigate(`/mlops/collection/${createdSession.id}`);
-                    return;
-                  }
-                  setPending(true);
-                  submissionRef.current = true;
-                  setError(null);
-                  void port.validateSession(createdSession.id).then(() => {
-                    setPending(false);
-                    submissionRef.current = false;
-                  }).catch((reason: unknown) => {
-                    setError(reason instanceof Error ? reason.message : '사전점검을 완료하지 못했습니다.');
-                    setPending(false);
-                    submissionRef.current = false;
-                  });
-                  return;
-                }
-                if (createdSessionId !== null) return;
-                const fields = { name, taskId, instruction, exoskeletonDeviceId, questDeviceId, headCameraDeviceId, externalCameraDeviceId };
-                const errors = validateCollectionSetup(fields);
-                setFieldErrors(errors);
-                if (Object.keys(errors).length > 0) {
-                  event.currentTarget.querySelector<HTMLElement>(`[name="${Object.keys(errors)[0]}"]`)?.focus();
-                  return;
-                }
-                submissionRef.current = true;
-                setPending(true);
-                setError(null);
-                const createSession = port.createHumanDemonstrationSession({
-                  projectId: 'project-tiger',
-                  siteId: 'site-lab',
-                  name: name.trim(),
-                  taskId: taskId.trim(),
-                  instruction: instruction.trim(),
-                  exoskeletonDeviceId: exoskeletonDeviceId.trim(),
-                  questDeviceId: questDeviceId.trim(),
-                  headCameraDeviceId: headCameraDeviceId.trim(),
-                  externalCameraDeviceId: externalCameraDeviceId.trim(),
-                  profileId: 'human-demo-quest-hand-v1',
-                });
-                void createSession.then((session) => {
-                  setCreatedSessionId(session.id);
-                  setPending(false);
-                  submissionRef.current = false;
-                }).catch((reason: unknown) => {
-                  setError(reason instanceof Error ? reason.message : '세션을 생성하지 못했습니다.');
-                  setPending(false);
-                  submissionRef.current = false;
-                });
-              }}
-            >
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
-                {createdSession === null ? (
-                  <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 md:gap-10">
-                    <section>
-                      <h2 className="text-base font-bold">작업 정의</h2>
-                      {dataEnvironment === 'simulation' ? (
-                        <div className="mt-3 grid justify-items-start gap-2">
-                          <Button type="button" variant="secondary" disabled={pending || createdSessionId !== null} onClick={() => {
-                            setTaskId('task-sort-fruit');
-                            setInstruction('과일을 종류에 맞는 트레이에 분류하세요.');
-                            setExoskeletonDeviceId('exoskeleton-001');
-                            setQuestDeviceId('quest2-001');
-                            setHeadCameraDeviceId('rbp-headcam-001');
-                            setExternalCameraDeviceId('external-camera-001');
-                            setExampleLoaded(true);
-                            setFieldErrors({});
-                          }}>시뮬레이션 예시 불러오기</Button>
-                          <p className="text-xs text-muted" role="status">{exampleLoaded ? '예시 작업과 장치 ID를 불러왔습니다. 실제 장치에 연결되지 않습니다.' : '예시 작업과 장치 ID로 수집 흐름을 확인할 수 있습니다.'}</p>
-                        </div>
-                      ) : null}
-                    <div className="mt-4 grid gap-4">
-                      <Input label="세션 이름" name="name" {...(fieldErrors.name ? { error: fieldErrors.name } : {})} disabled={pending || createdSessionId !== null} value={name} onChange={(event) => setName(event.target.value)} required />
-                      <Input label="작업 ID" name="taskId" {...(fieldErrors.taskId ? { error: fieldErrors.taskId } : {})} disabled={pending || createdSessionId !== null} value={taskId} onChange={(event) => setTaskId(event.target.value)} required />
-                      <Textarea label="작업 지시" name="instruction" aria-invalid={fieldErrors.instruction ? true : undefined} aria-describedby={fieldErrors.instruction ? 'collection-instruction-error' : undefined} disabled={pending || createdSessionId !== null} value={instruction} onChange={(event) => setInstruction(event.target.value)} required />
-                      {fieldErrors.instruction ? <p className="text-sm text-negative" id="collection-instruction-error">{fieldErrors.instruction}</p> : null}
-                    </div>
-                    </section>
-                    <section>
-                      <h2 className="text-base font-bold">수집 장치 연결</h2>
-                      <p className="mt-2 text-sm leading-6 text-muted">
-                        세션 생성 후 Quest 연결 코드가 발급됩니다.
-                      </p>
-                      <div className="mt-4 grid gap-3">
-                        <Input label="외골격 장치 ID" name="exoskeletonDeviceId" {...(fieldErrors.exoskeletonDeviceId ? { error: fieldErrors.exoskeletonDeviceId } : {})} disabled={pending || createdSessionId !== null} value={exoskeletonDeviceId} onChange={(event) => setExoskeletonDeviceId(event.target.value)} required />
-                        <Input label="Quest 손 추적 장치 ID" name="questDeviceId" {...(fieldErrors.questDeviceId ? { error: fieldErrors.questDeviceId } : {})} disabled={pending || createdSessionId !== null} value={questDeviceId} onChange={(event) => setQuestDeviceId(event.target.value)} required />
-                        <Input label="RBP 헤드 카메라 ID" name="headCameraDeviceId" {...(fieldErrors.headCameraDeviceId ? { error: fieldErrors.headCameraDeviceId } : {})} disabled={pending || createdSessionId !== null} value={headCameraDeviceId} onChange={(event) => setHeadCameraDeviceId(event.target.value)} required />
-                        <Input label="외부 카메라 ID · 선택" name="externalCameraDeviceId" {...(fieldErrors.externalCameraDeviceId ? { error: fieldErrors.externalCameraDeviceId } : {})} disabled={pending || createdSessionId !== null} value={externalCameraDeviceId} onChange={(event) => setExternalCameraDeviceId(event.target.value)} />
-                      </div>
-                      <p className="mt-4 text-xs leading-5 text-muted">
-                        참여자 ID는 세션마다 가명으로 발급됩니다.
-                      </p>
-                    </section>
-                  </div>
-                ) : (
-                  <div className="grid gap-4" aria-live="polite">
-                    <div>
-                      <h2 className="text-base font-bold">Quest 연결</h2>
-                      <p className="mt-2 text-sm leading-6 text-muted">
-                        {requiredSourcesReady ? '필수 장치가 연결되었습니다. 사전점검 결과를 확인하세요.' : 'Quest의 수집 앱을 이 세션에 연결하세요.'}
-                      </p>
-                    </div>
-                    <div className={requiredSourcesReady ? 'flex flex-wrap items-center justify-between gap-2 border-y border-border py-3' : 'border-y border-border py-5 text-center'}>
-                      <p className="text-sm text-muted">Quest 연결 코드</p>
-                      <output
-                        aria-label="Quest pairing code"
-                        className="block font-mono text-2xl font-bold tracking-[0.16em] tabular-nums"
-                      >
-                        {pairingCode}
-                      </output>
-                      <p className="mt-2 text-xs text-muted">
-                        <PairingCountdown expiresAtMs={binding?.pairing.expiresAtMs ?? null} />
-                      </p>
-                    </div>
-                    {requiredSourcesReady ? null : <p className="text-sm leading-6 text-muted">
-                      Quest 브라우저에서 이 플랫폼의{' '}
-                      <code className="font-mono text-foreground">/collect/quest</code>를 열고 위 6자리 코드를 입력하세요.
-                    </p>}
-                    {createdSession.preflight.length === 0 ? null : (
-                      <section>
-                        <h3 className="text-sm font-semibold">최근 사전점검</h3>
-                        <div className="mt-2 divide-y divide-border">
-                          {createdSession.preflight.map((check) => (
-                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-2.5" key={check.id}>
-                              <div>
-                                <p className="text-sm font-medium">{check.label}</p>
-                                <p className="mt-0.5 text-xs text-muted">{check.detail}</p>
-                              </div>
-                              {check.state === 'passed' ? <span className="text-sm text-muted">통과</span> : <StatusIndicator
-                                label={check.state === 'warning' ? '검토' : '실패'}
-                                tone={check.state === 'warning' ? 'warning' : 'negative'}
-                              />}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
-                )}
-              </div>
-              <StickyActionBar aria-label="새 수집 작업" position="contained">
-                {createdSession === null ? null : (
-                  <div className="mb-2 md:hidden">
-                    <Dialog title="장치 준비 상태" description="연결된 장치와 수신 상태를 확인하세요." trigger={<Button className="w-full" variant="secondary">장치 준비 상태 보기</Button>}>
-                      <div className="h-[60dvh]"><NewCollectionReadinessStage session={createdSession} /></div>
-                    </Dialog>
-                  </div>
-                )}
-                {error === null ? null : <p className="mb-3 text-sm text-negative" role="alert"><MessageNotice message={error} /></p>}
-                {createdSessionId !== null && createdSession === null && (createdSessionQuery.status === 'error' || createdSessionQuery.refreshError !== null) ? <QueryFeedback kind="error" message="세션을 만들었지만 연결 정보를 불러오지 못했습니다. 다시 조회하세요." onRetry={createdSessionQuery.retry} /> : null}
-                <Button
-                  className={createdSession === null ? 'w-full md:ms-auto md:flex md:w-64' : 'w-full'}
-                  disabled={createdSessionId !== null && createdSession === null || createdSession !== null && !requiredSourcesReady}
-                  isLoading={pending || createdSessionId !== null && (createdSessionQuery.status === 'loading' || createdSessionQuery.isRefreshing)}
-                  type="submit"
-                >
-                  {submitLabel}
-                </Button>
-                {createdSession !== null && !requiredSourcesReady && binding?.sourceBindings.some((source) => source.role === 'xr-hand-tracking' && source.state === 'paired') ? (
-                  <p className="mt-2 text-center text-xs text-muted">
-                    Quest에서 MR 모드를 시작해 손 추적을 준비하세요.
-                  </p>
-                ) : null}
-              </StickyActionBar>
-          </form>
-        </aside>
-
-        {createdSession === null ? null : (
-          <div className="hidden min-h-0 bg-layer-base md:block" data-setup-preview>
-            <NewCollectionReadinessStage session={createdSession} />
-          </div>
-        )}
-      </div>
-    </ColorSchemeArea>
+      {query.status === 'loading' ? <QueryFeedback kind="loading" /> : null}
+      {query.status === 'error' || query.refreshError !== null ? (
+        <QueryFeedback kind="error" message="세션 연결 정보를 불러오지 못했습니다. 다시 조회하세요." onRetry={query.retry} />
+      ) : null}
+      {query.status === 'ready' && session === null ? <QueryFeedback kind="empty" message="수집 세션을 찾을 수 없습니다." /> : null}
+      {session === null ? null : <QuestPairingPanel key={session.id} session={session} disabled={query.refreshError !== null} />}
+    </Dialog>
   );
 }
 
 export function HumanoidCollectionDetailPage() {
   const { sessionId = '' } = useParams();
+  const now = useNow();
   const port = useFlywheelPort();
   const navigate = useNavigate();
   const telemetryQuery = useCollectionTelemetry(sessionId);
   const loadSession = useCallback((value: ReturnType<typeof useFlywheelPort>) => value.getSession(sessionId), [sessionId]);
   const sessionQuery = useFlywheelQuery(loadSession);
+  const automaticPreflight = useAutomaticPreflight(sessionQuery.status === 'ready' ? sessionQuery.data : null);
   const episodesQuery = useFlywheelQuery(loadEpisodes);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('session');
+  const closeDetails = () => {
+    setDetailsOpen(false);
+    requestAnimationFrame(() => document.getElementById(`collection-tab-${detailsTab}`)?.focus());
+  };
   const [pending, setPending] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const leaveAfterExitRef = useRef(false);
   const [exitError, setExitError] = useState<string | null>(null);
   const [retakeDialogOpen, setRetakeDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -1611,6 +1205,7 @@ export function HumanoidCollectionDetailPage() {
   const [reviewPositionMs, setReviewPositionMs] = useState(0);
   const [actionStatus, setActionStatus] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [conflictingSessionId, setConflictingSessionId] = useState<string | null>(null);
   const episodeData = episodesQuery.status === 'ready' ? episodesQuery.data : null;
   const telemetry = telemetryQuery.status === 'ready' ? telemetryQuery.data : null;
   const sessionErrorMessage = sessionQuery.status === 'ready'
@@ -1628,24 +1223,23 @@ export function HumanoidCollectionDetailPage() {
   async function run(action: () => Promise<unknown>, success: string): Promise<boolean> {
     setPending(true);
     setActionError(null);
+    setConflictingSessionId(null);
     try {
       await action();
       setActionStatus(success);
       return true;
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : '작업을 완료하지 못했습니다.';
-      setActionError(message);
+      setConflictingSessionId(reason instanceof SessionConflictError ? reason.sessionId : null);
+      setActionError(reason instanceof SessionConflictError
+        ? '다른 세션에서 수집 장치를 사용 중입니다. 해당 세션을 확인하세요.'
+        : '작업을 완료하지 못했습니다. 장치 연결과 수집 상태를 확인하고 다시 시도하세요.');
       return false;
     } finally {
       setPending(false);
     }
   }
 
-  const visibleActionError = actionError !== null
-    && telemetryQuery.effectiveConnectionState === 'live'
-    && (actionError.includes('source 연결') || actionError.includes('stream 연결'))
-    ? null
-    : actionError ?? sessionErrorMessage;
+  const visibleActionError = actionError ?? automaticPreflight.error ?? sessionErrorMessage;
 
   return (
     <AsyncState query={sessionQuery} emptyMessage="수집 세션을 찾을 수 없습니다.">
@@ -1674,41 +1268,43 @@ export function HumanoidCollectionDetailPage() {
         const shouldRetryProcessing = session.status === 'failed'
           && session.stoppedAtMs !== null
           && savedEpisodes.length > 0;
-        const canRunPreflight = session.status === 'draft'
-          || (session.status === 'failed' && !shouldRetryProcessing);
         const requiredSourcesOperational = session.humanDemonstration === null
           || sessionRequiredSourceLabel(session).tone === 'positive';
-        const preflightSourceBlocked = canRunPreflight && !requiredSourcesOperational;
+        const requiredPreviewStates = telemetry?.streams.filter((stream) => stream.required && stream.origin !== 'derived')
+          .map((stream) => collectionPreviewState(session, telemetry, stream.streamId, now,
+            telemetryQuery.status === 'error' || telemetryQuery.refreshError !== null || sessionQuery.refreshError !== null)) ?? [];
+        const previewConnectionState = session.humanDemonstration === null ? telemetryQuery.effectiveConnectionState : requiredPreviewStates.some((state) => state === 'offline' || state === 'idle') ? 'offline'
+          : requiredPreviewStates.some((state) => state === 'stale') ? 'stale' : telemetryQuery.effectiveConnectionState;
         const canStartEpisode = episodeData !== null && session.activeEpisodeId === null
           && (session.status === 'active' || session.status === 'ready')
-          && requiredSourcesOperational;
-        const workspaceState = getCollectionWorkspaceState(session, activeEpisode);
+          && requiredSourcesOperational && (session.humanDemonstration === null || previewConnectionState === 'live') && !automaticPreflight.checking && automaticPreflight.error === null;
+        const baseWorkspaceState = getCollectionWorkspaceState(session, activeEpisode);
+        const workspaceState = session.humanDemonstration !== null && baseWorkspaceState === 'episode-ready' && previewConnectionState !== 'live' ? 'prepare' : baseWorkspaceState;
         const recordingSummary = getRecordingSummary(session, workspaceState, telemetry, activeEpisode);
         const closeIntent = getCloseIntent(workspaceState, savedEpisodes.length);
         const recordedPreview = activeEpisode?.status === 'finalizing'
           || workspaceState === 'finalizing'
           || workspaceState === 'review';
-        const livePreview = (session.status === 'active' || session.status === 'ready') && !recordedPreview;
+        const needsQuestConnection = !recordedPreview && session.stoppedAtMs === null
+          && session.humanDemonstration?.sourceBindings.some((source) => source.role === 'xr-hand-tracking'
+            && ['pending', 'paired', 'offline', 'stale', 'error'].includes(source.state)) === true;
+        const hasRecording = activeEpisode !== null || savedEpisodes.length > 0 || session.stoppedAtMs !== null;
         const configuredCameraSources = session.humanDemonstration === null
           ? humanoidCameraSources
           : humanDemonstrationCameraSources.filter((source) => (
             source.id !== 'external-fullbody-rgb'
             || session.humanDemonstration?.sourceBindings.some((binding) => (
               binding.role === 'external-scene-camera'
-              && (binding.state === 'paired' || binding.state === 'ready' || binding.state === 'recording')
             ))
           ));
-        const cameraSources = configuredCameraSources.map((source) => {
-          const stream = telemetry?.streams.find((item) => item.streamId === source.id);
-          const status = recordedPreview
-            ? 'recorded' as const
-            : livePreview && stream?.connectionState === 'live'
-              ? 'live' as const
-              : source.id === 'external-fullbody-rgb'
-                ? 'idle' as const
-                : 'offline' as const;
-          return { ...source, meta: '', status };
-        });
+        const previewStates: Readonly<Record<string, MediaStreamState>> = Object.fromEntries(
+          [...configuredCameraSources.map((source) => source.id), 'quest-hand-left', 'quest-hand-right'].map((streamId) => [
+            streamId,
+            recordedPreview ? 'recorded' : collectionPreviewState(session, telemetry, streamId, now,
+              telemetryQuery.status === 'error' || telemetryQuery.refreshError !== null || sessionQuery.refreshError !== null),
+          ]),
+        );
+        const cameraSources = configuredCameraSources.map((source) => ({ ...source, meta: '', status: previewStates[source.id] ?? 'idle' }));
         const performClosePrimary = async (): Promise<void> => {
           setPending(true);
           setExitError(null);
@@ -1717,8 +1313,8 @@ export function HumanoidCollectionDetailPage() {
               if (activeEpisode === null) throw new Error('정지할 Episode를 찾을 수 없습니다.');
               await port.stopEpisode(activeEpisode.id);
               setActionStatus('녹화를 정지하고 수집 목록으로 이동했습니다.');
+              leaveAfterExitRef.current = true;
               setExitDialogOpen(false);
-              void navigate('/mlops/collection');
               return;
             }
             if (closeIntent.kind === 'save-review-and-finish') {
@@ -1741,11 +1337,10 @@ export function HumanoidCollectionDetailPage() {
               setExitDialogOpen(false);
               return;
             }
+            leaveAfterExitRef.current = true;
             setExitDialogOpen(false);
-            void navigate('/mlops/collection');
-          } catch (reason) {
-            const message = reason instanceof Error ? reason.message : '종료 작업을 완료하지 못했습니다.';
-            setExitError(message);
+          } catch {
+            setExitError('종료 작업을 완료하지 못했습니다. 원본 전송과 저장 상태를 확인하고 다시 시도하세요.');
           } finally {
             setPending(false);
           }
@@ -1760,22 +1355,22 @@ export function HumanoidCollectionDetailPage() {
         };
         const collectionIssues = getCollectionIssues({
           actionError: visibleActionError,
+          conflictingSessionId,
           preflight: session.preflight,
           refreshError: telemetryQuery.status === 'error' ? telemetryQuery.message : telemetryQuery.refreshError,
           telemetry,
-          effectiveConnectionState: telemetryQuery.effectiveConnectionState,
+          effectiveConnectionState: previewConnectionState,
+          monitoring: !recordedPreview,
         });
-        const notices = (
+        const problemCount = collectionIssues.count + Number(episodesQuery.status === 'error');
+        const issuesContent = (
           <div className="grid gap-2 empty:hidden">
             {episodesQuery.status === 'error' ? (
               <section aria-label="Episode 조회 오류" className="shrink-0">
                 <QueryFeedback kind="error" message="Episode 기록을 불러오지 못했습니다. 다시 시도해 현재 녹화와 저장 상태를 확인하세요." onRetry={episodesQuery.retry} />
               </section>
             ) : null}
-            <CollectionIssuesSection
-              issues={collectionIssues}
-              onOpenDetails={() => { setDetailsTab('issues'); setDetailsOpen(true); }}
-            />
+            {episodesQuery.status === 'error' && collectionIssues.count === 0 ? null : <CollectionIssuesSection issues={collectionIssues} />}
           </div>
         );
         return (
@@ -1788,9 +1383,15 @@ export function HumanoidCollectionDetailPage() {
               {actionStatus}
             </span>
             <header
-              className="grid shrink-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border px-3 py-2 text-foreground sm:px-4"
+              className="flex h-14 shrink-0 items-center gap-2 px-3 text-foreground sm:gap-3 sm:px-4"
               data-collection-header
             >
+              <h1 className="min-w-0 flex-1 truncate text-base font-bold sm:text-lg" title={session.name}>{session.name}</h1>
+              <Dropdown
+                items={[{ label: '세션 삭제', onSelect: () => setDeleteDialogOpen(true) }]}
+                label="세션 메뉴"
+                trigger={<Button aria-label="세션 메뉴" className="size-10 min-h-0 p-0" variant="ghost"><Icon name="more" /></Button>}
+              />
               <Dialog
                 actions={(
                   <>
@@ -1798,8 +1399,8 @@ export function HumanoidCollectionDetailPage() {
                       <Button
                         disabled={pending}
                         onClick={() => {
+                          leaveAfterExitRef.current = true;
                           setExitDialogOpen(false);
-                          void navigate('/mlops/collection');
                         }}
                         variant="secondary"
                       >
@@ -1822,6 +1423,12 @@ export function HumanoidCollectionDetailPage() {
                   if (open) setExitError(null);
                 }}
                 open={exitDialogOpen}
+                cancelDisabled={pending}
+                onAfterClose={() => {
+                  if (!leaveAfterExitRef.current) return;
+                  leaveAfterExitRef.current = false;
+                  void navigate('/mlops/collection');
+                }}
                 title={closeIntent.title}
                 trigger={(
                   <Button
@@ -1842,18 +1449,6 @@ export function HumanoidCollectionDetailPage() {
                   </div>
                 )}
               </Dialog>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h1 className="min-w-0 truncate text-base font-bold sm:text-lg" title={session.name}>{session.name}</h1>
-                  <span className="text-xs text-muted">{getExecutionEnvironmentLabel(session.provenance.environment)}</span>
-                </div>
-              </div>
-              <Button aria-controls="collection-details" aria-expanded={detailsOpen} className="shrink-0" onClick={() => setDetailsOpen((open) => !open)} variant="secondary">수집 상세<Icon name="chevron-down" /></Button>
-              <Dropdown
-                items={[{ label: '세션 삭제', onSelect: () => setDeleteDialogOpen(true) }]}
-                label="세션 메뉴"
-                trigger={<Button aria-label="세션 메뉴" className="size-10 min-h-0 p-0" variant="ghost"><Icon name="more" /></Button>}
-              />
               <DeleteOperationalSessionButton
                 onDeleted={() => void navigate('/mlops/collection')}
                 onOpenChange={setDeleteDialogOpen}
@@ -1863,16 +1458,20 @@ export function HumanoidCollectionDetailPage() {
             </header>
             <CollectionWorkspaceLiveStatus
               activeEpisode={activeEpisode}
-              effectiveConnectionState={telemetryQuery.effectiveConnectionState}
+              effectiveConnectionState={previewConnectionState}
               session={session}
               state={workspaceState}
             />
             <div
-              className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3 sm:p-4"
+              className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 pt-0 sm:p-3 sm:pt-0"
               data-capture-viewport
             >
-              {!detailsOpen ? notices : null}
-              <div className="collection-workspace" data-inspector-open={detailsOpen}>
+              <RailTabs
+                className="collection-workspace"
+                data-inspector-open={detailsOpen}
+                value={detailsOpen ? detailsTab : ''}
+                onValueChange={(value) => { setDetailsTab(value); setDetailsOpen(true); }}
+              >
               <div
                 className="collection-preview"
                 data-preview-workspace
@@ -1889,6 +1488,7 @@ export function HumanoidCollectionDetailPage() {
                     playbackPositionMs={reviewPositionMs}
                     replayEpisodeId={reviewEpisode?.id ?? null}
                     telemetry={telemetry}
+                    previewStates={previewStates}
                   />
 
                   {reviewEpisode === null ? null : (
@@ -1910,47 +1510,27 @@ export function HumanoidCollectionDetailPage() {
                 </div>
               </div>
 
-              <aside
+              <Surface
+                as="aside"
+                layer="raised"
                 aria-label="수집 상세"
                 className="collection-inspector"
                 hidden={!detailsOpen}
                 id="collection-details"
                 tabIndex={-1}
               >
-                <div className="grid gap-2" data-collection-summary>
-                  <section aria-label="작업 지시" className="min-w-0">
-                    <h2 className="text-sm text-muted">작업 지시</h2>
-                    <p className="mt-2 break-words text-base font-semibold leading-relaxed">{session.instruction}</p>
-                  </section>
-                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2" data-episode-summary>
-                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                      <span className="text-xs text-muted">{recordedPreview ? '녹화본' : activeEpisode === null ? '다음 기록' : '현재 기록'}</span>
-                      <h2 className="min-w-0 break-words text-base font-semibold">{episodeData === null ? 'Episode 확인 중' : activeEpisode?.name ?? '새 Episode'}</h2>
-                    </div>
-                    <span className="text-xs tabular-nums text-muted">저장한 Episode {episodeData === null ? '확인 중' : `${String(savedEpisodes.length)}개`}</span>
-                  </div>
-                  {detailsOpen && detailsTab !== 'issues' ? notices : null}
-                </div>
-                <Tabs density="compact" value={detailsTab} onValueChange={setDetailsTab} items={[
-                  { value: 'session', label: '세션 정보', content: (
+                <header className="mb-3 flex shrink-0 items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold">{detailsTab === 'session' ? '세션 정보' : detailsTab === 'sources' ? '수집 상태' : '문제'}</h2>
+                  <Button id="collection-details-close" aria-label="수집 상세 닫기" aria-controls="collection-details" aria-expanded={true} title="수집 상세 닫기" className="size-10 shrink-0 p-0" variant="ghost" onClick={closeDetails}><Icon name="close" /></Button>
+                </header>
+                <div className="collection-inspector-tabs">
+                <RailTabPanel value="session" labelledBy="collection-tab-session" forceMount hidden={detailsTab !== 'session'}>
                   <section aria-label="세션 정보">
-                    <h2 className="sr-only">세션 정보</h2>
-                  {session.humanDemonstration === null || !session.humanDemonstration.sourceBindings.some((source) => source.role === 'xr-hand-tracking' && (source.state === 'pending' || source.state === 'offline' || source.state === 'stale')) ? null : (
-                    <section aria-label="Quest 연결" className="collection-pairing">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-xs font-semibold text-muted">Quest 연결 코드</h2>
-                        <output aria-label="Quest pairing code" className="font-mono text-base font-semibold tabular-nums">{session.humanDemonstration.pairing.code}</output>
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-muted">Quest 브라우저의 수집 페이지에서 입력하세요.</p>
+                    <section aria-label="작업 지시" className="mb-5 min-w-0">
+                      <h3 className="text-xs text-muted">작업 지시</h3>
+                      <p className="collection-instruction mt-2 break-words text-sm leading-relaxed" tabIndex={0}>{session.instruction}</p>
                     </section>
-                  )}
-                    <dl className="collection-session-fields text-xs">
-                      <div><dt>세션 ID</dt><dd className="font-mono">{session.id}</dd></div>
-                      <div><dt>작업</dt><dd className="font-mono">{session.taskId}</dd></div>
-                      <div><dt>{session.humanDemonstration === null ? '로봇' : '참여자'}</dt><dd className="font-mono">{session.humanDemonstration?.participantId ?? session.robotId}</dd></div>
-                      <div><dt>{session.humanDemonstration === null ? '센서' : '외골격 장치'}</dt><dd className="font-mono">{session.humanDemonstration?.exoskeletonDeviceId ?? session.sensorPresetId}</dd></div>
-                    </dl>
-                    <dl className="collection-recording-fields grid grid-cols-2 gap-3 border-t border-border py-3 text-sm">
+                    {hasRecording ? <dl className="collection-recording-fields grid gap-4 pb-5 text-sm">
                       <div>
                         <dt className="text-muted">원본 기록</dt>
                         <dd className="mt-1">
@@ -1965,42 +1545,69 @@ export function HumanoidCollectionDetailPage() {
                           <span className="mt-1 block text-xs text-muted">{syncLabel(telemetry)} · {telemetry === null || telemetry.totalSampleCount === 0 ? '데이터 수신 전' : `${telemetry.completenessPercent.toFixed(1)}% 완전성`}</span>
                         </dd>
                       </div>
-                    </dl>
-                    {session.humanDemonstration === null ? null : (
-                      <details className="collection-inline-details">
-                        <summary>장치 연결과 명령 응답</summary>
-                        <SourceBindingsSection binding={session.humanDemonstration} />
-                      </details>
-                    )}
+                    </dl> : null}
+                      <dl className={`collection-session-fields text-xs ${hasRecording ? 'border-t border-border pt-4' : ''}`}>
+                        <div><dt>세션 ID</dt><dd className="font-mono">{session.id}</dd></div>
+                        <div><dt>작업</dt><dd className="font-mono">{session.taskId}</dd></div>
+                        <div><dt>{session.humanDemonstration === null ? '로봇' : '참여자'}</dt><dd className="font-mono">{session.humanDemonstration?.participantId ?? session.robotId}</dd></div>
+                        <div><dt>{session.humanDemonstration === null ? '센서' : '외골격 장치'}</dt><dd className="font-mono">{session.humanDemonstration?.exoskeletonDeviceId ?? session.sensorPresetId}</dd></div>
+                      </dl>
                   </section>
-                  ) },
-                  { value: 'sources', label: '수집 소스', content: <CollectionStreamsSection telemetry={telemetry} /> },
-                  { value: 'sync', label: '동기화', content: <MultimodalTimeline telemetry={telemetry} /> },
-                  { value: 'issues', label: collectionIssues.count === 0 ? '문제와 조치' : `문제와 조치 · ${String(collectionIssues.count)}`, content: (
-                    <CollectionIssuesSection
-                      issues={collectionIssues}
-                      onOpenDetails={() => setDetailsTab('session')}
-                      expanded
-                    />
-                  ) },
-                ]} />
-              </aside>
-              </div>
+                </RailTabPanel>
+                <RailTabPanel value="sources" labelledBy="collection-tab-sources">
+                    <div className="grid gap-5">
+                      <CollectionStreamsSection telemetry={telemetry} questConnection={!needsQuestConnection ? null : (
+                        <Dialog title="Quest 연결" cancelLabel="닫기" trigger={<Button disabled={pending}>Quest 연결</Button>}>
+                          <QuestPairingPanel key={session.id} session={session} />
+                        </Dialog>
+                      )} />
+                      {session.humanDemonstration === null ? null : <CollectorCommandStatus binding={session.humanDemonstration} />}
+                    </div>
+                </RailTabPanel>
+                <RailTabPanel value="issues" labelledBy="collection-tab-issues">{issuesContent}</RailTabPanel>
+                </div>
+              </Surface>
+              <RailTabList aria-label="수집 상세 메뉴" className="collection-details-rail">
+                {([
+                  { value: 'session', label: '세션 정보', shortLabel: '세션', icon: 'table' },
+                  { value: 'sources', label: '수집 상태', shortLabel: '수집', icon: 'activity' },
+                  { value: 'issues', label: '문제', shortLabel: '문제', icon: 'events' },
+                ] as const).map((item) => (
+                  <RailTab
+                    key={item.value}
+                    id={`collection-tab-${item.value}`}
+                    value={item.value}
+                    label={item.label}
+                    shortLabel={item.shortLabel}
+                    icon={item.icon}
+                    count={item.value === 'issues' ? problemCount : 0}
+                    onReselect={closeDetails}
+                  />
+                ))}
+              </RailTabList>
+              </RailTabs>
             </div>
                   <StickyActionBar
+                    appearance="plain"
                     aria-label="수집 작업 컨트롤"
                     className="@container static grid shrink-0 gap-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:flex-wrap sm:items-center sm:justify-between"
                     data-collection-state={workspaceState}
                     position="contained"
                   >
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <StatusIndicator label={episodeData === null ? 'Episode 상태 확인 필요' : getWorkspaceStateLabel(workspaceState, activeEpisode)} pulse={workspaceState === 'recording'} tone={episodeData === null ? 'warning' : workspaceState === 'recording' ? 'negative' : workspaceTone(workspaceState)} />
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-episode-summary>
+                        <StatusIndicator
+                          label={episodeData === null
+                            ? 'Episode 상태 확인 필요'
+                            : `${activeEpisode === null || workspaceState === 'processing' ? '' : `${activeEpisode.name} · `}${getWorkspaceStateLabel(workspaceState, activeEpisode)}`}
+                          pulse={workspaceState === 'recording'}
+                          tone={episodeData === null ? 'warning' : workspaceState === 'recording' ? 'negative' : workspaceTone(workspaceState)}
+                        />
                         {activeEpisode?.status === 'recording' ? <span aria-label="녹화 경과 시간" className="text-2xl font-semibold tabular-nums"><RecordingElapsedTime episode={activeEpisode} /></span> : null}
+                        {episodeData === null || savedEpisodes.length === 0 ? null : <span className="text-xs tabular-nums text-muted">저장 완료 {savedEpisodes.length}개</span>}
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-wrap items-center gap-3 max-sm:[&>button]:flex-1" data-cycle-control-anchor>
-                      {reviewEpisode !== null ? (
                         <Dialog
                           actions={(
                             <Button
@@ -2012,15 +1619,15 @@ export function HumanoidCollectionDetailPage() {
                             </Button>
                           )}
                           cancelLabel="녹화본 계속 확인"
+                          cancelDisabled={pending}
                           description="현재 녹화본은 복구할 수 없으며, 삭제 후 바로 새 녹화를 시작합니다."
                           onOpenChange={setRetakeDialogOpen}
                           open={retakeDialogOpen}
                           title="이 녹화본을 삭제하고 다시 녹화할까요?"
-                          trigger={(
+                          trigger={reviewEpisode === null ? undefined : (
                             <Button disabled={pending} variant="secondary"><Icon name="restart" />다시 녹화</Button>
                           )}
                         />
-                      ) : null}
                       {activeEpisode?.status === 'finalizing' && activeEpisode.finalizationError !== null ? (
                         <Button
                           disabled={pending}
@@ -2030,23 +1637,11 @@ export function HumanoidCollectionDetailPage() {
                           Episode 제외
                         </Button>
                       ) : null}
-                      {canRunPreflight ? (
-                        <Button
-                          disabled={preflightSourceBlocked || episodeData === null}
-                          isLoading={pending}
-                          onClick={() => void run(
-                            () => port.validateSession(session.id),
-                            '사전점검을 통과했습니다. 이제 Episode를 시작할 수 있습니다.',
-                          )}
-                        >
-                          {preflightSourceBlocked ? 'Collector 준비 필요' : '사전점검 실행'}
-                        </Button>
-                      ) : null}
-                      {!canRunPreflight
+                      {session.stoppedAtMs === null
                         && session.activeEpisodeId === null
-                        && (session.status === 'active' || session.status === 'ready')
-                        && !requiredSourcesOperational ? (
-                          <Button disabled>필수 Collector 확인</Button>
+                        && ['draft', 'ready', 'active', 'failed'].includes(session.status)
+                        && !canStartEpisode ? (
+                          <Button disabled>{automaticPreflight.checking ? '연결 확인 중' : '장치 연결 대기'}</Button>
                         ) : null}
                       {canStartEpisode ? (
                         <Button

@@ -9,11 +9,12 @@ import {
   FlywheelContext,
 } from '@/entities/flywheel';
 import { ToastProvider } from '@/shared/ui/toast';
-import { DataEnvironmentContext } from '@/shared/config';
+import { fillCollectionSetup } from '@/test/fill-collection-setup';
 
 import { CatalogDetailPage, CatalogPage } from './FlywheelDataPages';
 import {
   CollectionWorkspacePage,
+  CollectionConnectionPage,
   HumanoidCollectionDetailPage,
   NewHumanoidCollectionPage,
 } from './FlywheelWorkspacePages';
@@ -28,7 +29,7 @@ describe('HumanoidCollectionDetailPage', () => {
         robotId: 'robot-003', sensorDeviceId: 'sensor-rig-001', siteId: 'site-lab', taskId: 'task-sort',
       });
       await port.validateSession(session.id);
-      vi.spyOn(port, 'listEpisodes').mockRejectedValueOnce(new Error('Episode 조회 실패'));
+      const listEpisodes = vi.spyOn(port, 'listEpisodes').mockRejectedValue(new Error('Episode 조회 실패'));
       render(
         <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
@@ -38,10 +39,12 @@ describe('HumanoidCollectionDetailPage', () => {
           </FlywheelContext.Provider>
         </MemoryRouter>,
       );
+      await user.click(await screen.findByRole('tab', { name: /^문제 · \d+$/u }));
       expect(await screen.findByRole('heading', { name: '데이터를 불러오지 못했습니다' })).toBeVisible();
       expect(screen.getByText('Episode 상태 확인 필요')).toBeVisible();
       expect(screen.queryByRole('button', { name: 'Episode 녹화 시작' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '수집 콘솔 닫기' })).toBeDisabled();
+      listEpisodes.mockRestore();
       await user.click(within(screen.getByRole('region', { name: 'Episode 조회 오류' })).getByRole('button', { name: '다시 시도' }));
       expect(await screen.findByRole('button', { name: 'Episode 녹화 시작' })).toBeEnabled();
       expect(screen.getByRole('button', { name: '수집 콘솔 닫기' })).toBeEnabled();
@@ -97,18 +100,43 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByText('더보기')).not.toBeInTheDocument();
     const sessionInfo = screen.getByRole('region', { name: '세션 정보' });
     expect(sessionInfo).toBeVisible();
-    const detailsToggle = screen.getByRole('button', { name: '수집 상세' });
+    const detailsToggle = screen.getByRole('button', { name: '수집 상세 닫기' });
+    expect(detailsToggle.closest('aside')).toHaveAttribute('id', 'collection-details');
     await user.click(detailsToggle);
     expect(sessionInfo).not.toBeVisible();
     expect(screen.getByRole('region', { name: '실시간 수집 카메라' })).toBeVisible();
-    await user.click(detailsToggle);
+    const detailsOpen = screen.getByRole('tab', { name: '세션 정보' });
+    expect(detailsOpen.closest('.collection-workspace')).toBeInTheDocument();
+    expect(detailsOpen).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tablist', { name: '수집 상세 메뉴' })).toHaveAttribute('aria-orientation', 'vertical');
+    await waitFor(() => expect(detailsOpen).toHaveFocus());
+    await user.click(detailsOpen);
     expect(sessionInfo).toBeVisible();
+    await user.click(detailsOpen);
+    expect(sessionInfo).not.toBeVisible();
+    expect(detailsOpen).toHaveAttribute('aria-selected', 'false');
+    await waitFor(() => expect(detailsOpen).toHaveFocus());
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('tab', { name: '수집 상태' })).toHaveFocus();
+    expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('tabpanel', { name: '수집 상태' })).toBeVisible();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
+    await user.keyboard(' ');
+    expect(screen.getByRole('tabpanel', { name: '수집 상태' })).toBeVisible();
+    await user.keyboard(' ');
+    expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
+    await user.click(detailsOpen);
     expect(within(sessionInfo).queryByRole('button', { name: '수집 목록으로 이동' }))
       .not.toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
+    expect(screen.queryByRole('tab', { name: '동기화' })).not.toBeInTheDocument();
+    expect(within(sessionInfo).queryByText('장치 연결과 명령 응답')).not.toBeInTheDocument();
     expect(within(sessionInfo).getByText(/task-sort-fruit/u)).toBeVisible();
     expect(within(sessionInfo).getByText('robot-003')).toBeVisible();
     expect(within(sessionInfo).getByText('preset-humanoid-default')).toBeVisible();
-    expect(screen.getByText('저장한 Episode 0개')).toBeVisible();
+    expect(screen.queryByText('저장한 Episode 0개')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '세션 정보' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '세션 정보 닫기' })).not.toBeInTheDocument();
     const cameraRegion = screen.getByRole('region', { name: '실시간 수집 카메라' });
@@ -141,7 +169,7 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByText('OpenArm · 5지 시각화')).not.toBeInTheDocument();
     expect(screen.queryByText('3D 스켈레톤')).not.toBeInTheDocument();
     expect(screen.getAllByText('실시간').length).toBeGreaterThan(0);
-    await user.click(screen.getByRole('tab', { name: '수집 소스' }));
+    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
     expect(screen.getAllByText(/FPS/u).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('tab', { name: '세션 정보' }));
     expect(screen.getByRole('region', {
@@ -149,6 +177,7 @@ describe('HumanoidCollectionDetailPage', () => {
     })).toBeVisible();
     expect(cameraRegion.closest('[data-color-scheme="dark"]')).toBeInTheDocument();
     const captureControls = screen.getByRole('region', { name: '수집 작업 컨트롤' });
+    expect(captureControls).toHaveClass('bg-transparent', 'border-0');
     expect(screen.queryByRole('complementary', { name: '세션 및 수집 제어' })).not.toBeInTheDocument();
     const captureViewport = document.querySelector('[data-capture-viewport]');
     expect(captureViewport?.nextElementSibling).toBe(captureControls);
@@ -160,8 +189,8 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(collectionStatus).toHaveTextContent('녹화 중');
     expect(collectionStatus).toHaveClass('sr-only');
     expect(collectionStatus.closest('[data-preview-workspace]')).toBeNull();
-    expect(screen.getByRole('heading', { level: 2, name: episode.name })).toBeVisible();
-    expect(screen.getByText('저장한 Episode 0개')).toBeVisible();
+    expect(captureControls).toHaveTextContent(`${episode.name} · 녹화 중`);
+    expect(document.querySelector('.collection-inspector [data-episode-summary]')).toBeNull();
     expect(screen.getByLabelText('녹화 경과 시간')).toBeVisible();
     const previewWorkspace = document.querySelector('[data-preview-workspace]');
     expect(previewWorkspace).not.toHaveAttribute('data-recording-tally');
@@ -233,7 +262,10 @@ describe('HumanoidCollectionDetailPage', () => {
         streams: snapshot.streams.map((stream) => ({
           ...stream, connectionState: scenario === 'offline' && stream.required ? 'offline' : 'live',
           health: scenario === 'offline' && stream.required ? 'disconnected' : 'healthy',
-          handTracking: null,
+          handTracking: scenario === 'offline' ? {
+            qualityState: 'tracking', poseObserved: true, sourcePresent: true,
+            consecutiveMissingMs: 0, validJointCount: 25,
+          } : null,
         })),
       });
       render(
@@ -246,32 +278,32 @@ describe('HumanoidCollectionDetailPage', () => {
       await screen.findByRole('heading', { name: 'Minimal collection' });
       await waitFor(() => expect(getTelemetry).toHaveBeenCalled());
       const details = screen.getByRole('complementary', { name: '수집 상세' });
-      const detailsToggle = screen.getByRole('button', { name: '수집 상세' });
+      const detailsToggle = screen.getByRole('button', { name: '수집 상세 닫기' });
       await user.click(detailsToggle);
       expect(details).not.toBeVisible();
-      expect(detailsToggle).toHaveAttribute('aria-expanded', 'false');
-      if (scenario === 'normal' || scenario === 'warning') {
-        expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
-        await user.click(detailsToggle);
-        expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
-        const issuesTab = screen.getByRole('tab', { name: scenario === 'warning' ? '문제와 조치 · 1' : '문제와 조치' });
-        await user.click(issuesTab);
-        if (scenario === 'warning') {
-          expect(screen.getByText('수집 데이터 점검 필요')).toBeVisible();
-          expect(screen.getAllByRole('region', { name: '현재 문제와 조치' })).toHaveLength(1);
-          expect(screen.queryByText('품질 검토 필요 1건')).not.toBeInTheDocument();
-          expect(screen.queryByRole('link', { name: '문제 확인' })).not.toBeInTheDocument();
-        } else expect(screen.getByText('현재 확인할 문제가 없습니다.')).toBeVisible();
+      expect(screen.getAllByRole('tab')).toHaveLength(3);
+      expect(screen.getByRole('tab', { name: '세션 정보' })).toHaveAttribute('aria-selected', 'false');
+      expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '문제 확인' })).not.toBeInTheDocument();
+      if (scenario === 'normal') {
+        expect(screen.queryByRole('button', { name: /^문제 \d+개$/u })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('tab', { name: '문제' }));
+        expect(screen.getByText('현재 확인할 문제가 없습니다.')).toBeVisible();
       } else {
+        await user.click(await screen.findByRole('tab', { name: /^문제 · \d+$/u }));
         const alerts = await screen.findByRole('region', { name: '현재 문제와 조치' });
         expect(alerts).toBeVisible();
-        if (scenario === 'critical') expect(alerts).toHaveTextContent('수집 데이터 점검 필요');
+        expect(screen.getAllByRole('region', { name: '현재 문제와 조치' })).toHaveLength(1);
+        if (scenario === 'critical' || scenario === 'warning') expect(alerts).toHaveTextContent('수집 데이터 점검 필요');
         else if (scenario === 'offline') expect(alerts).toHaveTextContent('장치 연결과 수신 상태를 확인하세요');
         else if (scenario === 'stale') expect(alerts).toHaveTextContent('갱신 지연');
         else expect(alerts).toHaveTextContent('상태 조회 실패');
-        await user.click(within(alerts).getByRole('link', { name: '문제 확인' }));
         expect(details).toBeVisible();
-        expect(screen.getByRole('tab', { name: /문제와 조치/u })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tab', { name: /^문제(?: · \d+)?$/u })).toHaveAttribute('aria-selected', 'true');
+        if (scenario === 'offline') {
+          expect(alerts).toHaveTextContent('연결 끊김');
+          expect(alerts).not.toHaveTextContent('추적 정상');
+        }
       }
       port.dispose();
     },
@@ -285,7 +317,8 @@ describe('HumanoidCollectionDetailPage', () => {
       <MemoryRouter initialEntries={['/mlops/collection/new']}>
         <FlywheelContext.Provider value={port}>
           <Routes>
-            <Route element={<DataEnvironmentContext.Provider value="simulation"><NewHumanoidCollectionPage /></DataEnvironmentContext.Provider>} path="/mlops/collection/new" />
+            <Route element={<NewHumanoidCollectionPage />} path="/mlops/collection/new" />
+            <Route element={<CollectionConnectionPage />} path="/mlops/collection/:sessionId/setup" />
           </Routes>
         </FlywheelContext.Provider>
       </MemoryRouter>,
@@ -293,45 +326,37 @@ describe('HumanoidCollectionDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: '새 데이터 수집' }))
       .toBeInTheDocument();
-    const setup = document.querySelector('[data-capture-setup]');
-    const setupSidebar = screen.getByRole('complementary', { name: '새 수집 세션 설정' });
-    expect(setup).toContainElement(setupSidebar);
-    expect(setup).toHaveClass('overflow-hidden');
-    expect(screen.getByRole('heading', { name: '수집 장치 연결' })).toBeVisible();
+    const setup = screen.getByRole('dialog', { name: '새 데이터 수집' });
+    expect(within(setup).getByRole('group', { name: '수집 장치' })).toBeVisible();
     expect(screen.queryByRole('region', { name: /미리보기/u })).not.toBeInTheDocument();
-    const setupExit = screen.getByRole('link', { name: '수집 설정 취소' });
-    expect(setupExit).toHaveTextContent('');
-    expect(setupExit.querySelector('svg')).toBeInTheDocument();
-    expect(setupExit.closest('header')).toHaveAttribute('data-collection-header');
-    expect(screen.getByRole('button', { name: '세션 생성' })).toHaveClass('w-full');
-    expect(setup?.closest('[data-color-scheme="dark"]')).toBeInTheDocument();
+    expect(within(setup).getByRole('button', { name: '취소' })).toBeEnabled();
     expect(screen.getByLabelText('작업 ID')).toHaveValue('');
     expect(screen.getByLabelText('외부 카메라 ID · 선택')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: '세션 생성' }));
     expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '시뮬레이션 예시 불러오기' }));
+    await fillCollectionSetup(user);
     expect(screen.getByLabelText('외부 카메라 ID · 선택')).toHaveValue('external-camera-001');
     expect(screen.getByLabelText('외부 카메라 ID · 선택')).not.toHaveAttribute('readonly');
 
     await user.click(screen.getByRole('button', { name: '세션 생성' }));
 
     const pairingCode = await screen.findByRole('status', { name: 'Quest pairing code' });
+    expect(screen.getByRole('dialog', { name: 'Quest 연결' })).toBeInTheDocument();
     expect(pairingCode).toHaveTextContent(/^\d{6}$/u);
-    expect(screen.getByRole('button', { name: 'Quest 페어링 대기' })).toBeDisabled();
+    expect(screen.getByText(/를 열고 아래 코드를 입력하세요/u)).toBeVisible();
     const pairing = await port.pairHumanDemonstrationSource({
       pairingCode: pairingCode.textContent ?? '',
       sourceDeviceId: 'quest2-001',
       integrationProfileId: 'quest-webxr-hand-pose-v1',
       capabilities: ['left-hand-pose', 'right-hand-pose'],
     });
-    expect(await screen.findByRole('button', { name: 'Quest MR 준비 대기' })).toBeDisabled();
+    expect(await screen.findByRole('heading', { name: 'Quest 연결 완료' })).toBeVisible();
+    expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
     await port.updateHumanDemonstrationSource(pairing.sessionId, pairing.sourceDeviceId, 'ready');
-    const preflight = await screen.findByRole('button', { name: '사전점검 실행' });
-    expect(screen.getByRole('region', { name: '연결된 장치 미리보기' })).toBeVisible();
-    expect(await screen.findByRole('region', { name: 'Quest 손 포즈 3D' })).toBeVisible();
-    await user.click(preflight);
+    expect(screen.queryByRole('region', { name: /미리보기/u })).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: '수집 콘솔 열기' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: '새 데이터 수집' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '사전점검 실행' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '장치 준비 상태' })).not.toBeInTheDocument();
     port.dispose();
   });
 
@@ -364,7 +389,18 @@ describe('HumanoidCollectionDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Quest hands only' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Collector 열기' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Quest 연결' })).toHaveTextContent('Quest 브라우저의 수집 페이지에서 입력하세요.');
+    expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '수집 작업 컨트롤' })).queryByRole('button', { name: 'Quest 연결' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
+    expect(screen.queryByText('저장 상태 확인 불가')).not.toBeInTheDocument();
+    expect(screen.queryByText('데이터 품질')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
+    expect(within(screen.getByRole('region', { name: 'Quest 손 추적 장치' })).getByRole('button', { name: 'Quest 연결' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Quest 연결' }));
+    const pairingDialog = screen.getByRole('dialog', { name: 'Quest 연결' });
+    expect(within(pairingDialog).getByRole('region', { name: 'Quest 연결' })).toHaveTextContent('Quest 브라우저에서 /collect/quest를 열고 아래 코드를 입력하세요.');
+    await user.click(within(pairingDialog).getByRole('button', { name: '닫기' }));
+    expect(screen.getByRole('button', { name: 'Quest 연결' })).toHaveFocus();
     const preview = screen.getByRole('region', { name: '실시간 수집 모니터' });
     expect(preview).toHaveClass('collection-visual-grid');
     expect(await within(preview).findByRole('region', { name: '전신 휴머노이드 3D' })).toBeVisible();
@@ -372,25 +408,24 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(await within(preview).findByRole('region', { name: 'Quest 손 포즈 3D' })).toBeVisible();
     expect(within(preview).getByRole('region', { name: '전신 휴머노이드 3D' }).querySelector('model-viewer'))
       .toHaveAttribute('src', '/assets/unitree-g1.glb');
+    await user.click(screen.getByRole('tab', { name: '세션 정보' }));
     const sessionInfo = screen.getByRole('region', { name: '세션 정보' });
-    const connectionSummary = within(sessionInfo).getByText('장치 연결과 명령 응답');
-    expect(connectionSummary.closest('details')).not.toHaveAttribute('open');
-    expect(within(sessionInfo).getByText('Collector 명령 응답')).not.toBeVisible();
-    await user.click(connectionSummary);
-    expect(connectionSummary.closest('details')).toHaveAttribute('open');
-    const bindings = within(sessionInfo).getByRole('region', { name: 'Human Demonstration source bindings' });
-    expect(within(bindings).getByText('quest2-001')).toBeVisible();
-    expect(within(bindings).getByText('Collector 명령 응답')).toBeVisible();
-    expect(within(bindings).getByText('Episode command 대기 중')).toBeVisible();
+    expect(within(sessionInfo).queryByText('Collector 명령 응답')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
+    const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
+    expect(within(sources).getAllByText('quest2-001').length).toBeGreaterThan(0);
+    const commands = screen.getByRole('region', { name: 'Collector 명령 응답' });
+    expect(within(commands).getByText('Episode command 대기 중')).toBeVisible();
+    expect(document.querySelector('.collection-inspector details')).toBeNull();
     expect(preview).toBeVisible();
     expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await user.click(connectionSummary);
-    expect(connectionSummary.closest('details')).not.toHaveAttribute('open');
+    await user.click(screen.getByRole('tab', { name: '세션 정보' }));
+    expect(screen.queryByRole('region', { name: 'Collector 명령 응답' })).not.toBeInTheDocument();
     port.dispose();
   });
 
-  it('필수 소스의 누락을 바로 표시하고 선택·파생 소스만 중복 없이 펼친다', async () => {
+  it('수집 상태에서 소스와 시간 차이·누락 구간을 같은 행에 표시한다', async () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     try {
@@ -408,11 +443,21 @@ describe('HumanoidCollectionDetailPage', () => {
           ...stream,
           droppedFrameCount: stream.streamId === 'quest-hand-left' ? 3 : 0,
           missingSampleCount: stream.streamId === 'quest-hand-left' ? 7 : 0,
+          lastSampleAtMs: stream.streamId === 'quest-hand-left' ? Date.now() : null,
+          driftMs: stream.streamId === 'quest-hand-left' ? 37 : null,
           handTracking: stream.streamId === 'quest-hand-left' ? {
             qualityState: 'lost', poseObserved: false, sourcePresent: true,
             consecutiveMissingMs: 500, validJointCount: 0,
           } : null,
         })),
+        sync: { ...snapshot.sync, state: 'out-of-sync', toleranceMs: 20, maxDriftMs: 37 },
+        timeline: {
+          windowMs: 10_000,
+          tracks: [{
+            streamId: 'quest-hand-left', label: 'Left Hand Pose · Quest', health: 'degraded',
+            anomalies: [{ startOffsetMs: -2_000, endOffsetMs: -1_000, kind: 'missing', severity: 'warning', label: '왼손 샘플 누락' }],
+          }],
+        },
       });
       render(
         <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
@@ -422,8 +467,13 @@ describe('HumanoidCollectionDetailPage', () => {
         </MemoryRouter>,
       );
       await screen.findByRole('heading', { name: '소스별 수신 확인' });
-      await user.click(screen.getByRole('tab', { name: '수집 소스' }));
+      await user.click(screen.getByRole('tab', { name: '수집 상태' }));
       const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
+      expect(within(sources).getByText('최대 시간 차이 37.0 ms · 허용 20 ms')).toBeVisible();
+      const drift = within(sources).getByText('시간 차이 37.0 ms');
+      expect(drift).toHaveClass('text-warning');
+      expect(within(drift.parentElement as HTMLElement).getByRole('img', { name: /최근 10초 수신 기록 · 왼손 샘플 누락/u })).toBeVisible();
+      expect(within(sources).getAllByText('시간 차이 확인 전').length).toBeGreaterThan(0);
       expect(within(sources).getByText(/프레임 손실 3 · 샘플 누락 7/u)).toBeVisible();
       expect(within(sources).getByText(/유효 관절 0\/25 · 연속 누락 500 ms/u)).toBeVisible();
       expect(within(sources).queryByRole('button', { name: /전체 소스 상세/u })).not.toBeInTheDocument();
@@ -431,10 +481,7 @@ describe('HumanoidCollectionDetailPage', () => {
         { label: '선택 소스', streams: snapshot.streams.filter((stream) => !stream.required && stream.origin !== 'derived') },
         { label: '파생 소스', streams: snapshot.streams.filter((stream) => stream.origin === 'derived') },
       ]) {
-        const summary = within(sources).getByText(`${group.label} · ${String(group.streams.length)}개`);
-        expect(summary.closest('details')).not.toHaveAttribute('open');
-        for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).not.toBeVisible();
-        await user.click(summary);
+        expect(within(sources).getByRole('heading', { name: `${group.label} ${String(group.streams.length)}` })).toBeVisible();
         for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       }
@@ -466,7 +513,7 @@ describe('HumanoidCollectionDetailPage', () => {
         </MemoryRouter>,
       );
       await screen.findByRole('heading', { name: '수신 대기' });
-      await user.click(screen.getByRole('tab', { name: '수집 소스' }));
+      await user.click(screen.getByRole('tab', { name: '수집 상태' }));
       const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
       expect(within(sources).getByText(state === 'waiting'
         ? '장치의 수신 상태를 기다리고 있습니다.'
@@ -501,16 +548,13 @@ describe('HumanoidCollectionDetailPage', () => {
     const controls = await screen.findByRole('region', { name: '수집 작업 컨트롤' });
     expect(within(controls).queryByRole('status', { name: '현재 수집 상태' }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: '현재 수집 상태' }))
-      .toHaveTextContent('사전점검이 필요합니다');
-    expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toHaveAttribute('data-collection-state', 'prepare');
     expect(document.querySelector('[data-preview-workspace]'))
       .not.toHaveAttribute('data-recording-tally');
-    expect(within(controls).queryByRole('button', { name: 'Episode 녹화 시작' }))
+    expect(within(controls).queryByRole('button', { name: '사전점검 실행' }))
       .not.toBeInTheDocument();
-
-    await user.click(within(controls).getByRole('button', { name: '사전점검 실행' }));
-    await user.click(await within(controls).findByRole('button', { name: 'Episode 녹화 시작' }));
+    const record = await within(controls).findByRole('button', { name: 'Episode 녹화 시작' });
+    expect(await port.getSession(session.id)).toMatchObject({ status: 'ready' });
+    await user.click(record);
 
     await waitFor(async () => {
       const started = await port.getSession(session.id);
@@ -559,12 +603,12 @@ describe('HumanoidCollectionDetailPage', () => {
 
     expect(await port.getSession(session.id)).toMatchObject({ activeEpisodeId: episode.id });
     expect(screen.getByRole('status', { name: '현재 수집 상태' }))
-      .toHaveTextContent('녹화본 검토 대기');
+      .toHaveTextContent('검토 중');
     expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toHaveAttribute('data-collection-state', 'review');
     expect(document.querySelector('[data-preview-workspace]'))
       .not.toHaveAttribute('data-recording-tally');
     expect(within(workflowControls).queryByText('녹화본 확인')).not.toBeInTheDocument();
-    expect(within(workflowControls).queryByText('Episode 01')).not.toBeInTheDocument();
+    expect(workflowControls).toHaveTextContent(`${episode.name} · 검토 중`);
     expect(document.querySelector('[data-capture-viewport]')?.nextElementSibling)
       .toBe(workflowControls);
     expect(workflowControls).toHaveAttribute('data-collection-state', 'review');
@@ -633,7 +677,9 @@ describe('HumanoidCollectionDetailPage', () => {
       name: '다음 Episode 녹화 시작',
     });
     expect(startRecording).toBeVisible();
-    expect(screen.getByText('저장한 Episode 1개')).toBeVisible();
+    expect(within(startControls).getByText('저장 완료 1개')).toBeVisible();
+    expect(startControls).toHaveTextContent('녹화 준비 완료');
+    expect(startControls).not.toHaveTextContent('검토 중');
     expect(startRecording).not.toHaveClass('rounded-[var(--design-radius-round)]');
     expect(startRecording.querySelector('svg')).toBeInTheDocument();
     expect(startRecording).toHaveTextContent('다음 Episode 녹화 시작');
@@ -698,7 +744,8 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(dialog).toHaveTextContent('녹화본을 저장하고 세션을 마칠까요?');
     await user.click(within(dialog).getByRole('button', { name: '녹화본 저장하고 마치기' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('catalog gateway unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent('종료 작업을 완료하지 못했습니다. 원본 전송과 저장 상태를 확인하고 다시 시도하세요.');
+    expect(screen.queryByText('catalog gateway unavailable')).not.toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(saveSpy).toHaveBeenCalledTimes(1);
     expect(stopSpy).toHaveBeenCalledTimes(1);
@@ -739,7 +786,7 @@ describe('HumanoidCollectionDetailPage', () => {
     await user.click(screen.getByRole('button', { name: '나중에 계속' }));
 
     expect(await screen.findByText('수집 세션 목록')).toBeInTheDocument();
-    expect(await port.getSession(session.id)).toMatchObject({ status: 'draft' });
+    expect(await port.getSession(session.id)).toMatchObject({ status: 'ready', startedAtMs: null, stoppedAtMs: null });
     port.dispose();
   });
 
@@ -904,9 +951,10 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByText('현재 작업', { exact: true })).not.toBeInTheDocument();
     await user.click(within(recordingControls).getByRole('button', { name: 'Episode 녹화 시작' }));
 
+    await user.click(await screen.findByRole('tab', { name: /^문제 · \d+$/u }));
     const conflictLink = await screen.findByRole('link', { name: '사용 중인 세션 열기' });
     expect(conflictLink).toHaveAttribute('href', `/mlops/collection/${active.id}`);
-    expect(conflictLink.closest('[role="alert"]')).toHaveTextContent('active robot session');
+    expect(conflictLink.closest('[role="alert"]')).toHaveTextContent('다른 세션에서 수집 장치를 사용 중입니다.');
     port.dispose();
   });
 
