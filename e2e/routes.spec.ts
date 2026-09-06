@@ -1,4 +1,5 @@
 import { expect, test } from './playwright-test';
+import { fillCollectionSetup } from './collection-setup';
 
 import {
   expectAccessiblePageStructure,
@@ -7,7 +8,7 @@ import {
 } from './browser-assertions';
 
 const officialRoutes = [
-  { path: '/collect/quest', heading: 'Quest Hand Pose 수집' },
+  { path: '/collect/quest', heading: 'Quest 손 추적' },
   { path: '/control/monitoring', heading: '모니터링' },
   {
     path: '/control/monitoring/multi?mode=multi&robotId=robot-001&robotId=robot-002',
@@ -124,7 +125,7 @@ test('모든 공식 경로가 오류 없이 업무 화면을 렌더링한다', a
       await page.goto(route.path);
       await expectApplicationReady(page);
       await expect(
-        page.getByRole('heading', { level: 1, name: route.heading }),
+        page.getByRole('heading', { level: new URL(page.url()).pathname === '/mlops/collection/new' ? 2 : 1, name: route.heading }),
       ).toBeVisible();
       await expectAccessiblePageStructure(page);
       issues.assertNone();
@@ -168,24 +169,25 @@ test('Human Demonstration 세션에서 Episode를 반복 기록하고 같은 ID�
   await page.goto('/mlops/collection');
   await expectApplicationReady(page);
   await page.getByRole('link', { name: '새 수집' }).click();
-  await expect(page.getByRole('button', { name: /사이드바/u })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '수집 설정 취소' })).toBeVisible();
-  await expect(page.getByRole('main')).toHaveAttribute('data-page-shell', 'full-bleed');
+  await expect(page.getByRole('dialog', { name: '새 데이터 수집' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '취소' })).toBeVisible();
+  await expect(page.locator('main')).toHaveAttribute('data-page-shell', 'standard');
   await page.getByRole('textbox', { name: '세션 이름' }).fill('E2E humanoid funnel');
-  await page.getByRole('button', { name: '시뮬레이션 예시 불러오기' }).click();
+  await fillCollectionSetup(page);
   await page.getByRole('button', { name: '세션 생성' }).click();
   const pairing = page.getByRole('status', { name: 'Quest pairing code' });
   await expect(pairing).toHaveText(/^\d{6}$/u);
-  await expect(page.getByRole('button', { name: 'Quest 페어링 대기' })).toBeDisabled();
+  await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toBeVisible();
+  await expect(page.locator('main')).toHaveAttribute('data-page-shell', 'standard');
+  await expect(page.getByText('를 열고 아래 코드를 입력하세요.', { exact: false })).toBeVisible();
   const collector = await page.context().newPage();
   const collectorIssues = observeBrowserIssues(collector);
   try {
     await collector.goto('/collect/quest');
     await expectApplicationReady(collector);
     await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-    await collector.getByRole('button', { name: 'Session 연결' }).click();
+    await collector.getByRole('button', { name: '세션 연결' }).click();
     await collector.getByRole('button', { name: 'MR 모드 시작' }).click();
-    await page.getByRole('button', { name: '사전점검 실행' }).click();
     await page.getByRole('button', { name: '수집 콘솔 열기' }).click();
     await expect(page.getByRole('heading', { name: 'E2E humanoid funnel' })).toBeVisible();
     const collectionId = new URL(page.url()).pathname.split('/').at(-1);
@@ -229,7 +231,7 @@ test('Human Demonstration 세션에서 Episode를 반복 기록하고 같은 ID�
     await expect(page).toHaveURL('/mlops/collection/' + collectionId);
     await expect(controls).toHaveAttribute('data-collection-state', 'review');
     await controls.getByRole('button', { name: '녹화본 저장' }).click();
-    await expect(page.locator('[data-episode-summary]')).toContainText('저장한 Episode 1개');
+    await expect(page.locator('[data-episode-summary]')).toContainText('저장 완료 1개');
     await controls.getByRole('button', { name: '다음 Episode 녹화 시작' }).click();
     await controls.getByRole('button', { name: 'Episode 녹화 정지' }).click();
     await controls.getByRole('button', { name: '다시 녹화' }).click();
@@ -237,7 +239,7 @@ test('Human Demonstration 세션에서 Episode를 반복 기록하고 같은 ID�
     await expect(controls).toHaveAttribute('data-collection-state', 'recording');
     await controls.getByRole('button', { name: 'Episode 녹화 정지' }).click();
     await controls.getByRole('button', { name: '녹화본 저장' }).click();
-    await expect(page.locator('[data-episode-summary]')).toContainText('저장한 Episode 2개');
+    await expect(page.locator('[data-episode-summary]')).toContainText('저장 완료 2개');
     await page.getByRole('button', { name: '수집 콘솔 닫기' }).click();
     await expect(page.getByRole('dialog')).toContainText('저장한 Episode 2개');
     await page.getByRole('button', { name: '저장하고 마치기', exact: true }).click();

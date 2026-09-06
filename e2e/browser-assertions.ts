@@ -65,8 +65,11 @@ export async function expectApplicationReady(page: Page): Promise<void> {
 
 /** 공식 화면의 기본 landmark, 이름과 viewport overflow를 실제 렌더 결과에서 확인한다. */
 export async function expectAccessiblePageStructure(page: Page): Promise<void> {
-  await expect(page.getByRole('main')).toHaveCount(1);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  const modal = page.getByRole('dialog');
+  const hasModal = await modal.count() > 0;
+  await expect(page.getByRole('main', { includeHidden: hasModal })).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 1, includeHidden: hasModal })).toHaveCount(1);
+  if (hasModal) await expect(modal).toHaveAccessibleName(/\S/u);
 
   const unnamedControls = await page.locator([
     'a[href]',
