@@ -11,14 +11,15 @@ export function getMonitoringRobotHealth(
   const battery = value !== undefined && Number.isFinite(value) && value >= 0 && value <= 100
     ? value
     : null;
+  const isCharging = status?.data.isCharging === true;
+  const batteryState = { battery, isCharging };
 
-  if (isStale) return { battery, label: '수신 지연', priority: 0, tone: 'warning' } as const;
-  if (status == null) return { battery, label: '상태 미수신', priority: 1, tone: 'muted' } as const;
-  if (!status.data.isConnecting) return { battery, label: '연결 끊김', priority: 0, tone: 'negative' } as const;
-  if (status.data.isCharging) return { battery, label: '충전 중', priority: 4, tone: 'positive' } as const;
-  if (battery === null) return { battery, label: '배터리 미수신', priority: 1, tone: 'warning' } as const;
-  if (battery <= 20) return { battery, label: '배터리 부족', priority: 2, tone: 'warning' } as const;
-  return { battery, label: '연결됨', priority: 3, tone: 'positive' } as const;
+  if (status != null && !status.data.isConnecting) return { ...batteryState, label: '미연결', priority: 3, tone: 'muted' } as const;
+  if (isStale) return { ...batteryState, label: '수신 지연', priority: 0, tone: 'warning' } as const;
+  if (status == null) return { ...batteryState, label: '상태 미수신', priority: 1, tone: 'muted' } as const;
+  if (battery === null) return { ...batteryState, label: '배터리 미수신', priority: 1, tone: 'warning' } as const;
+  if (battery <= 20 && !isCharging) return { ...batteryState, label: '배터리 부족', priority: 2, tone: 'warning' } as const;
+  return { ...batteryState, label: null, priority: 3, tone: 'muted' } as const;
 }
 
 export function needsMonitoringAttention(

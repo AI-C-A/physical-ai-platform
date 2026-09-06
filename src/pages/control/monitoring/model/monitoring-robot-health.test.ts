@@ -20,11 +20,20 @@ const robots: readonly RobotDescriptor[] = [
 ];
 
 describe('관제 기체 상태와 목록', () => {
-  it('20% 이하 미충전 기체와 연결 끊김을 확인 대상으로 분류한다', () => {
+  it('20% 이하 미충전 기체를 확인 대상으로 분류하고 미연결은 일반 상태로 둔다', () => {
     expect(needsMonitoringAttention(status(20))).toBe(true);
     expect(needsMonitoringAttention(status(21))).toBe(false);
     expect(needsMonitoringAttention(status(5, { isCharging: true }))).toBe(false);
-    expect(getMonitoringRobotHealth(status(90, { isConnecting: false })).label).toBe('연결 끊김');
+    expect(getMonitoringRobotHealth(status(90, { isConnecting: false }))).toMatchObject({ label: '미연결', tone: 'muted' });
+    expect(needsMonitoringAttention(status(90, { isConnecting: false }))).toBe(false);
+    expect(needsMonitoringAttention(status(5, { isConnecting: false }), true)).toBe(false);
+  });
+
+  it('충전 상태는 연결 상태와 독립적으로 유지하며 정상 연결 문구는 표시하지 않는다', () => {
+    expect(getMonitoringRobotHealth(status(80))).toMatchObject({ label: null, isCharging: false });
+    expect(getMonitoringRobotHealth(status(80, { isCharging: true }))).toMatchObject({ label: null, isCharging: true });
+    expect(getMonitoringRobotHealth(status(80, { isConnecting: false, isCharging: true })))
+      .toMatchObject({ label: '미연결', isCharging: true, tone: 'muted' });
   });
 
   it('지연되거나 없는 상태를 정상 연결로 표시하지 않는다', () => {

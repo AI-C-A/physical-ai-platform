@@ -6,7 +6,7 @@ import { Icon } from '@/shared/ui/icon';
 import { getMonitoringRobotHealth } from '../model/monitoring-robot-health';
 
 export const robotMonitoringListClassName =
-  'mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1';
+  'mt-3 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]';
 
 interface RobotMonitoringListRowProps {
   readonly disabled?: boolean;
@@ -34,30 +34,34 @@ export function RobotMonitoringListRow({
   operationalStatus,
 }: RobotMonitoringListRowProps) {
   const health = getMonitoringRobotHealth(operationalStatus, isStale);
-  const toneClassName = health.tone === 'negative' ? 'text-negative'
-    : health.tone === 'warning' ? 'text-warning'
-      : 'text-muted';
+  const toneClassName = health.tone === 'warning' ? 'text-warning' : 'text-muted';
   const rowClassName = [
-    'min-h-[var(--layout-control-height)] w-full justify-between rounded-[var(--design-radius-list-row)] border-0 px-3 py-3 text-left',
+    'ui-focus-inset min-h-[var(--layout-control-height)] w-full justify-between rounded-[var(--design-radius-list-row)] border-0 px-3 py-2.5 text-left',
     isSelected
       ? 'bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.1]'
       : 'bg-transparent hover:bg-foreground/[0.035] active:bg-foreground/[0.05]',
   ].filter(Boolean).join(' ');
   const label = (
-    <span className="min-w-0 flex-1">
-      <span className="block truncate font-semibold">{robot.displayName}</span>
-      <span className="mt-0.5 block truncate text-xs font-normal text-muted">
-        {getRobotSubtitle(robot)}
-      </span>
-      <span className={`mt-2 flex items-center justify-between gap-2 text-xs font-medium ${toneClassName}`}>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <Icon name={health.tone === 'negative' ? 'wifi-off'
-            : health.tone === 'warning' ? 'events'
-              : health.label === '충전 중' ? 'charging' : 'radio'} />
-          {health.label}
+    <span className="flex min-w-0 flex-1 items-center gap-3">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold leading-5">{robot.displayName}</span>
+        <span className="mt-0.5 block truncate text-xs font-normal leading-4 text-muted">
+          {getRobotSubtitle(robot)}
         </span>
+        {health.label === null ? null : (
+          <span className={`mt-1 block text-xs font-normal leading-4 ${toneClassName}`}>
+            {health.label}
+          </span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1 text-xs font-medium tabular-nums text-muted">
+        {health.isCharging ? (
+          <span aria-label="충전 중" className="inline-flex" role="img" title="충전 중">
+            <Icon name="charging" />
+          </span>
+        ) : null}
         {health.battery === null ? null : (
-          <span className="shrink-0 tabular-nums" aria-label={`배터리 ${String(health.battery)}%`}>
+          <span aria-label={`배터리 ${String(health.battery)}%`}>
             {Math.round(health.battery)}%
           </span>
         )}
@@ -69,7 +73,7 @@ export function RobotMonitoringListRow({
     return (
       <Checkbox
         checked={isSelected}
-        className={`${rowClassName} has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-inset`}
+        className={`${rowClassName} ui-focus-within`}
         disabled={disabled}
         indicatorPosition="end"
         label={label}

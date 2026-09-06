@@ -135,10 +135,9 @@ function RobotSnapshotOverview({
         >
           <p
             aria-atomic="true"
-            className="flex items-center gap-2 text-sm font-medium text-negative"
+            className="flex items-center gap-2 text-sm font-medium text-muted"
             role="status"
           >
-            <Icon name="wifi-off" />
             {connectionLabel}
           </p>
         </section>

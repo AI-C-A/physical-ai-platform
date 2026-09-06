@@ -252,11 +252,11 @@ describe('RobotInfoOverview', () => {
       'gap-2',
       'text-sm',
       'font-medium',
-      'text-negative',
+      'text-muted',
     );
     expect(offlineStatus).not.toHaveClass('mt-1');
     expect(offlineStatus).not.toHaveClass('rounded-full', 'bg-red-50', 'px-2');
-    expect(offlineStatus.querySelector('.lucide-wifi-off')).toBeInTheDocument();
+    expect(offlineStatus.querySelector('.lucide-wifi-off')).not.toBeInTheDocument();
     expect(within(overview).queryByText('충전 중')).not.toBeInTheDocument();
     expect(within(overview).getAllByText('미등록')).toHaveLength(2);
     expect(within(overview).getByText('0° N')).toBeInTheDocument();
