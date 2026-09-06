@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   useFlywheelPort,
@@ -8,9 +8,10 @@ import {
   type ReviewStatus,
 } from "@/entities/flywheel";
 import { Badge } from "@/shared/ui/badge";
-import { Button, getButtonClassName } from "@/shared/ui/button";
+import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Dialog } from "@/shared/ui/dialog";
+import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Panel } from "@/shared/ui/panel";
@@ -18,6 +19,7 @@ import { Select } from "@/shared/ui/select";
 import { StatTile } from "@/shared/ui/stat-tile";
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -71,6 +73,7 @@ function DeleteCatalogCollectionButton({
 }) {
   const port = useFlywheelPort();
   const [open, setOpen] = useState(false);
+  const deletedRef = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,8 +82,8 @@ function DeleteCatalogCollectionButton({
     setError(null);
     try {
       await port.deleteCatalogCollection(collectionId);
+      deletedRef.current = true;
       setOpen(false);
-      onDeleted?.();
     } catch {
       setError(actionFailureMessage());
     } finally {
@@ -105,8 +108,14 @@ function DeleteCatalogCollectionButton({
         if (nextOpen) setError(null);
       }}
       open={open}
+      cancelDisabled={pending}
+      onAfterClose={() => {
+        if (!deletedRef.current) return;
+        deletedRef.current = false;
+        onDeleted?.();
+      }}
       title={`${collectionName} 카탈로그를 삭제하시겠습니까?`}
-      trigger={<Button disabled={pending} variant="ghost">삭제</Button>}
+      trigger={<Button disabled={pending} variant="ghost"><Icon name="trash" />삭제</Button>}
     >
       {error === null ? null : <p className="text-sm text-negative" role="alert">{error}</p>}
     </Dialog>
@@ -190,15 +199,12 @@ export function CatalogDetailPage() {
           : [];
         const selectedEpisodes = selected.filter((id) => episodes.some((episode) => episode.id === id));
         return (
-          <div className="grid gap-6">
-            <nav aria-label="카탈로그 경로">
-              <Link className={getButtonClassName('ghost')} to="/mlops/catalog">데이터 카탈로그로 돌아가기</Link>
-            </nav>
+          <div className="grid min-w-0 gap-[var(--layout-section-gap)]">
             <PageHeader
               title={collection.name}
-              description={`${collection.taskId} · ${collection.instruction}`}
+              description={collection.instruction}
               actions={(
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-[var(--layout-toolbar-gap)]">
                   <StatusBadge status={collection.qualityStatus} />
                   <DeleteCatalogCollectionButton
                     collectionId={collection.id}
@@ -208,18 +214,43 @@ export function CatalogDetailPage() {
                 </div>
               )}
             />
-            <Panel title="수집 정보">
-              <DefinitionGrid items={[
-                { label: '수집 ID', value: collection.id },
-                { label: '수집 대상', value: collection.robotId ?? collection.participantId ?? '미지정' },
-                { label: '완료 시각', value: formatDateTime(collection.completedAtMs) },
-                { label: '에피소드', value: `${String(collection.episodeIds.length)}개` },
-              ]} />
-            </Panel>
-            <Panel
-              title="에피소드 선택"
-              description="데이터셋에 포함할 녹화본을 선택하세요."
-            >
+            <DefinitionGrid items={[
+              { label: '수집 ID', value: collection.id },
+              { label: '수집 대상', value: collection.robotId ?? collection.participantId ?? '미지정' },
+              { label: '작업 ID', value: collection.taskId },
+              { label: '완료 시각', value: formatDateTime(collection.completedAtMs) },
+            ]} />
+            <section aria-labelledby="catalog-episodes-heading" className="grid min-w-0 gap-[var(--layout-toolbar-gap)]">
+              <div className="flex flex-wrap items-center justify-between gap-[var(--layout-toolbar-gap)]">
+                <div>
+                  <h2 className="text-base font-bold text-foreground" id="catalog-episodes-heading">
+                    에피소드 <span className="ml-1 font-normal text-muted">{String(collection.episodeIds.length)}개</span>
+                  </h2>
+                  {episodesQuery.status === 'ready' && episodes.length > 0 ? (
+                    <p aria-live="polite" className="mt-1 text-sm text-muted">
+                      {selectedEpisodes.length === 0
+                        ? '데이터셋에 포함할 에피소드를 선택하세요.'
+                        : `${String(selectedEpisodes.length)}개 선택됨`}
+                    </p>
+                  ) : null}
+                </div>
+                {episodesQuery.status === 'ready' && episodes.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-[var(--layout-toolbar-gap)]">
+                    <JsonExportButton fileName={`${collection.id}-episodes.json`} label="에피소드 JSON 내보내기" records={episodes.map(createEpisodeExportRecord)} />
+                    <Button
+                      aria-label={`선택한 에피소드 ${String(selectedEpisodes.length)}개로 데이터셋 구성`}
+                      disabled={selectedEpisodes.length === 0}
+                      onClick={() => {
+                        const params = new URLSearchParams({ kind: 'humanoid-episode' });
+                        selectedEpisodes.forEach((episodeId) => params.append('episode', episodeId));
+                        void navigate(`/mlops/datasets/new?${params.toString()}`);
+                      }}
+                    >
+                      데이터셋 구성
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
               {episodesQuery.status === 'loading' ? (
                 <p className="text-sm text-muted" role="status">에피소드를 불러오는 중입니다.</p>
               ) : episodesQuery.status === 'error' ? (
@@ -230,19 +261,19 @@ export function CatalogDetailPage() {
               ) : episodes.length === 0 ? (
                 <p className="text-sm text-muted" role="status">이 수집에 저장된 에피소드가 없습니다.</p>
               ) : (
-                <div className="grid gap-4">
-                  <div className="justify-self-end">
-                    <JsonExportButton fileName={`${collection.id}-episodes.json`} label="에피소드 JSON 내보내기" records={episodes.map(createEpisodeExportRecord)} />
-                  </div>
                   <Table aria-label="카탈로그 에피소드 선택">
+                    <colgroup>
+                      <col className="w-14" />
+                      <col />
+                      <col className="w-20 sm:w-24" />
+                      <col className="w-24 sm:w-32" />
+                    </colgroup>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>선택</TableHead>
+                        <TableHead><span className="sr-only">선택</span></TableHead>
                         <TableHead>에피소드</TableHead>
                         <TableHead>길이</TableHead>
-                        <TableHead>저장 상태</TableHead>
                         <TableHead>품질</TableHead>
-                        <TableHead>상세</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -259,33 +290,21 @@ export function CatalogDetailPage() {
                               ))}
                             />
                           </TableCell>
-                          <TableCell>{episode.name || `Episode ${String(index + 1).padStart(2, '0')}`}</TableCell>
-                          <TableCell>
-                            {episode.endedAtMs === null ? '—' : `${String(Math.round((episode.endedAtMs - episode.startedAtMs) / 1_000))}초`}
+                          <TableCell className="h-[var(--layout-data-row-height)] min-w-24 break-words px-4 py-2 text-foreground">
+                            <DetailLink to={`/mlops/episodes/${episode.id}`}>
+                              {episode.name || `Episode ${String(index + 1).padStart(2, '0')}`}
+                            </DetailLink>
                           </TableCell>
-                          <TableCell><StatusBadge status="저장됨" /></TableCell>
+                          <TableCell>
+                            {episode.endedAtMs === null ? '미완료' : `${String(Math.round((episode.endedAtMs - episode.startedAtMs) / 1_000))}초`}
+                          </TableCell>
                           <TableCell><StatusBadge status={episode.qualityStatus} /></TableCell>
-                          <TableCell><DetailLink to={`/mlops/episodes/${episode.id}`}>상세 보기</DetailLink></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div>
-                    <Button
-                      className="max-w-full whitespace-normal text-left"
-                      disabled={selectedEpisodes.length === 0}
-                      onClick={() => {
-                        const params = new URLSearchParams({ kind: 'humanoid-episode' });
-                        selectedEpisodes.forEach((episodeId) => params.append('episode', episodeId));
-                        void navigate(`/mlops/datasets/new?${params.toString()}`);
-                      }}
-                    >
-                      선택한 에피소드 {String(selectedEpisodes.length)}개로 데이터셋 구성
-                    </Button>
-                  </div>
-                </div>
               )}
-            </Panel>
+            </section>
           </div>
         );
       }}
@@ -456,7 +475,7 @@ export function LegacyCatalogPage() {
           <p className="text-sm text-muted">조건에 맞는 데이터가 없습니다.</p>
         </Panel>
       ) : (
-        <Panel title={`${String(rows.length)}개 레코드`}>
+        <TableSection title={`${String(rows.length)}개 레코드`}>
           <Table aria-label="카탈로그 레코드 목록">
             <TableHeader>
               <TableRow>
@@ -488,7 +507,7 @@ export function LegacyCatalogPage() {
               ))}
             </TableBody>
           </Table>
-        </Panel>
+        </TableSection>
       )}
     </div>
   );
@@ -567,46 +586,44 @@ export function AnnotationsPage() {
       </Panel>
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="검수 작업 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>작업</TableHead>
-                  <TableHead>유형 / 스키마</TableHead>
-                  <TableHead>담당 / 검수</TableHead>
-                  <TableHead>진행률</TableHead>
-                  <TableHead>상태</TableHead>
+          <Table aria-label="검수 작업 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>작업</TableHead>
+                <TableHead>유형 / 스키마</TableHead>
+                <TableHead>담당 / 검수</TableHead>
+                <TableHead>진행률</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/annotations/${item.id}`}>
+                      {item.name}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>
+                    {kindOptions.find((option) => option.value === item.dataKind)?.label ?? item.dataKind}
+                    <br />
+                    <span className="text-xs text-muted">
+                      {item.schemaName}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {item.assignee} / {item.reviewer}
+                  </TableCell>
+                  <TableCell>
+                    {String(item.completedItems)} / {String(item.totalItems)}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/annotations/${item.id}`}>
-                        {item.name}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>
-                      {kindOptions.find((option) => option.value === item.dataKind)?.label ?? item.dataKind}
-                      <br />
-                      <span className="text-xs text-muted">
-                        {item.schemaName}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {item.assignee} / {item.reviewer}
-                    </TableCell>
-                    <TableCell>
-                      {String(item.completedItems)} / {String(item.totalItems)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -779,38 +796,36 @@ export function QualityPage() {
       </Panel>
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="품질 검사 실행 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>실행</TableHead>
-                  <TableHead>유형</TableHead>
-                  <TableHead>통과</TableHead>
-                  <TableHead>실패</TableHead>
-                  <TableHead>격리</TableHead>
-                  <TableHead>상태</TableHead>
+          <Table aria-label="품질 검사 실행 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>실행</TableHead>
+                <TableHead>유형</TableHead>
+                <TableHead>통과</TableHead>
+                <TableHead>실패</TableHead>
+                <TableHead>격리</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/quality/${item.id}`}>
+                      {item.name}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>{item.dataKind}</TableCell>
+                  <TableCell>{String(item.passedItems)}</TableCell>
+                  <TableCell>{String(item.failedItems)}</TableCell>
+                  <TableCell>{String(item.quarantinedItems)}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/quality/${item.id}`}>
-                        {item.name}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>{item.dataKind}</TableCell>
-                    <TableCell>{String(item.passedItems)}</TableCell>
-                    <TableCell>{String(item.failedItems)}</TableCell>
-                    <TableCell>{String(item.quarantinedItems)}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -889,12 +904,14 @@ export function FlywheelDatasetsPage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <JsonExportButton
-              fileName="dataset-versions.json"
-              label="Dataset JSON 내보내기"
-              records={items}
-            />
+          <div className="grid min-w-0 gap-[var(--layout-toolbar-gap)]">
+            <div className="justify-self-end">
+              <JsonExportButton
+                fileName="dataset-versions.json"
+                label="Dataset JSON 내보내기"
+                records={items}
+              />
+            </div>
             <Table aria-label="Dataset 버전 목록">
               <TableHeader>
                 <TableRow>
@@ -933,7 +950,7 @@ export function FlywheelDatasetsPage() {
                 ))}
               </TableBody>
             </Table>
-          </Panel>
+          </div>
         )}
       </AsyncState>
     </div>

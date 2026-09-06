@@ -31,6 +31,7 @@ import {
   Settings as SettingsIcon,
   Square,
   TableProperties,
+  Trash2,
   WifiOff,
   X,
   Zap,
@@ -71,6 +72,7 @@ export type IconName =
   | 'settings'
   | 'stop'
   | 'table'
+  | 'trash'
   | 'wifi-off';
 
 interface IconProps {
@@ -115,6 +117,7 @@ const icons = {
   settings: SettingsIcon,
   stop: Square,
   table: TableProperties,
+  trash: Trash2,
   'wifi-off': WifiOff,
 } as const;
 

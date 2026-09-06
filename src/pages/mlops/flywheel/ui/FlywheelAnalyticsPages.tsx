@@ -10,6 +10,7 @@ import { Panel } from "@/shared/ui/panel";
 import { Select } from "@/shared/ui/select";
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -144,14 +145,16 @@ export function FlywheelExplorerPage() {
             (node) => type === "all" || node.type === type,
           );
           return (
-            <Panel title={`기록 ${String(nodes.length)}개`}>
-              <JsonExportButton
-                fileName="flywheel-records.json"
-                label="탐색 결과 JSON 내보내기"
-                records={nodes}
-              />
+            <TableSection title={`기록 ${String(nodes.length)}개`}>
+              <div className="justify-self-end">
+                <JsonExportButton
+                  fileName="flywheel-records.json"
+                  label="탐색 결과 JSON 내보내기"
+                  records={nodes}
+                />
+              </div>
               {nodes.length === 0 ? (
-                <div className="mt-4 grid justify-items-start gap-3">
+                <div className="grid justify-items-start gap-3">
                   <p className="text-sm text-muted" role="status">선택한 유형의 기록이 없습니다.</p>
                   <Button onClick={() => { const next = new URLSearchParams(params); next.delete('type'); setParams(next); }} variant="secondary">전체 기록 보기</Button>
                 </div>
@@ -192,7 +195,7 @@ export function FlywheelExplorerPage() {
                   ))}
                 </TableBody>
               </Table>}
-            </Panel>
+            </TableSection>
           );
         }}
       </AsyncState>

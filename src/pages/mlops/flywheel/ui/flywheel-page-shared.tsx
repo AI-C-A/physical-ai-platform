@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/shared/ui/badge';
-import { getButtonClassName } from '@/shared/ui/button';
+import { Button, getButtonClassName } from '@/shared/ui/button';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 
 import { getStatusLabel } from './flywheel-status';
@@ -47,7 +47,7 @@ export function JsonExportButton({
     anchor.click();
     URL.revokeObjectURL(url);
   }
-  return <button className={getButtonClassName('secondary')} onClick={download} type="button">{label}</button>;
+  return <Button onClick={download} variant="secondary">{label}</Button>;
 }
 
 export function AsyncState<T>({

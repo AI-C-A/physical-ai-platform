@@ -1,3 +1,4 @@
+import { ChoiceCard } from '@/shared/ui/choice-card';
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -22,6 +23,7 @@ import { Stepper } from "@/shared/ui/stepper";
 import { SynchronizedPlayer } from "@/shared/ui/synchronized-player";
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -72,40 +74,38 @@ export function TrainingPage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="학습 실행 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>실행</TableHead>
-                  <TableHead>모델</TableHead>
-                  <TableHead>Dataset</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>단계</TableHead>
-                  <TableHead>생성 시각</TableHead>
+          <Table aria-label="학습 실행 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>실행</TableHead>
+                <TableHead>모델</TableHead>
+                <TableHead>Dataset</TableHead>
+                <TableHead>상태</TableHead>
+                <TableHead>단계</TableHead>
+                <TableHead>생성 시각</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/training/${run.id}`}>
+                      {run.name}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>{run.modelFamily}</TableCell>
+                  <TableCell>{run.datasetVersionId}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={run.status} />
+                  </TableCell>
+                  <TableCell>
+                    {String(run.currentStep)} / {String(run.steps)}
+                  </TableCell>
+                  <TableCell>{formatDateTime(run.createdAtMs)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((run) => (
-                  <TableRow key={run.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/training/${run.id}`}>
-                        {run.name}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>{run.modelFamily}</TableCell>
-                    <TableCell>{run.datasetVersionId}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={run.status} />
-                    </TableCell>
-                    <TableCell>
-                      {String(run.currentStep)} / {String(run.steps)}
-                    </TableCell>
-                    <TableCell>{formatDateTime(run.createdAtMs)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -203,32 +203,14 @@ export function NewTrainingPage() {
         {step === 1 ? (
           <div className="grid gap-3 md:grid-cols-4">
             {(["pi0", "pi05", "act", "custom"] as const).map((model) => (
-              <button
-                aria-pressed={modelFamily === model}
-                className={
-                  modelFamily === model
-                    ? "min-h-36 rounded-[var(--design-radius-surface)] bg-action-secondary-active ring-2 ring-focus p-5 text-left"
-                    : "min-h-36 rounded-[var(--design-radius-surface)] bg-layer-base p-5 text-left"
-                }
+              <ChoiceCard
+                selected={modelFamily === model}
+                className="min-h-36"
                 key={model}
                 onClick={() => setModelFamily(model)}
-                type="button"
-              >
-                <strong className="text-xl">
-                  {model === "pi05"
-                    ? "π0.5"
-                    : model === "pi0"
-                      ? "π0"
-                      : model.toUpperCase()}
-                </strong>
-                <p className="mt-3 text-sm text-muted">
-                  {model === "act"
-                    ? '동작 시퀀스 학습'
-                    : model === "custom"
-                      ? '사용자 정의 모델 계열'
-                      : '시각·언어·행동 모델'}
-                </p>
-              </button>
+                title={model === 'pi05' ? 'π0.5' : model === 'pi0' ? 'π0' : model.toUpperCase()}
+                description={model === 'act' ? '동작 시퀀스 학습' : model === 'custom' ? '사용자 정의 모델 계열' : '시각·언어·행동 모델'}
+              />
             ))}
           </div>
         ) : null}
@@ -236,24 +218,14 @@ export function NewTrainingPage() {
           <AsyncState query={datasets} emptyMessage="릴리스된 데이터셋이 없습니다. 데이터셋을 구성하고 릴리스한 뒤 다시 확인하세요.">
             {() => released.length === 0 ? <p className="text-sm text-muted" role="status">릴리스된 데이터셋이 없습니다. 데이터셋을 릴리스한 뒤 다시 확인하세요.</p> : <div className="grid gap-3">
             {released.map((dataset) => (
-              <button
-                aria-pressed={datasetId === dataset.id}
-                className={
-                  datasetId === dataset.id
-                    ? "rounded-[var(--design-radius-control)] bg-action-secondary-active ring-2 ring-focus p-4 text-left"
-                    : "rounded-[var(--design-radius-control)] bg-layer-base p-4 text-left"
-                }
+              <ChoiceCard
+                selected={datasetId === dataset.id}
+                density="compact"
                 key={dataset.id}
                 onClick={() => setDatasetId(dataset.id)}
-                type="button"
-              >
-                <strong>
-                  {dataset.name} v{String(dataset.version)}
-                </strong>
-                <p className="mt-1 text-sm text-muted">
-                  데이터 {String(dataset.unitRefs.length)}개 · 릴리스됨
-                </p>
-              </button>
+                title={dataset.name + ' v' + String(dataset.version)}
+                description={'데이터 ' + String(dataset.unitRefs.length) + '개 · 릴리스됨'}
+              />
             ))}
           </div>}
           </AsyncState>
@@ -450,40 +422,38 @@ export function EvaluationsPage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="평가 실행 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>실행</TableHead>
-                  <TableHead>모델</TableHead>
-                  <TableHead>로봇 / 환경</TableHead>
-                  <TableHead>점수</TableHead>
-                  <TableHead>통과 기준</TableHead>
-                  <TableHead>상태</TableHead>
+          <Table aria-label="평가 실행 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>실행</TableHead>
+                <TableHead>모델</TableHead>
+                <TableHead>로봇 / 환경</TableHead>
+                <TableHead>점수</TableHead>
+                <TableHead>통과 기준</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/evaluations/${run.id}`}>
+                      {run.name}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>{run.modelVersionId}</TableCell>
+                  <TableCell>
+                    {run.robotType} / {run.environment}
+                  </TableCell>
+                  <TableCell>{run.score?.toFixed(1) ?? "—"}</TableCell>
+                  <TableCell>{run.passThreshold.toFixed(1)}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={run.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((run) => (
-                  <TableRow key={run.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/evaluations/${run.id}`}>
-                        {run.name}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>{run.modelVersionId}</TableCell>
-                    <TableCell>
-                      {run.robotType} / {run.environment}
-                    </TableCell>
-                    <TableCell>{run.score?.toFixed(1) ?? "—"}</TableCell>
-                    <TableCell>{run.passThreshold.toFixed(1)}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={run.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -672,40 +642,38 @@ export function ModelsPage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="모델 버전 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>모델 버전</TableHead>
-                  <TableHead>계열</TableHead>
-                  <TableHead>로봇</TableHead>
-                  <TableHead>단계</TableHead>
-                  <TableHead>평가</TableHead>
-                  <TableHead>생성 시각</TableHead>
+          <Table aria-label="모델 버전 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>모델 버전</TableHead>
+                <TableHead>계열</TableHead>
+                <TableHead>로봇</TableHead>
+                <TableHead>단계</TableHead>
+                <TableHead>평가</TableHead>
+                <TableHead>생성 시각</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((model) => (
+                <TableRow key={model.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/models/${model.id}`}>
+                      {model.name} v{String(model.version)}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>{model.modelFamily}</TableCell>
+                  <TableCell>{model.robotType}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={model.stage} />
+                  </TableCell>
+                  <TableCell>
+                    {String(model.evaluationRunIds.length)} runs
+                  </TableCell>
+                  <TableCell>{formatDateTime(model.createdAtMs)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((model) => (
-                  <TableRow key={model.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/models/${model.id}`}>
-                        {model.name} v{String(model.version)}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>{model.modelFamily}</TableCell>
-                    <TableCell>{model.robotType}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={model.stage} />
-                    </TableCell>
-                    <TableCell>
-                      {String(model.evaluationRunIds.length)} runs
-                    </TableCell>
-                    <TableCell>{formatDateTime(model.createdAtMs)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -830,42 +798,40 @@ export function DeploymentsPage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="배포 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>배포</TableHead>
-                  <TableHead>모델</TableHead>
-                  <TableHead>로봇</TableHead>
-                  <TableHead>배포 비율</TableHead>
-                  <TableHead>지연 시간</TableHead>
-                  <TableHead>상태</TableHead>
+          <Table aria-label="배포 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>배포</TableHead>
+                <TableHead>모델</TableHead>
+                <TableHead>로봇</TableHead>
+                <TableHead>배포 비율</TableHead>
+                <TableHead>지연 시간</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/deployments/${item.id}`}>
+                      {item.name}
+                    </DetailLink>
+                  </TableCell>
+                  <TableCell>{item.modelVersionId}</TableCell>
+                  <TableCell>{item.robotIds.join(", ")}</TableCell>
+                  <TableCell>{String(item.rolloutPercent)}%</TableCell>
+                  <TableCell>
+                    {item.latencyMs === null
+                      ? "—"
+                      : `${String(item.latencyMs)} ms`}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/deployments/${item.id}`}>
-                        {item.name}
-                      </DetailLink>
-                    </TableCell>
-                    <TableCell>{item.modelVersionId}</TableCell>
-                    <TableCell>{item.robotIds.join(", ")}</TableCell>
-                    <TableCell>{String(item.rolloutPercent)}%</TableCell>
-                    <TableCell>
-                      {item.latencyMs === null
-                        ? "—"
-                        : `${String(item.latencyMs)} ms`}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -1121,49 +1087,47 @@ export function InferencePage() {
       />
       <AsyncState query={query}>
         {(items) => (
-          <Panel>
-            <Table aria-label="추론 세션 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>추론</TableHead>
-                  <TableHead>모델 / 배포</TableHead>
-                  <TableHead>로봇</TableHead>
-                  <TableHead>결과</TableHead>
-                  <TableHead>지연 시간</TableHead>
-                  <TableHead>상태</TableHead>
+          <Table aria-label="추론 세션 목록">
+            <TableHeader>
+              <TableRow>
+                <TableHead>추론</TableHead>
+                <TableHead>모델 / 배포</TableHead>
+                <TableHead>로봇</TableHead>
+                <TableHead>결과</TableHead>
+                <TableHead>지연 시간</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <DetailLink to={`/mlops/inference/${item.id}`}>
+                      {item.task}
+                    </DetailLink>
+                    <span className="mt-1 block text-xs text-muted">
+                      {item.id}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {item.modelVersionId}
+                    <br />
+                    <span className="text-xs text-muted">
+                      {item.deploymentId}
+                    </span>
+                  </TableCell>
+                  <TableCell>{item.robotId}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.outcome ?? "pending"} />
+                  </TableCell>
+                  <TableCell>{String(item.averageLatencyMs)} ms</TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <DetailLink to={`/mlops/inference/${item.id}`}>
-                        {item.task}
-                      </DetailLink>
-                      <span className="mt-1 block text-xs text-muted">
-                        {item.id}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {item.modelVersionId}
-                      <br />
-                      <span className="text-xs text-muted">
-                        {item.deploymentId}
-                      </span>
-                    </TableCell>
-                    <TableCell>{item.robotId}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.outcome ?? "pending"} />
-                    </TableCell>
-                    <TableCell>{String(item.averageLatencyMs)} ms</TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Panel>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </AsyncState>
     </div>
@@ -1214,7 +1178,7 @@ export function InferenceDetailPage() {
               />
               <StatTile label="단계 수" value={String(item.steps.length)} />
             </div>
-            <Panel title="예측 동작 / 로봇 응답">
+            <TableSection title="예측 동작 / 로봇 응답">
               <Table aria-label="추론 단계 목록">
                 <TableHeader>
                   <TableRow>
@@ -1237,7 +1201,7 @@ export function InferenceDetailPage() {
                   ))}
                 </TableBody>
               </Table>
-            </Panel>
+            </TableSection>
             <Panel title="실패 / 개입">
               <p className="text-sm text-muted">
                 {item.interventionId === null
