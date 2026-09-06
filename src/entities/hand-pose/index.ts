@@ -32,3 +32,5 @@ export { BrowserWebXrRuntime } from './api/browser-webxr-runtime';
 export { QuestCollectorAdapter } from './api/quest-collector-adapter';
 export { SimulatedWebXrRuntime } from './api/simulated-webxr-runtime';
 export { createUnavailableQuestCollector } from './api/unavailable-quest-collector';
+export { HttpQuestCollectorBackend } from './api/http-quest-collector-backend';
+export type { QuestLivePreviewPort, QuestLiveSession, QuestLiveSnapshot } from './model/quest-live-preview';

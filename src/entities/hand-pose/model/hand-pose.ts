@@ -1,3 +1,5 @@
+import type { QuestLivePreviewPort } from './quest-live-preview';
+
 export const HAND_JOINT_NAMES = [
   'wrist',
   'thumb-metacarpal',
@@ -69,6 +71,7 @@ export interface HandTrackingPolicy {
 }
 
 export interface QuestPairingResult {
+  readonly collection?: boolean;
   readonly sessionId: string;
   readonly sourceDeviceId: string;
   readonly participantId: string;
@@ -101,6 +104,7 @@ export interface QuestCollectorSnapshot {
     readonly detail: string;
   };
   readonly pairing: {
+    readonly collection?: boolean;
     readonly state: QuestPairingState;
     readonly sessionId: string | null;
     readonly participantId: string | null;
@@ -188,6 +192,7 @@ export interface QuestCollectorBackendPort {
 }
 
 export interface QuestCollectorPort {
+  readonly livePreview?: QuestLivePreviewPort;
   getSnapshot(): QuestCollectorSnapshot;
   checkSupport(): Promise<QuestCollectorSnapshot>;
   pair(pairingCode: string): Promise<QuestCollectorSnapshot>;

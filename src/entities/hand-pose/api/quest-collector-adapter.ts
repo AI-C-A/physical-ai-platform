@@ -1,5 +1,6 @@
 import { encodeHandPoseBatch } from '../lib/hand-pose-binary';
 import { HandPoseFrameQueue } from '../lib/hand-pose-frame-queue';
+import type { QuestLivePreviewPort } from '../model/quest-live-preview';
 import type {
   ActiveWebXrSession,
   HandPoseFrame,
@@ -70,6 +71,7 @@ function initialSnapshot(
 }
 
 interface QuestCollectorAdapterOptions {
+  readonly livePreview?: QuestLivePreviewPort;
   readonly backend: QuestCollectorBackendPort;
   readonly nowMs?: () => number;
   readonly runtime: WebXrRuntimePort;
@@ -80,6 +82,7 @@ interface QuestCollectorAdapterOptions {
  * Pairing credential은 메모리에만 머물며 영속 브라우저 저장소에 기록하지 않는다.
  */
 export class QuestCollectorAdapter implements QuestCollectorPort {
+  readonly livePreview?: QuestLivePreviewPort;
   readonly #backend: QuestCollectorBackendPort;
   readonly #listeners = new Set<() => void>();
   readonly #nowMs: () => number;
@@ -107,7 +110,8 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
   #reconnectAttempt = 0;
   #latestPreviewObservation: WebXrFrameObservation | null = null;
 
-  constructor({ backend, nowMs = () => Date.now(), runtime }: QuestCollectorAdapterOptions) {
+  constructor({ backend, nowMs = () => Date.now(), runtime, livePreview }: QuestCollectorAdapterOptions) {
+    if (livePreview !== undefined) this.livePreview = livePreview;
     this.#backend = backend;
     this.#nowMs = nowMs;
     this.#runtime = runtime;
@@ -181,6 +185,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
       this.#update({
         pairing: {
           state: 'paired',
+          ...(pairing.collection === undefined ? {} : { collection: pairing.collection }),
           sessionId: pairing.sessionId,
           participantId: pairing.participantId,
           sourceDeviceId: pairing.sourceDeviceId,
@@ -552,9 +557,12 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
     this.#latestPreviewObservation = null;
     this.#previewRunning = true;
     try {
-      await this.#backend.sendHandPosePreview({ pairing, observation });
+      const receipt = await this.#backend.sendHandPosePreview({ pairing, observation });
+      if (this.#pairing === pairing && this.#activeSession !== null) {
+        this.#update({ backend: { ...this.#snapshot.backend, lastReceivedTimestampMs: receipt.receivedTimestampMs } });
+      }
     } catch (reason) {
-      this.#handleBackendFailure(reason);
+      if (this.#pairing === pairing && this.#activeSession !== null) this.#handleBackendFailure(reason);
     } finally {
       this.#previewRunning = false;
       if (this.#latestPreviewObservation !== null
