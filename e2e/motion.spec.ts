@@ -3,6 +3,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './playwright-test';
 
 import { expectApplicationReady } from './browser-assertions';
+import { fillCollectionSetup } from './collection-setup';
 
 async function getAnimationDuration(locator: Locator): Promise<string> {
   return locator.evaluate((element) => getComputedStyle(element).animationDuration);
@@ -154,14 +155,199 @@ async function openExplorerTabs(page: Page) {
   return indicator;
 }
 
+test('공통 press는 레이아웃을 유지하고 놓기·모션 감소에서 복원된다', async ({ page }) => {
+  await page.goto('/control/events');
+  await expectApplicationReady(page);
+  const button = page.getByRole('button', { name: /상세 보기/u }).first();
+  const layoutWidth = await button.evaluate((element) => (element as HTMLElement).offsetWidth);
+  await button.hover();
+  await page.mouse.down();
+  await expect.poll(() => button.evaluate((element) => getComputedStyle(element).scale)).toBe('0.96');
+  expect(await button.evaluate((element) => (element as HTMLElement).offsetWidth)).toBe(layoutWidth);
+  expect(await getTransitionDuration(button)).toBe('0.18s');
+  await page.mouse.move(1, 1);
+  await page.mouse.up();
+  await expect.poll(() => button.evaluate((element) => getComputedStyle(element).scale)).toBe('none');
+  expect(await getTransitionDuration(button)).toBe('0.28s');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await button.hover();
+  await page.mouse.down();
+  expect(await button.evaluate((element) => getComputedStyle(element).scale)).toBe('none');
+  expect(await getTransitionProperty(button)).toBe('none');
+  await page.mouse.move(1, 1);
+  await page.mouse.up();
+});
+
+test('메뉴와 Select는 배치 기준으로 열리고 퇴장 후 포커스를 복원한다', async ({ page }) => {
+  await page.goto('/control/events');
+  await expectApplicationReady(page);
+  const triggers = [
+    page.getByRole('button', { name: /미니앱 전환/u }),
+    page.getByRole('combobox', { name: '유형', exact: true }),
+  ];
+  const popups = [page.locator('.design-motion-menu'), page.locator('.design-motion-select')];
+
+  for (const [index, trigger] of triggers.entries()) {
+    const popup = popups[index]!;
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(popup).toBeVisible();
+    expect(await getAnimationDuration(popup)).toBe('0.28s');
+    expect(await popup.evaluate((element) => getComputedStyle(element).animationName)).toBe('design-motion-popover-in');
+    const side = await popup.getAttribute('data-side');
+    expect(['top', 'bottom', 'left', 'right']).toContain(side);
+    const origin = await popup.evaluate((element) => {
+      const styles = getComputedStyle(element);
+      const variable = element.classList.contains('design-motion-select')
+        ? '--radix-select-content-transform-origin'
+        : '--radix-dropdown-menu-content-transform-origin';
+      return styles.getPropertyValue(variable).trim();
+    });
+    expect(origin).not.toBe('');
+    await popup.evaluate((element) => {
+      element.addEventListener('animationstart', (event) => {
+        if ((event as AnimationEvent).animationName !== 'design-motion-popover-out') return;
+        for (const animation of element.getAnimations()) animation.pause();
+      });
+    });
+    await page.keyboard.press('Escape');
+    await expect(popup).toHaveAttribute('data-state', 'closed');
+    await expect.poll(() => popup.evaluate((element) => element.getAnimations().some((animation) => animation.playState === 'paused'))).toBe(true);
+    expect(await popup.evaluate((element) => getComputedStyle(element).pointerEvents)).toBe('none');
+    await popup.evaluate((element) => {
+      for (const animation of element.getAnimations()) animation.finish();
+    });
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const [index, trigger] of triggers.entries()) {
+    const popup = popups[index]!;
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(popup).toBeVisible();
+    expect(await getAnimationDuration(popup)).toBe('0.001s');
+    expect(await popup.evaluate((element) => getComputedStyle(element).transform)).toBe('none');
+    await page.keyboard.press('Escape');
+    await expect(popup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+});
+
+async function pauseDialogExit(dialog: Locator) {
+  await dialog.evaluate((element) => {
+    element.addEventListener('animationstart', (event) => {
+      if (event.target !== element || (event as AnimationEvent).animationName !== 'design-motion-dialog-out') return;
+      for (const animation of element.getAnimations()) {
+        animation.pause();
+        animation.currentTime = 70;
+      }
+    });
+  });
+}
+
+async function expectDialogExiting(dialog: Locator) {
+  await expect(dialog).toHaveAttribute('data-state', 'closed');
+  await expect.poll(() => dialog.evaluate((element) => element.getAnimations().some((animation) => animation.playState === 'paused'))).toBe(true);
+  const opacity = await dialog.evaluate((element) => Number(getComputedStyle(element).opacity));
+  expect(opacity).toBeGreaterThan(0);
+  expect(opacity).toBeLessThan(1);
+}
+
+async function finishDialogExit(dialog: Locator) {
+  await dialog.evaluate((element) => element.getAnimations().forEach((animation) => animation.finish()));
+  await expect(dialog).toHaveCount(0);
+}
+
+test('사이드바는 펼침·접힘·모바일에서 press를 공유한다', async ({ page }) => {
+  await page.goto('/control/events');
+  await expectApplicationReady(page);
+  const pressAndRelease = async (link: Locator, scale: string) => {
+    await link.hover();
+    await page.mouse.down();
+    await expect.poll(() => link.evaluate((element) => getComputedStyle(element).scale)).toBe(scale);
+    await page.mouse.move(760, 890);
+    await page.mouse.up();
+    await expect.poll(() => link.evaluate((element) => getComputedStyle(element).scale)).toBe('none');
+  };
+  await pressAndRelease(page.getByRole('link', { name: '이벤트 로그', exact: true }), '0.98');
+  await pressAndRelease(page.getByRole('link', { name: '설정', exact: true }), '0.98');
+  await page.getByRole('button', { name: '사이드바 접기' }).click();
+  await pressAndRelease(page.getByRole('link', { name: '이벤트 로그', exact: true }), '0.96');
+  await page.setViewportSize({ width: 768, height: 900 });
+  await page.getByRole('button', { name: '업무 메뉴 열기' }).click();
+  const mobileLink = page.getByRole('dialog').getByRole('link', { name: '이벤트 로그', exact: true });
+  await pressAndRelease(mobileLink, '0.98');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mobileLink.hover();
+  await page.mouse.down();
+  expect(await mobileLink.evaluate((element) => getComputedStyle(element).scale)).toBe('none');
+  await page.mouse.move(760, 890);
+  await page.mouse.up();
+});
+
+test('이벤트 상세는 퇴장 중 내용을 유지하고 완료 후에 제거한다', async ({ page }) => {
+  const { dialog, trigger } = await openEventDialog(page);
+  const title = await dialog.getByRole('heading').textContent();
+  await pauseDialogExit(dialog);
+  await dialog.getByRole('button', { name: '닫기', exact: true }).click();
+  await expectDialogExiting(dialog);
+  expect(await dialog.getByRole('heading').textContent()).toBe(title);
+  await finishDialogExit(dialog);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('수집·Quest 다이얼로그는 퇴장 완료 후에 라우트를 이동한다', async ({ page }) => {
+  await page.goto('/mlops/collection/new?q=motion');
+  await expectApplicationReady(page);
+  const dialog = page.locator('.design-motion-dialog').filter({ has: page.getByRole('heading', { name: '새 데이터 수집', exact: true }) });
+  await pauseDialogExit(dialog);
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await expectDialogExiting(dialog);
+  await expect(page).toHaveURL(/\/collection\/new\?q=motion/u);
+  await finishDialogExit(dialog);
+  await expect(page).toHaveURL(/\/collection\?q=motion/u);
+  const trigger = page.getByRole('link', { name: '새 수집', exact: true });
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await fillCollectionSetup(page);
+  await pauseDialogExit(dialog);
+  await page.getByRole('button', { name: '세션 생성', exact: true }).click();
+  await expectDialogExiting(dialog);
+  await expect(page).toHaveURL(/\/collection\/new\?q=motion/u);
+  await finishDialogExit(dialog);
+  await expect(page).toHaveURL(/\/collection\/[^/]+\/setup\?q=motion/u);
+  await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toBeVisible();
+  const questDialog = page.locator('.design-motion-dialog').filter({ has: page.getByRole('heading', { name: 'Quest 연결', exact: true }) });
+  await pauseDialogExit(questDialog);
+  await page.keyboard.press('Escape');
+  await expectDialogExiting(questDialog);
+  await expect(page).toHaveURL(/\/setup\?q=motion/u);
+  await finishDialogExit(questDialog);
+  await expect(page).toHaveURL(/\/collection\?q=motion/u);
+  await expect(trigger).toBeFocused();
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/collection\?q=motion/u);
+});
+
 test('overlay·toast·tabs는 데스크톱 모션 시간과 최종 위치를 유지한다', async ({
   page,
 }) => {
   const { dialog, trigger } = await openEventDialog(page);
-  await expect.poll(() => getAnimationDuration(dialog)).toBe('0.18s');
+  await expect.poll(() => getAnimationDuration(dialog)).toBe('0.28s');
   await expect.poll(() => getAnimationDuration(
     page.locator('.design-motion-overlay'),
-  )).toBe('0.18s');
+  )).toBe('0.28s');
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
