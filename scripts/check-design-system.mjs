@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const sourceRoot = resolve(repositoryRoot, 'src');
@@ -24,20 +25,16 @@ const visualizationAllowlist = new Set([
 ]);
 
 const elevationAllowlist = new Set([
-  'src/pages/control/monitoring/ui/ControlMonitoringPage.tsx',
-  'src/pages/control/monitoring/ui/MonitoringMap.tsx',
   'src/shared/ui/dialog/Dialog.tsx',
   'src/shared/ui/dropdown/Dropdown.tsx',
   'src/shared/ui/select/Select.tsx',
   'src/shared/ui/sheet/Sheet.tsx',
   'src/shared/ui/surface/floating-surface.ts',
   'src/shared/ui/surface/Surface.tsx',
+  'src/shared/ui/surface/overlay-surface.ts',
+  'src/shared/ui/input/field-styles.ts',
   'src/shared/ui/toast/ToastItem.tsx',
   'src/shared/ui/tooltip/Tooltip.tsx',
-]);
-
-const radiusAllowlist = new Set([
-  'src/pages/control/monitoring/ui/ControlMonitoringPage.tsx',
 ]);
 
 const collectionMediaPanels = new Set([
@@ -47,6 +44,24 @@ const collectionMediaPanels = new Set([
 ]);
 
 const rules = [
+  {
+    id: 'shared-control',
+    message: '입력·버튼은 shared/ui의 공통 컴포넌트를 사용해야 합니다.',
+    pattern: /<(?:input|select|textarea|button)\b/gu,
+    appliesTo: isProductSource,
+  },
+  {
+    id: 'shared-control-internals',
+    message: '입력·메뉴·선택 카드의 내부 스타일은 공통 컴포넌트에서 관리해야 합니다.',
+    pattern: /\bui-(?:field|menu|choice)[\w-]*\b|\b(?:inputClassName|triggerClassName|itemClassName)\s*=/gu,
+    appliesTo: isProductSource,
+  },
+  {
+    id: 'shared-interaction-primitive',
+    message: 'Radix 상호작용 부품은 shared/ui에서 감싸고 화면에서는 공통 컴포넌트를 조합해야 합니다.',
+    pattern: /['"]@radix-ui\/react-[^'"]+['"]/gu,
+    appliesTo: isProductSource,
+  },
   {
     id: 'collection-media-panel',
     message: '수집 시각화 카드는 공통 MediaPanel의 곡률·헤더·clipping 계약을 사용해야 합니다.',
@@ -62,7 +77,7 @@ const rules = [
   },
   {
     id: 'input-radius-token',
-    message: '공통 입력 곡률은 design-radius-control 토큰을 사용해야 합니다.',
+    message: '공통 입력 곡률은 design-radius-field 토큰을 사용해야 합니다.',
     pattern: /\brounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/gu,
     appliesTo: (path) => path === 'src/shared/ui/input/Input.tsx'
       || path === 'src/shared/ui/textarea/Textarea.tsx',
@@ -98,7 +113,7 @@ const rules = [
     id: 'page-radius',
     message: '페이지 로컬 radius 대신 design radius token 또는 공통 surface를 사용해야 합니다.',
     pattern: /\brounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/gu,
-    appliesTo: (path) => path.startsWith('src/pages/') && !radiusAllowlist.has(path),
+    appliesTo: (path) => path.startsWith('src/pages/'),
   },
   {
     id: 'static-card-boundary',
@@ -108,8 +123,33 @@ const rules = [
   },
 ];
 
-export function inspectDesignSystemSource(path, source) {
+function isProductSource(path) {
+  return /^src\/(?:pages|widgets|entities)\//u.test(path);
+}
+
+function inspectControlProps(path, source) {
+  if (!isProductSource(path) || !path.endsWith('.tsx')) return [];
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const violations = [];
+  const controls = new Set(['Input', 'SearchField', 'Select', 'Textarea', 'ChoiceCard', 'Menu.Content', 'Menu.Item']);
+  function visit(node) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && controls.has(node.tagName.getText(file))) {
+      for (const prop of node.attributes.properties) {
+        if (!ts.isJsxAttribute(prop)) continue;
+        const name = prop.name.getText(file);
+        const value = prop.initializer?.getText(file) ?? '';
+        if (name !== 'style' && !(name === 'className' && /\b(?:bg|text|rounded|border|ring|outline|shadow|backdrop|font|p[xytrblse]?)-/u.test(value))) continue;
+        violations.push({ id: 'control-design-override', path, line: file.getLineAndCharacterOfPosition(prop.getStart(file)).line + 1, value: prop.getText(file), message: '컨트롤 디자인은 공식 size·surface·density 옵션으로 선택하고 className은 외부 배치에 사용해야 합니다.' });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  return violations;
+}
+
+export function inspectDesignSystemSource(path, source) {
+  const violations = inspectControlProps(path, source);
   for (const rule of rules) {
     if (!rule.appliesTo(path)) continue;
     for (const match of source.matchAll(rule.pattern)) {
