@@ -13,6 +13,7 @@ export const ROUTE_PATHS = {
   controlSettings: '/control/settings',
   mlopsCollection: '/mlops/collection',
   mlopsNewCollection: '/mlops/collection/new',
+  mlopsCollectionSetup: '/mlops/collection/:sessionId/setup',
   mlopsCollectionDetail: '/mlops/collection/:sessionId',
   mlopsReview: '/mlops/review',
   mlopsOperations: '/mlops/operations',

@@ -62,9 +62,10 @@ function renderShell(initialPath = '/control/monitoring') {
               path="mlops/collection"
             />
             <Route
-              element={<p>새 수집 몰입형 화면</p>}
+              element={<p>새 수집 모달 화면</p>}
               path="mlops/collection/new"
             />
+            <Route element={<p>장치 연결 모달 화면</p>} path="mlops/collection/:sessionId/setup" />
             <Route
               element={<p>수집 세션 몰입형 화면</p>}
               path="mlops/collection/:sessionId"
@@ -176,9 +177,8 @@ describe('PlatformShell', () => {
   });
 
   it.each([
-    ['/mlops/collection/new', '새 수집 몰입형 화면'],
     ['/mlops/collection/capture-h-0001', '수집 세션 몰입형 화면'],
-  ])('새 수집부터 세션 운영까지 관제처럼 글로벌 메뉴를 숨긴다', (path, content) => {
+  ])('수집 콘솔에서는 글로벌 메뉴를 숨긴다', (path, content) => {
     renderShell(path);
 
     expect(screen.getByText(content)).toBeInTheDocument();
@@ -187,6 +187,12 @@ describe('PlatformShell', () => {
     expect(screen.queryByRole('link', { name: '수집' })).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveClass('p-0');
     expect(screen.getByRole('main')).toHaveAttribute('data-page-shell', 'full-bleed');
+  });
+
+  it.each(['/mlops/collection/new', '/mlops/collection/capture-h-0001/setup'])('설정 모달 %s에서는 목록 레이아웃을 유지한다', (path) => {
+    renderShell(path);
+    expect(screen.getByRole('button', { name: '사이드바 접기' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveAttribute('data-page-shell', 'standard');
   });
 
   it('업무 메뉴와 Dropdown으로 미니앱을 이동한다', async () => {
@@ -211,13 +217,49 @@ describe('PlatformShell', () => {
       screen.getByRole('menuitem', { name: 'MLOps' }),
     ).not.toHaveAttribute('aria-current');
     await user.click(screen.getByRole('menuitem', { name: 'MLOps' }));
-    expect(screen.getByText('MLOps 데이터 수집 화면')).toBeInTheDocument();
+    expect(await screen.findByText('MLOps 데이터 수집 화면')).toBeInTheDocument();
 
     await user.click(
       screen.getByRole('button', { name: '미니앱 전환 · MLOps' }),
     );
     await user.click(screen.getByRole('menuitem', { name: 'BigData' }));
-    expect(screen.getByText('BigData 개요 화면')).toBeInTheDocument();
+    expect(await screen.findByText('BigData 개요 화면')).toBeInTheDocument();
+  });
+
+  it('앱 런처를 키보드로 탐색하고 Escape로 닫으면 런처에 포커스를 돌린다', async () => {
+    const user = userEvent.setup();
+    renderShell();
+
+    const launcher = screen.getByRole('button', { name: '미니앱 전환 · 관제' });
+    expect(screen.getByRole('complementary')).toContainElement(launcher);
+    expect(screen.queryByRole('menuitem', { name: 'MLOps' })).not.toBeInTheDocument();
+    launcher.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menuitem', { name: '관제' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'MLOps' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'BigData' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'MLOps' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(launcher).toHaveFocus();
+  });
+
+  it('런처에서 현재 앱을 선택하면 작업 페이지를 유지한다', async () => {
+    const user = userEvent.setup();
+    renderShell('/control/robots?siteId=pangyo-army-ax-hub');
+
+    const launcher = screen.getByRole('button', { name: '미니앱 전환 · 관제' });
+    await user.click(launcher);
+    await user.click(screen.getByRole('menuitem', { name: '관제' }));
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/control/robots?siteId=pangyo-army-ax-hub',
+    );
+    expect(launcher).toHaveFocus();
   });
 
   it('MLOps 업무 메뉴 8개를 접힘 그룹 없이 한 목록으로 표시한다', () => {
@@ -263,7 +305,8 @@ describe('PlatformShell', () => {
 
     await user.click(settingsLink);
     expect(screen.getByText('공통 설정 화면')).toBeInTheDocument();
-    expect(settingsLink).toHaveClass('bg-action-secondary-active');
+    expect(settingsLink).toHaveClass('ui-navigation-item');
+    expect(settingsLink).toHaveAttribute('aria-current', 'page');
     expect(document.title).toBe('설정 | ROBOT Army TIGER+');
   });
 
@@ -291,15 +334,15 @@ describe('PlatformShell', () => {
 
     await user.click(screen.getByRole('button', { name: '미니앱 전환 · 관제' }));
     await user.click(screen.getByRole('menuitem', { name: 'MLOps' }));
-    expect(screen.getByTestId('current-location')).toHaveTextContent(
+    await waitFor(() => expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/mlops/collection?siteId=pangyo-army-ax-hub',
-    );
+    ));
 
     await user.click(screen.getByRole('button', { name: '미니앱 전환 · MLOps' }));
     await user.click(screen.getByRole('menuitem', { name: '관제' }));
-    expect(screen.getByTestId('current-location')).toHaveTextContent(
+    await waitFor(() => expect(screen.getByTestId('current-location')).toHaveTextContent(
       '/control/monitoring?siteId=pangyo-army-ax-hub',
-    );
+    ));
   });
 
   it('접힘 상태를 브라우저에 저장하고 메뉴의 접근 가능한 이름을 유지한다', async () => {
@@ -310,9 +353,6 @@ describe('PlatformShell', () => {
       name: '사이드바 접기',
     });
     const sidebarControlRegion = collapseButton.parentElement;
-    const appSwitcherRegion = screen.getByRole('button', {
-      name: '미니앱 전환 · 관제',
-    }).parentElement;
     await user.click(collapseButton);
     expect(
       window.localStorage.getItem(
@@ -326,19 +366,13 @@ describe('PlatformShell', () => {
       screen.getByRole('button', { name: '미니앱 전환 · 관제' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '미니앱 전환 · 관제' })
-        .parentElement,
-    ).toBe(appSwitcherRegion);
-    expect(
       screen.getByRole('button', { name: '사이드바 펼치기' })
         .parentElement,
     ).toBe(sidebarControlRegion);
-    expect(screen.getByRole('link', { name: '모니터링' })).toHaveClass(
-      'bg-action-secondary-active',
-    );
+    expect(screen.getByRole('link', { name: '모니터링' })).toHaveAttribute('aria-current', 'page');
     expect(
       screen.getByRole('link', { name: '개입 요청' }),
-    ).not.toHaveClass('bg-action-secondary-active');
+    ).not.toHaveAttribute('aria-current');
 
     view.unmount();
     renderShell();
@@ -348,6 +382,10 @@ describe('PlatformShell', () => {
 
     await user.hover(screen.getByRole('link', { name: '모니터링' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('모니터링');
+
+    expect(screen.getByRole('button', { name: '미니앱 전환 · 관제' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '사이드바 펼치기' }));
+    expect(screen.getByRole('button', { name: '미니앱 전환 · 관제' })).toBeInTheDocument();
   });
 
   it('Sheet를 Escape로 닫으면 메뉴 버튼으로 포커스를 복귀한다', async () => {

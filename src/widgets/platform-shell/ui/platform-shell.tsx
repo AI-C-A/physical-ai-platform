@@ -7,16 +7,17 @@ import {
   useNavigate,
 } from 'react-router-dom';
 
-import { useBranding, useDataEnvironment } from '@/shared/config';
+import { useBranding } from '@/shared/config';
 import { Button } from '@/shared/ui/button';
 import { cn } from '@/shared/ui/class-names';
-import { Dropdown } from '@/shared/ui/dropdown';
 import { Icon, type IconName } from '@/shared/ui/icon';
 import { PageFrame, type PageFrameLayout } from '@/shared/ui/page-frame';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Sheet } from '@/shared/ui/sheet';
 import { getFloatingSurfaceClassName } from '@/shared/ui/surface';
 import { Tooltip, TooltipProvider } from '@/shared/ui/tooltip';
+
+import { AppLauncher } from './AppLauncher';
 
 const sidebarCollapsedStorageKey =
   'army-robot.platform-shell.collapsed.v1';
@@ -37,6 +38,7 @@ export interface MiniAppNavigationGroup {
 type MiniAppNavigationEntry = MiniAppNavigationChild | MiniAppNavigationGroup;
 
 export interface MiniAppNavigationItem {
+  readonly description?: string;
   readonly homePath: string;
   readonly icon: IconName;
   readonly id: string;
@@ -137,7 +139,7 @@ function Brand({ compact }: { readonly compact: boolean }) {
       className={
         compact
           ? 'flex min-h-12 items-center justify-center'
-          : 'flex min-h-12 min-w-0 items-center gap-3'
+          : 'flex min-h-12 min-w-0 items-center gap-2'
       }
       to={{
         pathname: '/control/monitoring',
@@ -147,20 +149,20 @@ function Brand({ compact }: { readonly compact: boolean }) {
       {branding.logo === null ? (
         <span
           aria-hidden="true"
-          className="grid size-9 shrink-0 place-items-center border border-border text-xs font-black"
+          className="grid size-7 shrink-0 place-items-center text-xs font-bold"
         >
           AR
         </span>
       ) : (
         <img
           alt=""
-          className="size-9 shrink-0 object-contain"
+          className="size-7 shrink-0 object-contain"
           src={branding.logo}
         />
       )}
       {compact ? null : (
         <span className="min-w-0">
-          <strong className="block truncate text-xs">
+          <strong className="block text-xs font-semibold leading-tight">
             {branding.productName}
           </strong>
         </span>
@@ -169,7 +171,7 @@ function Brand({ compact }: { readonly compact: boolean }) {
   );
 }
 
-function MiniAppSwitcher({
+function MiniAppHeader({
   collapsed,
   currentMiniApp,
   miniApps,
@@ -182,49 +184,22 @@ function MiniAppSwitcher({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const siteSelectionSearch = getSiteSelectionSearch(location.search);
-  const trigger = (
-    <Button
-      className={
-        collapsed
-          ? 'mx-auto size-10 p-0'
-          : 'h-10 min-h-10 w-full justify-between py-0'
-      }
-      {...(collapsed
-        ? { title: `미니앱 전환 · ${currentMiniApp.label}` }
-        : {})}
-      variant="secondary"
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        <Icon name="apps" />
-        {collapsed ? null : (
-          <span className="truncate">{currentMiniApp.label}</span>
-        )}
-      </span>
-      {collapsed ? null : <Icon name="chevron-down" />}
-    </Button>
-  );
 
   return (
-    <Dropdown
-      align="start"
-      items={miniApps.map((miniApp) => ({
-        icon: <Icon name={miniApp.icon} />,
-        label: miniApp.label,
-        onSelect: () => {
+    <div className={cn('flex min-w-0 items-center', collapsed ? 'justify-center' : 'justify-start')}>
+      <AppLauncher
+        collapsed={collapsed}
+        currentMiniApp={currentMiniApp}
+        miniApps={miniApps}
+        onSelect={(miniApp) => {
           void navigate({
             pathname: miniApp.homePath,
-            search: siteSelectionSearch,
+            search: getSiteSelectionSearch(location.search),
           });
           onNavigate?.();
-        },
-        selected: miniApp.id === currentMiniApp.id,
-      }))}
-      label={`미니앱 전환 · ${currentMiniApp.label}`}
-      matchTriggerWidth={!collapsed}
-      side={collapsed ? 'right' : 'bottom'}
-      trigger={trigger}
-    />
+        }}
+      />
+    </div>
   );
 }
 
@@ -237,9 +212,6 @@ function InnerNavigation({
   readonly items: MiniAppNavigationItem['items'];
   readonly onNavigate?: () => void;
 }) {
-  const location = useLocation();
-  const siteSelectionSearch = getSiteSelectionSearch(location.search);
-
   return (
     <nav
       aria-label="미니앱 업무 메뉴"
@@ -256,31 +228,13 @@ function InnerNavigation({
             />
           );
         }
-        const item = entry;
-        const isActive = isNavigationItemActive(location.pathname, item);
-        const link = (
-          <Link
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={item.label}
-            className={
-              isActive
-                ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-                : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-            }
-            onClick={onNavigate}
-            to={{
-              pathname: item.path,
-              search: siteSelectionSearch,
-            }}
-          >
-            <Icon name={item.icon} />
-            {collapsed ? null : <span>{item.label}</span>}
-          </Link>
-        );
-        return collapsed ? (
-          <Tooltip content={item.label} key={item.path} trigger={link} />
-        ) : (
-          <div key={item.path}>{link}</div>
+        return (
+          <NavigationLink
+            collapsed={collapsed}
+            item={entry}
+            key={entry.path}
+            {...(onNavigate === undefined ? {} : { onNavigate })}
+          />
         );
       })}
     </nav>
@@ -296,52 +250,34 @@ function NavigationGroup({
   readonly group: MiniAppNavigationGroup;
   readonly onNavigate?: () => void;
 }) {
-  const location = useLocation();
-  const hasActiveItem = group.items.some(
-    (item) => isNavigationItemActive(location.pathname, item),
-  );
-  const [expanded, setExpanded] = useState(hasActiveItem);
-  const effectiveExpanded = expanded || hasActiveItem;
-
-  if (collapsed) {
-    return (
-      <div className="grid gap-1 border-b border-border pb-2 last:border-b-0">
+  return (
+    <section aria-label={group.label} className="mt-6 min-w-0 first:mt-0">
+      {collapsed ? null : (
+        <h2 className="mb-2 px-3 py-1 text-xs font-medium text-navigation-label">
+          {group.label}
+        </h2>
+      )}
+      <div className="grid gap-1">
         {group.items.map((item) => (
           <NavigationLink
-            collapsed
+            collapsed={collapsed}
             item={item}
             key={item.path}
             {...(onNavigate === undefined ? {} : { onNavigate })}
           />
         ))}
       </div>
-    );
-  }
-
-  return (
-    <section className="border-b border-border pb-2 last:border-b-0">
-      <button
-        aria-expanded={effectiveExpanded}
-        className="flex min-h-9 w-full items-center justify-between rounded-md px-3 text-xs font-bold normal-case tracking-normal text-muted hover:bg-action-secondary-hover hover:text-foreground"
-        onClick={() => setExpanded((current) => !current)}
-        type="button"
-      >
-        <span>{group.label}</span>
-        <Icon name={effectiveExpanded ? 'chevron-down' : 'chevron-right'} />
-      </button>
-      {effectiveExpanded ? (
-        <div className="grid gap-1 pt-1">
-          {group.items.map((item) => (
-            <NavigationLink
-              collapsed={false}
-              item={item}
-              key={item.path}
-              {...(onNavigate === undefined ? {} : { onNavigate })}
-            />
-          ))}
-        </div>
-      ) : null}
     </section>
+  );
+}
+
+function getNavigationClassName(isActive: boolean, collapsed: boolean) {
+  return cn(
+    'ui-pressable ui-navigation-item ui-focus-inset flex min-h-11 min-w-0 items-center px-3 py-2 text-sm',
+    collapsed ? 'justify-center' : 'ui-pressable--subtle gap-3',
+    isActive
+      ? 'font-semibold'
+      : 'font-normal',
   );
 }
 
@@ -361,16 +297,14 @@ function NavigationLink({
     <Link
       aria-current={isActive ? 'page' : undefined}
       aria-label={item.label}
-      className={
-        isActive
-          ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-          : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-      }
+      className={getNavigationClassName(isActive, collapsed)}
       onClick={onNavigate}
       to={{ pathname: item.path, search: siteSelectionSearch }}
     >
-      <Icon name={item.icon} />
-      {collapsed ? null : <span>{item.label}</span>}
+      <span className="shrink-0">
+        <Icon name={item.icon} />
+      </span>
+      {collapsed ? null : <span className="min-w-0 break-words">{item.label}</span>}
     </Link>
   );
   return collapsed ? (
@@ -393,18 +327,16 @@ function SettingsNavigation({
   const link = (
     <NavLink
       aria-label="설정"
-      className={
-        isActive
-          ? `flex min-h-10 items-center rounded-md bg-action-secondary-active px-3 py-2 text-sm font-semibold text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-          : `flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-action-secondary-hover hover:text-foreground ${collapsed ? 'justify-center' : 'gap-3'}`
-      }
+      className={getNavigationClassName(isActive, collapsed)}
       onClick={onNavigate}
       to={{
         pathname: path,
         search: siteSelectionSearch,
       }}
     >
-      <Icon name="settings" />
+      <span className="shrink-0">
+        <Icon name="settings" />
+      </span>
       {collapsed ? null : <span>설정</span>}
     </NavLink>
   );
@@ -416,7 +348,6 @@ function SettingsNavigation({
 
 export function PlatformShell({ miniApps }: PlatformShellProps) {
   const branding = useBranding();
-  const dataEnvironment = useDataEnvironment();
   const location = useLocation();
   const mainContentRef = useRef<HTMLElement>(null);
   const mobileMenuNavigationRef = useRef(false);
@@ -446,8 +377,8 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
   const isImmersiveMonitoringRoute =
     /^\/control\/monitoring\/[^/]+$/u.test(location.pathname);
   const isImmersiveCaptureRoute =
-    location.pathname === '/mlops/capture/humanoid'
-    || /^\/mlops\/collection\/[^/]+$/u.test(location.pathname);
+    location.pathname !== '/mlops/collection/new'
+    && /^\/mlops\/collection\/[^/]+$/u.test(location.pathname);
   const isImmersiveRoute =
     isImmersiveMonitoringRoute || isImmersiveCaptureRoute;
   const isFullBleedRoute = isMonitoringRoute || isImmersiveCaptureRoute;
@@ -456,7 +387,6 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
     : isMonitoringRoute
       ? 'full-bleed'
       : location.pathname.endsWith('/settings')
-        || location.pathname === '/mlops/collection'
         || location.pathname === '/mlops/capture'
         || location.pathname === '/mlops/datasets/new'
         ? 'focused'
@@ -481,6 +411,9 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
       previousPathname === null ||
       previousPathname === '/' ||
       previousPathname === location.pathname
+      || location.pathname === '/mlops/collection/new'
+      || /^\/mlops\/collection\/[^/]+\/setup$/u.test(location.pathname)
+      || ((previousPathname === '/mlops/collection/new' || /^\/mlops\/collection\/[^/]+\/setup$/u.test(previousPathname)) && location.pathname === '/mlops/collection')
     ) {
       return;
     }
@@ -498,7 +431,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
 
   return (
     <TooltipProvider>
-      <div className={cn('min-h-screen bg-background text-foreground', dataEnvironment === 'simulation' && !isImmersiveRoute ? '[--platform-environment-height:1.5rem]' : '[--platform-environment-height:0rem]')}>
+      <div className="min-h-screen bg-background text-foreground">
         <a
           className={cn(
             'sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--design-radius-control)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:ring-2 focus:ring-focus',
@@ -510,10 +443,10 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
           본문으로 건너뛰기
         </a>
         {isImmersiveRoute ? null : (
-          <header className="sticky top-0 z-30 border-b border-border bg-layer-base lg:hidden">
-            <div className="flex min-h-14 items-center justify-between gap-3 px-4">
-              <Brand compact={false} />
+          <header className="sticky top-0 z-30 bg-navigation-background lg:hidden">
+            <div className="flex min-h-14 items-center gap-3 px-4">
               <Sheet
+                hideTitle
                 onCloseAutoFocus={(event) => {
                   if (!mobileMenuNavigationRef.current) return;
                   event.preventDefault();
@@ -527,13 +460,13 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                 open={mobileMenuOpen}
                 title={`${branding.productName} 메뉴`}
                 trigger={
-                  <Button aria-label="업무 메뉴 열기" variant="ghost">
+                  <Button aria-label="업무 메뉴 열기" className="size-11 shrink-0 p-0" variant="ghost">
                     <Icon name="menu" size="md" />
                   </Button>
                 }
               >
                 <div className="flex h-full min-h-0 flex-col gap-5">
-                  <MiniAppSwitcher
+                  <MiniAppHeader
                     collapsed={false}
                     currentMiniApp={currentMiniApp}
                     miniApps={miniApps}
@@ -546,7 +479,7 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                       onNavigate={closeMobileMenuForNavigation}
                     />
                   </div>
-                  <div className="border-t border-border pt-3">
+                  <div className="pt-3">
                     <SettingsNavigation
                       collapsed={false}
                       onNavigate={closeMobileMenuForNavigation}
@@ -555,51 +488,40 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
                   </div>
                 </div>
               </Sheet>
+              <Brand compact={false} />
             </div>
           </header>
         )}
 
         {isImmersiveRoute ? null : (
           <aside
-            className={`fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-layer-base p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
+            className={`fixed inset-y-0 left-0 z-30 hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
-            <div className="flex h-12 min-w-0 items-center gap-2">
+            <div className={cn('flex min-w-0 items-center gap-1 pt-1', sidebarCollapsed && 'flex-col')}>
+              <div className={cn('min-w-0', !sidebarCollapsed && 'flex-1')}>
+                <MiniAppHeader
+                  collapsed={sidebarCollapsed}
+                  currentMiniApp={currentMiniApp}
+                  miniApps={miniApps}
+                />
+              </div>
               <Button
-                aria-label={
-                  sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'
-                }
-                className="size-10 shrink-0 p-0"
-                onClick={() =>
-                  setSidebarCollapsed((current) => !current)
-                }
+                aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+                className="size-10 shrink-0 p-0 text-muted"
+                onClick={() => setSidebarCollapsed((current) => !current)}
+                title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
                 variant="ghost"
               >
-                <Icon
-                  name={sidebarCollapsed ? 'panel-open' : 'panel-close'}
-                />
+                <Icon name={sidebarCollapsed ? 'panel-open' : 'panel-close'} />
               </Button>
-              {sidebarCollapsed ? null : (
-                <div className="min-w-0 flex-1">
-                  <Brand compact={false} />
-                </div>
-              )}
             </div>
-            <div
-              className="mt-2 border-b border-border pb-3"
-            >
-              <MiniAppSwitcher
-                collapsed={sidebarCollapsed}
-                currentMiniApp={currentMiniApp}
-                miniApps={miniApps}
-              />
-            </div>
-            <div className="mt-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
               <InnerNavigation
                 collapsed={sidebarCollapsed}
                 items={currentMiniApp.items}
               />
             </div>
-            <div className="mt-3 border-t border-border pt-2">
+            <div className="mt-4 pt-2">
               <SettingsNavigation
                 collapsed={sidebarCollapsed}
                 path={currentMiniApp.settingsPath}
@@ -622,11 +544,6 @@ export function PlatformShell({ miniApps }: PlatformShellProps) {
             ref={mainContentRef}
             tabIndex={-1}
           >
-            {dataEnvironment === 'simulation' && !isImmersiveRoute ? (
-              <p className={cn('flex h-6 items-center bg-layer-raised px-4 text-xs text-muted', !isFullBleedRoute && 'mb-4')}>
-                시뮬레이션 데이터 · 실제 운영 기록이 아닙니다
-              </p>
-            ) : null}
             <Suspense fallback={<QueryFeedback kind="loading" />}>
               <PageFrame layout={pageFrameLayout}>
                 <Outlet />
