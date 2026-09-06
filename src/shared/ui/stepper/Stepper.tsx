@@ -17,8 +17,8 @@ export function Stepper({ activeIndex, items }: StepperProps) {
           <li
             aria-current={index === activeIndex ? 'step' : undefined}
             className={index === activeIndex
-              ? 'rounded-[var(--design-radius-control)] border border-focus bg-action-secondary-active p-3'
-              : 'rounded-[var(--design-radius-control)] border border-border bg-layer-base p-3'}
+              ? 'rounded-[var(--design-radius-control)] border-0 bg-selection-background p-3'
+              : 'rounded-[var(--design-radius-control)] border-0 bg-layer-base p-3'}
             key={item.label}
           >
             <span className="text-xs font-bold text-muted">{String(index + 1)} · {state}</span>

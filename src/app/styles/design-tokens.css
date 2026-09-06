@@ -4,7 +4,9 @@
   --layout-toolbar-gap: 0.75rem;
   --layout-surface-padding-compact: 1rem;
   --layout-surface-padding-normal: 1.25rem;
+  --layout-surface-inset: 0.25rem;
   --layout-control-height: 2.5rem;
+  --layout-control-height-large: 3rem;
   --layout-data-row-height: 3rem;
   --layout-focused-width: 64rem;
   --layout-toast-gap: 0.75rem;
@@ -14,10 +16,20 @@
   --layout-toast-padding-inline: 1rem;
   --design-backdrop-blur-floating: 1.5rem;
   --design-radius-control: 0.5rem;
+  --design-radius-surface: 0.75rem;
+  --design-radius-surface-inner: calc(var(--design-radius-surface) - var(--layout-surface-inset));
+  --design-radius-field: var(--design-radius-control);
+  --design-radius-menu: var(--design-radius-surface);
+  --design-radius-menu-item: var(--design-radius-surface-inner);
+  --layout-menu-item-height: 2.75rem;
+  --layout-menu-padding: var(--layout-surface-inset);
   --design-radius-list-row: 0.375rem;
   --design-radius-round: 9999px;
-  --design-radius-soft-group: 0.5rem;
-  --design-radius-surface: 0.75rem;
+  --design-radius-soft-group: var(--design-radius-surface-inner);
+  --design-focus-width: 2px;
+  --design-focus-offset: 2px;
+  --design-focus-inset-width: 3px;
+  --design-focus-inset-offset: -3px;
   --design-slider-track-height: 0.3125rem;
   --design-slider-thumb-size: 1.5rem;
   --design-motion-fast: 120ms;
@@ -25,11 +37,30 @@
   --design-motion-slow: 220ms;
   --design-motion-progress: 500ms;
   --design-motion-route: 550ms;
+  --design-motion-press: 180ms;
+  --design-motion-release: 280ms;
+  --design-motion-enter: 280ms;
+  --design-motion-exit: 140ms;
+  --design-press-scale-control: 0.96;
+  --design-press-scale-compact: 0.9;
+  --design-press-scale-subtle: 0.98;
+  --design-press-scale-surface: 0.99;
+  --design-ease-press: cubic-bezier(0.2, 0, 0, 1);
+  --design-ease-release: cubic-bezier(0.16, 1, 0.3, 1);
   --design-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --design-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --design-ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --design-ease-route: cubic-bezier(0.32, 0.72, 0, 1);
   --design-z-toast: 70;
+  --design-z-popover: 60;
+}
+
+/* stiffness 1000/800, damping 55, mass 1의 스프링을 180/280ms로 샘플링한다. */
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --design-ease-press: linear(0, 0.03425, 0.11625, 0.22215, 0.33590, 0.44722, 0.54998, 0.64102, 0.71912, 0.78439, 0.83769, 0.88032, 0.91373, 0.93940, 0.95873, 0.97296, 0.98319, 0.99032, 0.99512, 0.99818, 1);
+    --design-ease-release: linear(0, 0.06097, 0.19074, 0.33836, 0.47831, 0.59961, 0.69917, 0.77792, 0.83854, 0.88422, 0.91805, 0.94274, 0.96053, 0.97321, 0.98216, 0.98841, 0.99274, 0.99571, 0.99773, 0.99909, 1);
+  }
 }
 
 @media (min-width: 40rem) {
@@ -52,5 +83,9 @@
     --design-motion-slow: 1ms;
     --design-motion-progress: 1ms;
     --design-motion-route: 1ms;
+    --design-motion-press: 1ms;
+    --design-motion-release: 1ms;
+    --design-motion-enter: 1ms;
+    --design-motion-exit: 1ms;
   }
 }

@@ -3,8 +3,9 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/shared/ui/class-names';
 
 import { getFloatingSurfaceClassName } from './floating-surface';
+import { getOverlaySurfaceClassName } from './overlay-surface';
 
-export type SurfaceDensity = 'compact' | 'normal';
+export type SurfaceDensity = 'compact' | 'normal' | 'inset';
 export type SurfaceLayer =
   | 'canvas'
   | 'base'
@@ -25,13 +26,14 @@ const layerClassNames: Record<SurfaceLayer, string> = {
   base: 'bg-layer-base',
   raised: 'bg-layer-raised',
   floating: getFloatingSurfaceClassName(),
-  translucent: 'bg-surface-muted/[0.88] shadow-xl backdrop-blur-xl',
+  translucent: getOverlaySurfaceClassName(),
   'soft-group': 'rounded-[var(--design-radius-soft-group)] border-0 bg-foreground/[0.04] shadow-none',
 };
 
 const densityClassNames: Record<SurfaceDensity, string> = {
   compact: 'p-[var(--layout-surface-padding-compact)]',
   normal: 'p-[var(--layout-surface-padding-normal)]',
+  inset: 'p-[var(--layout-surface-inset)]',
 };
 
 export function Surface({

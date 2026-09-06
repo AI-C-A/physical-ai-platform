@@ -78,8 +78,8 @@ describe('ToastProvider', () => {
       'min-h-[var(--layout-control-height)]',
       'rounded-[var(--design-radius-control)]',
       'bg-transparent',
-      'hover:bg-action-secondary-hover',
-      'active:bg-action-secondary-active',
+      'hover:bg-action-ghost-hover',
+      'active:bg-action-ghost-active',
     );
     expect(firstCloseButton).not.toHaveClass('rounded-full', 'min-h-8');
     expect(successToast?.querySelector('[data-toast-status-icon]')).toHaveClass(

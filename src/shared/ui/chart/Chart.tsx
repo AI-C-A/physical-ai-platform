@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { getButtonClassName } from '@/shared/ui/button';
 import {
   Bar,
   BarChart,
@@ -85,7 +86,7 @@ export function Chart({
           {data.map((datum, index) => (
             <button
               aria-disabled={isPending}
-              className="rounded border border-border bg-action-secondary px-2 py-1 text-xs font-semibold text-foreground hover:bg-action-secondary-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              className={getButtonClassName('secondary', 'px-2 text-xs aria-disabled:cursor-not-allowed aria-disabled:opacity-50')}
               key={`${datum.id ?? datum.label}-${String(index)}`}
               onClick={() => {
                 if (!isPending) onDatumSelect(datum);

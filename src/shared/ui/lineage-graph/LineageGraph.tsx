@@ -50,7 +50,7 @@ export function LineageGraph({ nodes }: LineageGraphProps) {
         {visible.map((node, index) => (
           <li className="flex items-center gap-2" key={node.id}>
             <Link
-              className="grid min-h-28 w-48 content-between rounded-[var(--design-radius-surface)] border border-border bg-layer-base p-4 hover:border-focus"
+              className="ui-focus-inset grid min-h-28 w-48 content-between rounded-[var(--design-radius-surface)] border-0 bg-layer-base p-4 hover:bg-action-secondary-hover"
               to={node.detailPath}
             >
               <span className="text-xs font-bold uppercase tracking-wide text-muted">

@@ -7,17 +7,17 @@ export function getButtonClassName(
   className?: string,
 ) {
   return cn(
-    'relative inline-flex min-h-[var(--layout-control-height)] transform-gpu items-center justify-center gap-2 whitespace-nowrap rounded-[var(--design-radius-control)] border px-3 py-2 text-sm font-semibold transition-[background-color,border-color,color,opacity,transform] active:scale-[0.98] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
+    'ui-pressable relative inline-flex min-h-[var(--layout-control-height)] items-center justify-center gap-2 whitespace-nowrap rounded-[var(--design-radius-control)] border-0 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 forced-colors:border forced-colors:border-[ButtonText]',
     variant === 'primary'
-      && 'border-transparent bg-action-primary text-action-on-fill hover:bg-action-primary-hover active:bg-action-primary-active',
+      && 'bg-action-primary text-action-on-fill hover:bg-action-primary-hover active:bg-action-primary-active',
     variant === 'secondary'
-      && 'border-border bg-action-secondary text-foreground hover:bg-action-secondary-hover active:bg-action-secondary-active',
+      && 'bg-action-secondary text-action-secondary-foreground hover:bg-action-secondary-hover active:bg-action-secondary-active active:text-action-secondary-active-foreground',
     variant === 'ghost'
-      && 'border-transparent bg-transparent text-foreground hover:bg-action-secondary-hover active:bg-action-secondary-active',
+      && 'bg-transparent text-foreground hover:bg-action-ghost-hover active:bg-action-ghost-active data-[state=open]:bg-action-ghost-hover',
     variant === 'danger'
-      && 'border-transparent bg-action-danger text-action-on-fill hover:bg-action-danger-hover active:bg-action-danger-active',
+      && 'bg-action-danger text-action-on-fill hover:bg-action-danger-hover active:bg-action-danger-active',
     variant === 'recording-stop'
-      && 'border-border bg-action-secondary text-negative hover:bg-status-negative-background hover:text-negative active:bg-status-negative-background active:text-negative',
+      && 'bg-action-secondary text-negative hover:bg-status-negative-background hover:text-negative active:bg-status-negative-background active:text-negative',
     className,
   );
 }

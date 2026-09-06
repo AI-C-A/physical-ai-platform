@@ -2,6 +2,7 @@
 @import "./color-tokens.css";
 @import "./design-tokens.css";
 @import "./motion.css";
+@import "./interaction.css";
 
 @theme inline {
   --font-weight-semibold: 500;
@@ -22,6 +23,9 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-focus: var(--focus);
+  --color-field-border: var(--field-border);
+  --color-selection-border: var(--selection-border);
+  --color-selection-background: var(--selection-background);
   --color-positive: var(--positive);
   --color-warning: var(--warning);
   --color-negative: var(--negative);
@@ -38,8 +42,15 @@
   --color-action-danger-active: var(--action-danger-active);
   --color-action-on-fill: var(--action-on-fill);
   --color-action-secondary: var(--action-secondary);
+  --color-action-secondary-foreground: var(--action-secondary-foreground);
   --color-action-secondary-hover: var(--action-secondary-hover);
   --color-action-secondary-active: var(--action-secondary-active);
+  --color-action-secondary-active-foreground: var(--action-secondary-active-foreground);
+  --color-action-ghost-hover: var(--action-ghost-hover);
+  --color-action-ghost-active: var(--action-ghost-active);
+  --color-menu-muted: var(--menu-muted);
+  --color-navigation-background: var(--navigation-background);
+  --color-navigation-label: var(--navigation-label);
   --color-overlay: var(--overlay);
   --color-media-background: var(--media-background);
   --color-media-foreground: var(--media-foreground);
@@ -95,9 +106,11 @@ a {
   transition-timing-function: var(--design-ease-standard);
 }
 
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+@layer base {
+  :where(a, button, input, select, textarea, summary, [tabindex], [contenteditable="true"]):focus-visible {
+    outline: var(--design-focus-width) solid var(--focus);
+    outline-offset: var(--design-focus-offset);
+  }
 }
 
 code {

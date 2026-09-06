@@ -1,3 +1,56 @@
+/* scale은 translate/transform과 독립적으로 적용해 배치와 라우트 전환을 보존한다. */
+.ui-pressable {
+  --ui-press-scale: var(--design-press-scale-control);
+  transition-property: background-color, border-color, color, opacity, scale;
+  transition-duration: var(--design-motion-release);
+  transition-timing-function: var(--design-ease-release);
+}
+
+.ui-pressable--compact { --ui-press-scale: var(--design-press-scale-compact); }
+.ui-pressable--subtle { --ui-press-scale: var(--design-press-scale-subtle); }
+.ui-pressable--surface { --ui-press-scale: var(--design-press-scale-surface); }
+
+.ui-pressable:active:not(:disabled, [aria-disabled="true"], [data-disabled], [aria-busy="true"]) {
+  scale: var(--ui-press-scale);
+  transition-duration: var(--design-motion-press);
+  transition-timing-function: var(--design-ease-press);
+}
+
+@keyframes design-motion-popover-in {
+  from { opacity: 0; transform: translate(var(--popover-x, 0), var(--popover-y, 0)) scale(0.92); }
+  to { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+@keyframes design-motion-popover-out {
+  from { opacity: 1; transform: translate(0, 0) scale(1); }
+  to { opacity: 0; transform: translate(var(--popover-x, 0), var(--popover-y, 0)) scale(0.96); }
+}
+
+.design-motion-select {
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+
+:is(.design-motion-menu, .design-motion-select)[data-side="bottom"] { --popover-y: -0.25rem; }
+:is(.design-motion-menu, .design-motion-select)[data-side="top"] { --popover-y: 0.25rem; }
+:is(.design-motion-menu, .design-motion-select)[data-side="right"] { --popover-x: -0.25rem; }
+:is(.design-motion-menu, .design-motion-select)[data-side="left"] { --popover-x: 0.25rem; }
+
+:is(.design-motion-menu, .design-motion-select)[data-state="open"] {
+  animation: design-motion-popover-in var(--design-motion-enter) var(--design-ease-release) both;
+}
+
+:is(.design-motion-menu, .design-motion-select)[data-state="closed"] {
+  animation: design-motion-popover-out var(--design-motion-exit) var(--design-ease-exit) both;
+  /* Radix DismissableLayer의 inline pointer-events보다 퇴장 상태를 우선한다. */
+  pointer-events: none !important;
+}
+
+.design-motion-disclosure {
+  transition: rotate var(--design-motion-release) var(--design-ease-release);
+}
+
+[data-state="open"] > .design-motion-disclosure { rotate: 180deg; }
+
 @keyframes design-motion-fade-in {
   from {
     opacity: 0;
@@ -13,7 +66,7 @@
 @keyframes design-motion-dialog-in {
   from {
     opacity: 0;
-    transform: translateY(0.5rem) scale(0.98);
+    transform: translateY(0.5rem) scale(0.96);
   }
 
   to {
@@ -103,27 +156,28 @@
 }
 
 .design-motion-overlay[data-state="open"] {
-  animation: design-motion-fade-in var(--design-motion-normal) var(--design-ease-enter) both;
+  animation: design-motion-fade-in var(--design-motion-enter) var(--design-ease-standard) both;
 }
 
 .design-motion-overlay[data-state="closed"] {
-  animation: design-motion-fade-out var(--design-motion-fast) var(--design-ease-exit) both;
+  animation: design-motion-fade-out var(--design-motion-exit) var(--design-ease-exit) both;
 }
 
 .design-motion-dialog[data-state="open"] {
-  animation: design-motion-dialog-in var(--design-motion-normal) var(--design-ease-enter) both;
+  animation: design-motion-dialog-in var(--design-motion-enter) var(--design-ease-release) both;
 }
 
 .design-motion-dialog[data-state="closed"] {
-  animation: design-motion-dialog-out var(--design-motion-fast) var(--design-ease-exit) both;
+  animation: design-motion-dialog-out var(--design-motion-exit) var(--design-ease-exit) both;
+  pointer-events: none !important;
 }
 
 .design-motion-sheet[data-state="open"] {
-  animation: design-motion-sheet-in var(--design-motion-slow) var(--design-ease-enter) both;
+  animation: design-motion-sheet-in var(--design-motion-enter) var(--design-ease-release) both;
 }
 
 .design-motion-sheet[data-state="closed"] {
-  animation: design-motion-sheet-out var(--design-motion-normal) var(--design-ease-exit) both;
+  animation: design-motion-sheet-out var(--design-motion-exit) var(--design-ease-exit) both;
 }
 
 .design-motion-tooltip {
@@ -156,6 +210,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ui-pressable,
+  .ui-pressable:active:not(:disabled, [aria-disabled="true"], [data-disabled], [aria-busy="true"]) {
+    scale: none;
+    transition: none;
+  }
+
+  .design-motion-disclosure {
+    transition: none;
+  }
+
+  .design-motion-menu[data-state],
+  .design-motion-select[data-state],
   .design-motion-dialog[data-state],
   .design-motion-sheet[data-state],
   .design-motion-tooltip[data-state],
@@ -167,6 +233,8 @@
     will-change: auto;
   }
 
+  .design-motion-menu[data-state="closed"],
+  .design-motion-select[data-state="closed"],
   .design-motion-dialog[data-state="closed"],
   .design-motion-sheet[data-state="closed"],
   .design-motion-tooltip[data-state="closed"],

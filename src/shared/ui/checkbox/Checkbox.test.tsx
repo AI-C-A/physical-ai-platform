@@ -19,8 +19,8 @@ describe('Checkbox', () => {
     const indicator = checkbox.querySelector('[data-state="unchecked"]');
 
     expect(checkbox).toHaveClass(
-      'active:scale-[0.96]',
-      'motion-reduce:active:scale-100',
+      'ui-pressable',
+      'ui-pressable--compact',
     );
     expect(indicator).toHaveClass(
       'scale-75',

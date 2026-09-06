@@ -39,8 +39,7 @@ describe('Button', () => {
     render(<Button>확인</Button>);
 
     expect(screen.getByRole('button', { name: '확인' })).toHaveClass(
-      'active:scale-[0.98]',
-      'motion-reduce:active:scale-100',
+      'ui-pressable',
     );
   });
 
@@ -72,7 +71,7 @@ describe('Button', () => {
     );
     expect(screen.getByRole('button', { name: '취소' })).toHaveClass(
       'bg-action-secondary',
-      'text-foreground',
+      'text-action-secondary-foreground',
     );
     expect(screen.getByRole('button', { name: '나가기' })).toHaveClass(
       'bg-action-danger',
