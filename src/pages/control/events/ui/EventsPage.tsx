@@ -62,6 +62,7 @@ export function EventsPage() {
   const clock = useClock();
   const [params, setParams] = useSearchParams();
   const [selectedEvent, setSelectedEvent] = useState<RobotEvent | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const dialogTriggerRef = useRef<HTMLButtonElement | null>(null);
   const resultsRegionRef = useRef<HTMLElement>(null);
   const eventType = readAllowedValue(
@@ -303,6 +304,7 @@ export function EventsPage() {
                       onClick={(clickEvent) => {
                         dialogTriggerRef.current = clickEvent.currentTarget;
                         setSelectedEvent(event);
+                        setDialogOpen(true);
                       }}
                       variant="ghost"
                     >
@@ -319,10 +321,9 @@ export function EventsPage() {
       {selectedEvent === null ? null : (
         <Dialog
           onCloseAutoFocus={restoreDialogFocus}
-          onOpenChange={(open) => {
-            if (!open) setSelectedEvent(null);
-          }}
-          open
+          onOpenChange={setDialogOpen}
+          onAfterClose={() => setSelectedEvent(null)}
+          open={dialogOpen}
           title={selectedEvent.title}
         >
           <dl className="grid gap-3">

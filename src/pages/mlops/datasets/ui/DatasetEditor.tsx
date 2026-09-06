@@ -13,6 +13,7 @@ import { Checkbox } from '@/shared/ui/checkbox';
 import { DetailPane } from '@/shared/ui/detail-pane';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { Pagination } from '@/shared/ui/pagination';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Textarea } from '@/shared/ui/textarea';
@@ -260,8 +261,8 @@ function DatasetEditorForm({
       tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
       episodeIds,
     })
-      .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : '데이터셋 저장에 실패했습니다.');
+      .catch(() => {
+        setError('데이터셋 저장에 실패했습니다. 연결 상태를 확인하고 다시 시도하세요.');
       })
       .finally(() => {
         pendingRef.current = false;
@@ -349,10 +350,10 @@ function DatasetEditorForm({
           title="에피소드 구성"
         >
           <div className="grid gap-4">
-            <Input
+            <SearchField
               inputRef={episodeSearchRef}
               label="구성할 에피소드 검색"
-              onChange={(event) => updateSearch(event.target.value)}
+              onValueChange={(value) => updateSearch(value)}
               value={search}
             />
             {episodes.refreshError === null ? null : (

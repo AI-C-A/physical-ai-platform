@@ -178,7 +178,7 @@ describe('EpisodesPage', () => {
     await waitFor(() => expect(queryEpisodes).toHaveBeenCalledOnce());
     queryEpisodes.mockClear();
 
-    const search = screen.getByRole('textbox', { name: '에피소드 검색' });
+    const search = screen.getByRole('searchbox', { name: '에피소드 검색' });
     await user.type(search, 'all');
 
     await waitFor(() => expect(queryEpisodes).toHaveBeenLastCalledWith(

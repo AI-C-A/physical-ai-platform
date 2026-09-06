@@ -182,7 +182,7 @@ describe('RobotsPage', () => {
   it('all 검색 문자열을 URL Query에 보존하고 입력 포커스를 유지한다', async () => {
     const user = userEvent.setup();
     renderPage();
-    const search = await screen.findByRole('textbox', { name: '로봇 검색' });
+    const search = await screen.findByRole('searchbox', { name: '로봇 검색' });
 
     await user.type(search, 'all');
 
@@ -201,6 +201,6 @@ describe('RobotsPage', () => {
       expect(screen.getByTestId('location-search')).toHaveTextContent('?search=all');
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('status=');
     });
-    expect(screen.getByRole('textbox', { name: '로봇 검색' })).toHaveValue('all');
+    expect(screen.getByRole('searchbox', { name: '로봇 검색' })).toHaveValue('all');
   });
 });

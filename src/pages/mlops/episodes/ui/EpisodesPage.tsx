@@ -30,7 +30,7 @@ import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
-import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { PageHeader } from '@/shared/ui/page-header';
 import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
@@ -243,9 +243,9 @@ export function EpisodesPage() {
       )}
       {recordExport.error === null ? null : <ErrorMessage>{recordExport.error}</ErrorMessage>}
       <PageToolbar aria-label="에피소드 필터">
-          <Input
+          <SearchField
             label="에피소드 검색"
-            onChange={(event) => update('search', event.target.value)}
+            onValueChange={(value) => update('search', value)}
             placeholder="이름 또는 ID"
             value={search}
           />

@@ -166,7 +166,7 @@ describe('DatasetEditor', () => {
     await user.keyboard('{Enter}');
 
     expect(
-      screen.getByRole('textbox', { name: '구성할 에피소드 검색' }),
+      screen.getByRole('searchbox', { name: '구성할 에피소드 검색' }),
     ).toHaveFocus();
     expect(screen.queryByText('에피소드 ID: episode-25')).not.toBeInTheDocument();
   });
@@ -285,7 +285,7 @@ describe('DatasetEditor', () => {
     await screen.findByRole('checkbox', { name: /^완료 Episode 1 ·/ });
     await user.click(screen.getByRole('button', { name: '다음' }));
     await screen.findByRole('checkbox', { name: /^완료 Episode 21 ·/ });
-    await user.type(screen.getByRole('textbox', { name: '구성할 에피소드 검색' }), '25');
+    await user.type(screen.getByRole('searchbox', { name: '구성할 에피소드 검색' }), '25');
 
     expect(
       await screen.findByRole('checkbox', { name: /^완료 Episode 25 ·/ }),
@@ -352,7 +352,7 @@ describe('DatasetEditor', () => {
     const name = await screen.findByRole('textbox', { name: '데이터셋 이름' });
     const description = screen.getByRole('textbox', { name: '설명' });
     const tags = screen.getByRole('textbox', { name: '태그' });
-    const search = screen.getByRole('textbox', { name: '구성할 에피소드 검색' });
+    const search = screen.getByRole('searchbox', { name: '구성할 에피소드 검색' });
     const episodeCheckbox = screen.getByRole('checkbox', { name: /^완료 Episode 1 ·/ });
     const clearOutsideSelection = screen.getByRole('button', {
       name: '에피소드 ID: episode-25 선택 해제',
@@ -423,7 +423,8 @@ describe('DatasetEditor', () => {
     expect(onSave).toHaveBeenCalledOnce();
 
     rejectSave?.(new Error('저장 실패'));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('저장 실패'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('데이터셋 저장에 실패했습니다. 연결 상태를 확인하고 다시 시도하세요.'));
+    expect(screen.queryByText('저장 실패')).not.toBeInTheDocument();
     expect(name).toHaveValue('보존할 Dataset');
     expect(screen.getByRole('checkbox', { name: /완료 Episode/ })).toBeChecked();
     expect(screen.getByRole('button', { name: '초안 저장' })).toBeEnabled();

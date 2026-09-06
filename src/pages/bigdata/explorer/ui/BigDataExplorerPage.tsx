@@ -59,6 +59,7 @@ import { Select } from '@/shared/ui/select';
 import { Spinner } from '@/shared/ui/spinner';
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -695,7 +696,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
             표시 중인 운영 기록 {String(operations.records.length)}건 전체를 내보내기에 반영하고, 표에는 현재 페이지 {String(pagedOperations.items.length)}건을 표시합니다.
           </p>
           {displayedOperationGroup === 'none' ? null : (
-            <Panel title={`${displayedOperationGroup === 'robot' ? '로봇' : '상태'} 그룹 요약`}>
+            <TableSection title={`${displayedOperationGroup === 'robot' ? '로봇' : '상태'} 그룹 요약`}>
               <Table aria-label="운영 기록 그룹 요약">
                 <TableHeader>
                   <TableRow><TableHead>그룹</TableHead><TableHead>기록</TableHead><TableHead>기록량</TableHead></TableRow>
@@ -718,7 +719,7 @@ function BigDataExplorerContent({ mode }: BigDataExplorerContentProps) {
                   ))}
                 </TableBody>
               </Table>
-            </Panel>
+            </TableSection>
           )}
           <Table aria-label="운영 기록 목록">
             <TableHeader>

@@ -256,7 +256,7 @@ describe('SessionsPage', () => {
     await waitFor(() => expect(querySessions).toHaveBeenCalledOnce());
     querySessions.mockClear();
 
-    const search = screen.getByRole('textbox', { name: '수집 세션 검색' });
+    const search = screen.getByRole('searchbox', { name: '수집 세션 검색' });
     await user.type(search, 'all');
 
     await waitFor(() => expect(querySessions).toHaveBeenLastCalledWith(
@@ -581,7 +581,7 @@ describe('SessionsPage', () => {
     ));
 
     await user.type(
-      screen.getByRole('textbox', { name: '수집 세션 검색' }),
+      screen.getByRole('searchbox', { name: '수집 세션 검색' }),
       '새 조건',
     );
     await act(async () => {

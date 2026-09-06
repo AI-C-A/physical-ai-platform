@@ -39,6 +39,7 @@ import { QueryFeedback } from '@/shared/ui/query-feedback';
 import { Select } from '@/shared/ui/select';
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -276,13 +277,12 @@ export function CapturePage() {
           setSelectedSession(event.session);
         }
       });
-    } catch (reason: unknown) {
+    } catch {
       active = false;
-      const detail = reason instanceof Error ? ` ${reason.message}` : '';
       void Promise.resolve().then(() => {
         if (!mounted) return;
         setSessionSubscriptionFailure({
-          message: `수집 상태 구독에 실패했습니다.${detail}`,
+          message: '수집 상태를 갱신하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.',
           operations,
           retrySequence: sessionSubscriptionRetrySequence,
           sessionId,
@@ -800,8 +800,8 @@ export function CapturePage() {
             )}
           </Panel>
 
-          <Panel title="스트림 기록 상태">
-            <p className="mb-3 text-sm text-muted">
+          <TableSection title="스트림 기록 상태">
+            <p className="text-sm text-muted">
               누적 {formatBytes(session.bytesWritten)} ·{' '}
               {getExecutionProvenanceLabel(session.provenance)}
             </p>
@@ -828,7 +828,7 @@ export function CapturePage() {
               </TableBody>
             </Table>
             {session.episodeId === null ? null : (
-              <p className="mt-4" role="status">
+              <p role="status">
                 생성된 에피소드:{' '}
                 <Link
                   className="font-semibold underline"
@@ -838,7 +838,7 @@ export function CapturePage() {
                 </Link>
               </p>
             )}
-          </Panel>
+          </TableSection>
         </>
       )}
 

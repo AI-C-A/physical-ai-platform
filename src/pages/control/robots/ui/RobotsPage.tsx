@@ -26,7 +26,7 @@ import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
-import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { PageHeader } from '@/shared/ui/page-header';
 import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
@@ -251,9 +251,9 @@ export function RobotsPage() {
         />
       ) : null}
       <PageToolbar aria-label="로봇 검색 및 정렬">
-          <Input
+          <SearchField
             label="로봇 검색"
-            onChange={(event) => updateParam('search', event.target.value)}
+            onValueChange={(value) => updateParam('search', value)}
             placeholder="이름 또는 ID"
             value={search}
           />

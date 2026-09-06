@@ -28,6 +28,7 @@ import { PageHeader } from '@/shared/ui/page-header';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -156,7 +157,7 @@ export function SessionDetailPage() {
         </DetailPane>
       )}
 
-      <DetailPane title="스트림">
+      <TableSection title="스트림">
         <Table aria-label="수집 세션 스트림 상태">
           <TableHeader>
             <TableRow>
@@ -181,7 +182,7 @@ export function SessionDetailPage() {
             ))}
           </TableBody>
         </Table>
-      </DetailPane>
+      </TableSection>
 
       {session.episodeId === null ? null : (
         <Link className="inline-flex items-center gap-1 font-semibold underline" to={appendPathSegment('/mlops/episodes', session.episodeId)}>

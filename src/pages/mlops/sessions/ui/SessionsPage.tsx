@@ -34,7 +34,7 @@ import { DataView } from '@/shared/ui/data-view';
 import { Dropdown } from '@/shared/ui/dropdown';
 import { ErrorMessage } from '@/shared/ui/error-message';
 import { Icon } from '@/shared/ui/icon';
-import { Input } from '@/shared/ui/input';
+import { SearchField } from '@/shared/ui/search-field';
 import { PageHeader } from '@/shared/ui/page-header';
 import { PageToolbar } from '@/shared/ui/page-toolbar';
 import { Pagination } from '@/shared/ui/pagination';
@@ -336,9 +336,9 @@ export function SessionsPage() {
       )}
       {recordExport.error === null ? null : <ErrorMessage>{recordExport.error}</ErrorMessage>}
       <PageToolbar aria-label="수집 세션 필터">
-          <Input
+          <SearchField
             label="수집 세션 검색"
-            onChange={(event) => updateParam('search', event.target.value)}
+            onValueChange={(value) => updateParam('search', value)}
             placeholder="이름 또는 ID"
             value={search}
           />

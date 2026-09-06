@@ -614,8 +614,9 @@ describe('CapturePage', () => {
     const view = renderCapturePage(makeOperations({ subscribeSession }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      '수집 상태 구독에 실패했습니다. 실시간 구독 실패',
+      '수집 상태를 갱신하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.',
     );
+    expect(screen.queryByText('실시간 구독 실패')).not.toBeInTheDocument();
     expect(getCaptureStatus(recordingSession.name)).toBeInTheDocument();
 
     fireEvent.click(
@@ -625,7 +626,7 @@ describe('CapturePage', () => {
     await waitFor(() => expect(subscribeSession).toHaveBeenCalledTimes(2));
     expect(getCaptureStatus(recoveredSession.name)).toBeInTheDocument();
     expect(
-      screen.queryByText(/수집 상태 구독에 실패했습니다/u),
+      screen.queryByText(/수집 상태를 갱신하지 못했습니다/u),
     ).not.toBeInTheDocument();
 
     view.unmount();

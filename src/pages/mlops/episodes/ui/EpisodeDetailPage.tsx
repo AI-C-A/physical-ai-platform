@@ -24,6 +24,7 @@ import { PageHeader } from '@/shared/ui/page-header';
 import { QueryFeedback } from '@/shared/ui/query-feedback';
 import {
   Table,
+  TableSection,
   TableBody,
   TableCell,
   TableHead,
@@ -130,7 +131,7 @@ export function EpisodeDetailPage() {
         </DetailPane>
       </section>
 
-      <DetailPane title="스트림 요약">
+      <TableSection title="스트림 요약">
         <Table aria-label="에피소드 스트림 요약">
           <TableHeader>
             <TableRow>
@@ -149,7 +150,7 @@ export function EpisodeDetailPage() {
             ))}
           </TableBody>
         </Table>
-      </DetailPane>
+      </TableSection>
     </div>
   );
 }
