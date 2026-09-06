@@ -4,7 +4,7 @@ const detail = 'Collector Backend와 WebXR runtime이 이 실행 환경에 구�
 
 export function createUnavailableQuestCollector(): QuestCollectorPort {
   const snapshot: QuestCollectorSnapshot = {
-    support: { state: 'unavailable', secureContext: false, runtimeMode: 'unavailable', detail },
+    support: { state: 'unavailable', secureContext: false, detail },
     pairing: { state: 'unpaired', sessionId: null, participantId: null, sourceDeviceId: null, detail: null },
     immersive: { state: 'idle', detail: null },
     backend: {

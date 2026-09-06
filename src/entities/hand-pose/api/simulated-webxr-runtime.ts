@@ -79,7 +79,7 @@ export class SimulatedWebXrRuntime implements WebXrRuntimePort {
     return Promise.resolve({
       supported: true,
       secureContext: true,
-      detail: 'Mock WebXR runtime으로 Hand Pose lifecycle을 검증합니다.',
+      detail: '손 추적을 시작할 수 있습니다.',
     });
   }
 

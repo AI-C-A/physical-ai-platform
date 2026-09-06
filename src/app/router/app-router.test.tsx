@@ -61,7 +61,7 @@ describe('App routes', () => {
   });
 
   it.each([
-    ['/collect/quest', 'Quest Hand Pose 수집'],
+    ['/collect/quest', 'Quest 손 추적'],
     ['/control/interventions', '개입 요청'],
     ['/control/sites', '사이트 관리'],
     ['/control/coordinates', '경로·좌표 관리'],
@@ -74,6 +74,8 @@ describe('App routes', () => {
     expect(
       await screen.findByRole('heading', { name: heading }),
     ).toBeInTheDocument();
+    expect(screen.queryByText('시뮬레이션 데이터 · 실제 운영 기록이 아닙니다')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mock WebXR|시뮬레이션/u)).not.toBeInTheDocument();
   });
 
   it('지도 스타일 설정은 Control 설정 경로에만 노출한다', async () => {

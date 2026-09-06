@@ -98,7 +98,6 @@ export interface QuestCollectorSnapshot {
   readonly support: {
     readonly state: QuestSupportState;
     readonly secureContext: boolean;
-    readonly runtimeMode: 'webxr' | 'simulated' | 'unavailable';
     readonly detail: string;
   };
   readonly pairing: {

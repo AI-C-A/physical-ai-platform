@@ -36,7 +36,6 @@ function initialSnapshot(
     support: {
       state: runtime.mode === 'unavailable' ? 'unavailable' : 'checking',
       secureContext: false,
-      runtimeMode: runtime.mode,
       detail: runtime.mode === 'unavailable'
         ? 'WebXR runtime이 구성되지 않았습니다.'
         : 'WebXR 지원 여부를 확인하는 중입니다.',
@@ -129,7 +128,6 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         support: {
           state: result.supported ? 'supported' : this.#runtime.mode === 'unavailable' ? 'unavailable' : 'unsupported',
           secureContext: result.secureContext,
-          runtimeMode: this.#runtime.mode,
           detail: result.detail,
         },
       });

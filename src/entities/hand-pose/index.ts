@@ -22,7 +22,6 @@ export {
   useQuestCollectorPort,
 } from './model/hand-pose-context';
 export { useQuestCollector } from './model/use-quest-collector';
-export { getQuestRuntimeModeLabel } from './model/hand-pose-display';
 export {
   decodeHandPoseBatch,
   encodeHandPoseBatch,
