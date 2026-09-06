@@ -26,6 +26,7 @@ export interface CollectionSetupContext {
 
 export function NewHumanoidCollectionPage() {
   const port = useFlywheelPort();
+  const questOnly = port.collectionMode === 'quest-hands';
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const context = useOutletContext<CollectionSetupContext | undefined>();
@@ -84,7 +85,7 @@ export function NewHumanoidCollectionPage() {
         onSubmit={(event) => {
           event.preventDefault();
           if (submissionRef.current) return;
-          const errors = validateCollectionSetup(fields);
+          const errors = validateCollectionSetup(fields, questOnly);
           setFieldErrors(errors);
           if (Object.keys(errors).length > 0) {
             event.currentTarget.querySelector<HTMLElement>(`[name="${Object.keys(errors)[0]}"]`)?.focus();
@@ -103,7 +104,7 @@ export function NewHumanoidCollectionPage() {
             questDeviceId: fields.questDeviceId.trim(),
             headCameraDeviceId: fields.headCameraDeviceId.trim(),
             externalCameraDeviceId: fields.externalCameraDeviceId.trim(),
-            profileId: 'human-demo-quest-hand-v1',
+            profileId: questOnly ? 'quest-hand-collection-v1' : 'human-demo-quest-hand-v1',
           }).then((session) => {
             createdRef.current = true;
             nextPathRef.current = `/mlops/collection/${encodeURIComponent(session.id)}/setup`;
@@ -131,13 +132,13 @@ export function NewHumanoidCollectionPage() {
         <fieldset className="min-w-0 border-t border-border pt-4">
           <legend className="pr-2 text-sm font-semibold">수집 장치</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="외골격 장치 ID" {...inputProps('exoskeletonDeviceId')} />
+            {questOnly ? null : <Input label="외골격 장치 ID" {...inputProps('exoskeletonDeviceId')} />}
             <Input label="Quest 손 추적 장치 ID" {...inputProps('questDeviceId')} />
-            <Input label="RBP 헤드 카메라 ID" {...inputProps('headCameraDeviceId')} />
-            <Input label="외부 카메라 ID · 선택" {...inputProps('externalCameraDeviceId')} />
+            {questOnly ? null : <Input label="RBP 헤드 카메라 ID" {...inputProps('headCameraDeviceId')} />}
+            {questOnly ? null : <Input label="외부 카메라 ID · 선택" {...inputProps('externalCameraDeviceId')} />}
           </div>
         </fieldset>
-        <p className="text-xs text-muted">세션을 생성하면 장치 연결로 이어집니다.</p>
+        <p className="text-xs text-muted">{questOnly ? '세션을 생성하면 Quest 연결 코드가 표시됩니다. 연결 후 수집 콘솔에서 양손 추적을 확인하고 녹화하세요.' : '세션을 생성하면 장치 연결로 이어집니다.'}</p>
         {error ? <p className="text-sm text-negative" role="alert">{error}</p> : null}
       </form>
     </Dialog>

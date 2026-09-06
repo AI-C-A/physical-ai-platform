@@ -41,6 +41,7 @@ export const createPatrolExternalAdapters: ExternalAdapterFactory = (
     dispose: () => {
       video.dispose();
       noData.questCollector.leaveCollector();
+      noData.flywheel.dispose();
     },
   };
 };

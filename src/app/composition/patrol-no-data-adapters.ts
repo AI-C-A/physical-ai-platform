@@ -2,9 +2,10 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
-import { createUnavailableFlywheel, type FlywheelPort } from '@/entities/flywheel';
+import { createHttpQuestFlywheel, type FlywheelPort } from '@/entities/flywheel';
 import {
   BrowserWebXrRuntime,
+  HttpQuestCollectorBackend,
   QuestCollectorAdapter,
   type QuestCollectorPort,
 } from '@/entities/hand-pose';
@@ -20,7 +21,6 @@ import type {
 import type { SensorDeviceCatalogPort } from '@/entities/sensor-device';
 import { createPageResult } from '@/shared/lib/query';
 
-import { createUnavailableQuestCollectorBackend } from './quest-collector-backends';
 
 const noOpUnsubscribe = (): void => undefined;
 const unavailableMessage = '이 실행 환경에서는 지원하지 않는 작업입니다.';
@@ -121,10 +121,12 @@ export function createPatrolNoDataAdapters(): PatrolNoDataAdapters {
     }),
     subscribe: () => noOpUnsubscribe,
   };
-  const flywheel = createUnavailableFlywheel();
+  const flywheel = createHttpQuestFlywheel();
+  const questBackend = new HttpQuestCollectorBackend();
   const questCollector = new QuestCollectorAdapter({
-    backend: createUnavailableQuestCollectorBackend(),
+    backend: questBackend,
     runtime: new BrowserWebXrRuntime(),
+    livePreview: questBackend,
   });
   const interventionQueue = createUnavailableInterventionQueue();
 

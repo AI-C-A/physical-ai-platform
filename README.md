@@ -51,7 +51,7 @@ npm run dev:mock
 
 기본 주소는 `http://localhost:5173`이다. 해당 port가 사용 중이면 Vite가 터미널에 출력한 다음 주소로 접속한다. Mock은 in-memory 데이터, 합성 위치와 저장소에 포함된 Mock 영상을 사용한다.
 
-새 수집 화면에서 작업 ID·작업 지시·장치 ID를 직접 입력한 뒤 세션을 생성한다. Mock 시연용 입력값은 [시연 가이드](docs/demo-guide.md#데이터-수집--카탈로그--데이터셋)를 참고한다. 별도 탭의 `/collect/quest`에서 연결 코드를 입력하면 PC 세션 연결, 수집 시작·종료, 좌·우 손 추적 유실, 에피소드 저장과 전송 대기열을 실기기 없이 확인할 수 있다. 실제 Quest 장치 수집과 저장은 별도 Backend 연결이 필요하며, Real 모드에서는 연결되지 않은 작업을 사용할 수 없다. 실행 방식 선택은 Composition에서 처리하고 제품 화면에는 표시하지 않는다.
+새 수집 화면에서 작업 ID·작업 지시·장치 ID를 직접 입력한 뒤 세션을 생성한다. Mock 시연용 입력값은 [시연 가이드](docs/demo-guide.md#데이터-수집--카탈로그--데이터셋)를 참고한다. Real 모드도 PC의 **수집 → 새 수집**에서 Quest 손 추적 세션을 생성한다. Quest 브라우저의 `/collect/quest`에서 세션 코드를 입력하고 MR을 시작하면 PC 수집 콘솔에서 손 추적 확인, Episode 녹화·정지·저장을 할 수 있다. 원본은 gateway의 `data/quest/`에 보관한다. 실행과 연결 순서는 [Real Quest 수집 안내](docs/quest-live.md)를 따른다. 실행 방식 선택은 Composition에서 처리하고 제품 화면에는 표시하지 않는다.
 
 ## Real 실행
 
@@ -101,7 +101,9 @@ npm run segmentation:dev
 | 카메라 | Mock MP4 | Kinesis Viewer |
 | 위치 | 합성 위치와 마커 | 판교역 중심 기본 지도, 위치 데이터가 없으면 마커 없음 |
 | Telemetry | in-memory | 연결 안 됨 |
-| 수집·Episode·Dataset | in-memory | 빈 결과, 쓰기 사용 불가 |
+| Quest 손 추적 | 시뮬레이션 | WebXR → Quest 중계 서버 → PC 수집 콘솔 |
+| 수집·Episode | in-memory | Quest 손 추적 세션 생성·녹화·원본 저장 |
+| Dataset 및 기타 수집 장치 | in-memory | 빈 결과, 쓰기 사용 불가 |
 | 이벤트·분석 | in-memory | 이벤트는 Patrol gateway 상태 전이, 분석은 빈 결과 |
 
 Real은 `external` bundle만 선택한다. 데이터가 없는 조회는 Empty, 연결 실패는 Error, 제공하지 않는 작업은 사용 불가 상태로 표시하며 in-memory 데이터로 바꾸지 않는다.

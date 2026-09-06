@@ -10,7 +10,7 @@ export interface CollectionSetupFields {
 
 export type CollectionSetupErrors = Partial<Record<keyof CollectionSetupFields, string>>;
 
-export function validateCollectionSetup(fields: CollectionSetupFields): CollectionSetupErrors {
+export function validateCollectionSetup(fields: CollectionSetupFields, questOnly = false): CollectionSetupErrors {
   const errors: CollectionSetupErrors = {};
   const required = {
     name: '세션 이름을 입력하세요.',
@@ -21,6 +21,7 @@ export function validateCollectionSetup(fields: CollectionSetupFields): Collecti
     headCameraDeviceId: '헤드 카메라 ID를 입력하세요.',
   } as const;
   for (const key of Object.keys(required) as (keyof typeof required)[]) {
+    if (questOnly && (key === 'exoskeletonDeviceId' || key === 'headCameraDeviceId')) continue;
     if (fields[key].trim() === '') errors[key] = required[key];
   }
   const deviceFields = ['exoskeletonDeviceId', 'questDeviceId', 'headCameraDeviceId', 'externalCameraDeviceId'] as const;

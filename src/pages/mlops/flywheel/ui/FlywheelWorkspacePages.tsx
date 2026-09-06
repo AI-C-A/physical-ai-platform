@@ -353,14 +353,15 @@ function HumanoidCollectionPreview({
   )) ?? null;
   const leftState = previewStates['quest-hand-left'] ?? 'idle';
   const rightState = previewStates['quest-hand-right'] ?? 'idle';
+  const handsOnly = poseKind === 'quest-hands' && cameraSources.length === 0;
   const handState = leftState === 'recorded' ? 'recorded' : leftState === 'live' || rightState === 'live' ? 'live'
     : leftState === 'stale' || rightState === 'stale' ? 'stale' : leftState === 'offline' || rightState === 'offline' ? 'offline' : 'idle';
   return (
     <section
       aria-label={ariaLabel}
-      className={poseKind === 'quest-hands' ? 'collection-visual-grid' : 'grid h-full min-h-0 grid-cols-2 gap-2'}
+      className={handsOnly ? 'grid h-full min-h-0' : poseKind === 'quest-hands' ? 'collection-visual-grid' : 'grid h-full min-h-0 grid-cols-2 gap-2'}
     >
-      <div
+      {handsOnly ? null : <div
         className="collection-cameras min-h-0 min-w-0 overflow-hidden"
         data-primary-visual="camera"
       >
@@ -370,9 +371,9 @@ function HumanoidCollectionPreview({
           sources={cameraSources}
           title={cameraTitle}
         />
-      </div>
+      </div>}
 
-      {poseKind === 'quest-hands' ? (
+      {poseKind === 'quest-hands' && !handsOnly ? (
         <div className="collection-perception min-h-0 min-w-0 overflow-hidden">
           <CollectionPerceptionViewer result={telemetry?.headPerception ?? null} streamState={previewStates['rbp-head-rgb'] ?? 'idle'} />
         </div>
@@ -409,7 +410,7 @@ function HumanoidCollectionPreview({
           />
         )}
       </div>
-      {poseKind === 'quest-hands' ? (
+      {poseKind === 'quest-hands' && !handsOnly ? (
         <div className="collection-body min-h-0 min-w-0 overflow-hidden">
           <Suspense fallback={<p className="p-3 text-xs text-muted" role="status">전신 뷰 준비 중</p>}>
             <CollectionBodyPoseViewer />
@@ -1289,7 +1290,7 @@ export function HumanoidCollectionDetailPage() {
           && session.humanDemonstration?.sourceBindings.some((source) => source.role === 'xr-hand-tracking'
             && ['pending', 'paired', 'offline', 'stale', 'error'].includes(source.state)) === true;
         const hasRecording = activeEpisode !== null || savedEpisodes.length > 0 || session.stoppedAtMs !== null;
-        const configuredCameraSources = session.humanDemonstration === null
+        const configuredCameraSources = session.sensorPresetId === 'quest-hand-collection-v1' ? [] : session.humanDemonstration === null
           ? humanoidCameraSources
           : humanDemonstrationCameraSources.filter((source) => (
             source.id !== 'external-fullbody-rgb'

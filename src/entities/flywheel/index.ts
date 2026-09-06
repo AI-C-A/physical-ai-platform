@@ -95,6 +95,7 @@ export {
   type InMemoryFlywheelSyncTransport,
 } from './api/in-memory-flywheel';
 export { createUnavailableFlywheel } from './api/unavailable-flywheel';
+export { createHttpQuestFlywheel } from './api/http-quest-flywheel';
 export { HumanoidRigViewer } from './ui/HumanoidRigViewer';
 export async function loadQuestHandPoseViewer() {
   return import('./ui/QuestHandPoseViewer');
