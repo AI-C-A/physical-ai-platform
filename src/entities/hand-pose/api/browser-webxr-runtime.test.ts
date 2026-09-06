@@ -54,7 +54,7 @@ describe('BrowserWebXrRuntime', () => {
       configurable: true,
       value: class FakeXrWebGlLayer {},
     });
-    const context = { makeXRCompatible: () => Promise.resolve() };
+    const context = { makeXRCompatible: () => Promise.resolve(), bindFramebuffer: vi.fn(), clearColor: vi.fn(), clear: vi.fn() };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
       context as never,
     );
@@ -66,6 +66,8 @@ describe('BrowserWebXrRuntime', () => {
     const active = await runtime.start((observation) => observations.push(observation), onEnded);
     expect(requestSession).toHaveBeenCalledWith('immersive-ar', {
       requiredFeatures: ['hand-tracking', 'local-floor'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.body },
     });
     expect(session.requestReferenceSpace).toHaveBeenCalledWith('local-floor');
     expect(document.querySelector('canvas[aria-hidden="true"]')).toBeInTheDocument();
@@ -127,7 +129,7 @@ describe('BrowserWebXrRuntime', () => {
       value: class FakeXrWebGlLayer {},
     });
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      { makeXRCompatible: () => Promise.resolve() } as never,
+      { makeXRCompatible: () => Promise.resolve(), bindFramebuffer: vi.fn(), clearColor: vi.fn(), clear: vi.fn() } as never,
     );
     const observations: WebXrFrameObservation[] = [];
     const active = await new BrowserWebXrRuntime().start(
@@ -155,5 +157,16 @@ describe('BrowserWebXrRuntime', () => {
       joints: [],
     });
     await active.end();
+  });
+
+  it('버튼 활성화 중 requestSession을 호출하고 비동기 지원 확인을 기다리지 않는다', async () => {
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+    const requestSession = vi.fn(() => Promise.reject(new DOMException('denied', 'NotAllowedError')));
+    const isSessionSupported = vi.fn(() => new Promise<boolean>(() => undefined));
+    Object.defineProperty(navigator, 'xr', { configurable: true, value: { requestSession, isSessionSupported } });
+    const starting = new BrowserWebXrRuntime().start(() => undefined, () => undefined);
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(isSessionSupported).not.toHaveBeenCalled();
+    await expect(starting).rejects.toThrow('denied');
   });
 });

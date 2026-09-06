@@ -165,14 +165,18 @@ export class BrowserWebXrRuntime implements WebXrRuntimePort {
     onFrame: (observation: WebXrFrameObservation) => void,
     onEnded: () => void,
   ): Promise<ActiveWebXrSession> {
-    const support = await this.checkSupport();
-    if (!support.supported) throw new Error(support.detail);
+    // requestSession must run in the button's activation before awaiting browser capability checks.
+    if (typeof window === 'undefined' || !window.isSecureContext) {
+      throw new Error('WebXR에는 HTTPS secure context가 필요합니다.');
+    }
     const xr = getXrSystem();
     const requestSession = getFunction<(mode: string, init: Readonly<Record<string, unknown>>) => Promise<unknown>>(xr, 'requestSession');
     if (xr === null || requestSession === null) throw new Error('WebXR session API를 사용할 수 없습니다.');
 
     const rawSession = await requestSession.call(xr, 'immersive-ar', {
       requiredFeatures: ['hand-tracking', 'local-floor'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.body },
     });
     const session = toRawSession(rawSession);
     let canvas: HTMLCanvasElement | null = null;
@@ -214,6 +218,9 @@ export class BrowserWebXrRuntime implements WebXrRuntimePort {
 
       const renderFrame = (time: number, frame: unknown): void => {
         if (ended) return;
+        context.bindFramebuffer(context.FRAMEBUFFER, baseLayer.framebuffer as WebGLFramebuffer | null);
+        context.clearColor(0, 0, 0, 0);
+        context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
         onFrame(readFrameObservation(frame, session.inputSources, referenceSpace, time));
         frameHandle = session.requestAnimationFrame(renderFrame);
       };
