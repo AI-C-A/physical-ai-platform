@@ -22,6 +22,7 @@
     "smoke:patrol-camera": "node --env-file-if-exists=.env.local scripts/patrol-camera-smoke.mjs",
     "segmentation:dev": "node scripts/run-segmentation.mjs",
     "gateway:dev": "node --env-file-if-exists=.env.local gateway/server.mjs",
+    "gateway:quest": "node --env-file-if-exists=.env.local gateway/quest-server.mjs",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:soak": "npm run build && playwright test e2e/telemetry-video-soak.spec.ts --project=chrome-1440 --config=playwright.soak.config.ts",
     "verify": "npm run typecheck && npm run lint && npm run check:design-system && npm run check:repository-safety && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation",

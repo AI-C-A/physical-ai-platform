@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), selectPublicAssets(mode)],
   server: {
     proxy: {
+      '/api/quest': 'http://127.0.0.1:8787',
       '/api/integrations/patrol': 'http://127.0.0.1:8787',
       '/api/segmentation': {
         target: 'http://127.0.0.1:8790',

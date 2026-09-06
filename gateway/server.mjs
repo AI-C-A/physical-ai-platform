@@ -10,6 +10,7 @@ import {
 import { createKinesisViewerSession } from './kinesis-viewer-session.mjs';
 import { createRobotEventLog } from './robot-event-log.mjs';
 import { createStatusPollingService } from './status-polling.mjs';
+import { createQuestRelayHandler } from './quest-relay.mjs';
 
 const apiBasePath = '/api/integrations/patrol';
 
@@ -182,10 +183,12 @@ function openRobotEventStream(request, response, eventLog) {
 }
 
 export function createGatewayRequestHandler(integration, options = {}) {
+  const handleQuestRequest = createQuestRelayHandler();
   const eventLog = options.eventLog;
   const statusPolling = options.statusPolling;
   return async (request, response) => {
     try {
+      if (await handleQuestRequest(request, response)) return;
       const method = request.method ?? 'GET';
       const url = new URL(request.url ?? '/', 'http://gateway.internal');
       if (method === 'GET' && url.pathname === `${apiBasePath}/robots`) {
