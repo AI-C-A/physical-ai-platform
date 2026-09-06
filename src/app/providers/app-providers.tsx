@@ -21,7 +21,6 @@ import { RobotVideoContext } from '@/entities/robot-video';
 import { SensorDeviceCatalogContext } from '@/entities/sensor-device';
 import {
   BrandingContext,
-  DataEnvironmentContext,
   ColorSchemePreferenceProvider,
   MapStylePreferenceProvider,
   type BrandingConfig,
@@ -61,7 +60,6 @@ export function AppProviders({
 
   return (
     <ColorSchemePreferenceProvider>
-      <DataEnvironmentContext.Provider value={services.dataEnvironment}>
       <MapStylePreferenceProvider>
         <BrandingContext.Provider value={branding}>
           <ClockContext.Provider value={services.clock}>
@@ -105,7 +103,6 @@ export function AppProviders({
           </ClockContext.Provider>
         </BrandingContext.Provider>
       </MapStylePreferenceProvider>
-      </DataEnvironmentContext.Provider>
     </ColorSchemePreferenceProvider>
   );
 }

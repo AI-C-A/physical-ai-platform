@@ -34,7 +34,7 @@ describe('Patrol real Adapter 구성', () => {
     const services = createApplicationServices(realRuntimeConfig, {
       externalAdapterFactory: createPatrolExternalAdapters,
     });
-    expect(services.dataEnvironment).toBe('connected');
+    expect(services).not.toHaveProperty('dataEnvironment');
 
     expect(services.robotCatalog).toBeInstanceOf(PatrolRobotCatalogAdapter);
     expect(services.patrolApiStatus).toBe(services.robotCatalog);

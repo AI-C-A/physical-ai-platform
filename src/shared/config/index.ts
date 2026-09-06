@@ -9,7 +9,6 @@ export {
   type RuntimeConnections,
 } from './runtime-config';
 export { BrandingContext, useBranding } from './branding-context';
-export { DataEnvironmentContext, useDataEnvironment, type DataEnvironment } from './data-environment-context';
 export {
   ColorSchemePreferenceProvider,
   useColorSchemePreference,

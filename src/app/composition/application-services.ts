@@ -22,7 +22,7 @@ import {
 } from '@/entities/robot-telemetry';
 import type { RobotVideoPort } from '@/entities/robot-video';
 import type { SensorDeviceCatalogPort } from '@/entities/sensor-device';
-import type { DataEnvironment, RuntimeConfig } from '@/shared/config';
+import type { RuntimeConfig } from '@/shared/config';
 import { systemClock, type ClockPort } from '@/shared/lib/clock';
 
 import { InMemoryAnalyticsAdapter } from './in-memory-analytics-adapter';
@@ -35,7 +35,6 @@ import { createBroadcastChannelFlywheelSyncTransport } from './broadcast-channel
 import { InMemoryQuestCollectorBackend } from './quest-collector-backends';
 
 export interface ApplicationServices {
-  readonly dataEnvironment: DataEnvironment;
   readonly clock: ClockPort;
   readonly patrolApiStatus: PatrolApiStatusPort;
   readonly robotCatalog: RobotCatalogPort;
@@ -56,7 +55,7 @@ export interface ApplicationServices {
   dispose(): void;
 }
 
-type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose' | 'dataEnvironment'>;
+type AdapterBundle = Omit<ApplicationServices, 'clock' | 'dispose'>;
 
 type ExternalAdapterBundle = AdapterBundle & {
   dispose?(): void;
@@ -230,7 +229,6 @@ export function createApplicationServices(
     return {
       clock,
       ...externalBundle,
-      dataEnvironment: 'connected',
       dispose: () => {
         if (disposed) return;
         disposed = true;
@@ -302,7 +300,6 @@ export function createApplicationServices(
       clock,
       patrolApiStatus: createUnconfiguredPatrolApiStatus(),
       ...core,
-      dataEnvironment: 'simulation',
       questCollector,
       analytics,
       dispose: () => {
