@@ -171,7 +171,10 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await controls.getByRole('button', { name: 'Episode 녹화 시작', exact: true }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'recording');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('녹화 중');
-    await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
+    {
+      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
+      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
+    }
     await expect(bindings).toContainText('quest2-001 · 시작 · 확인 완료');
     await expect(page.getByRole('region', { name: 'Quest 손 포즈 3D' }).locator('canvas')).toBeVisible();
     await openCollectionDetails(page, '세션 정보');
@@ -182,7 +185,10 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await controls.getByRole('button', { name: 'Episode 녹화 정지' }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'review');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('검토 대기');
-    await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
+    {
+      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
+      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
+    }
     await expect(bindings).toContainText('quest2-001 · 정지 · 확인 완료');
     const recordedCamera = page.getByRole('region', { name: '기록된 Episode 카메라' });
     await expect(recordedCamera.locator('figure')).toHaveCount(2);
@@ -934,7 +940,8 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       const connectionBox = await connection.boundingBox();
       expect(connectionBox?.height).toBeGreaterThanOrEqual(40);
       await connection.press('Enter');
-      await page.locator('summary').filter({ hasText: '녹화 명령 응답' }).click();
+      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
+      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
       await expect(page.getByRole('region', { name: 'Collector 명령 응답' })).toBeVisible();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       const connectionScreenshot = testInfo.outputPath(`inline-connection-${String(viewport.width)}.png`);
@@ -953,7 +960,7 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       for (const label of ['선택 소스', '파생 데이터']) {
         const disclosure = sources.locator('summary').filter({ hasText: label });
         await expect(disclosure).toBeVisible();
-        await disclosure.click();
+        if (!await disclosure.locator('..').evaluate((element) => element.hasAttribute('open'))) await disclosure.click();
       }
       await expect(sources.getByText('External RGB · Full body', { exact: true })).toBeVisible();
       await expect(sources.getByText('Head Semantic', { exact: true })).toBeVisible();

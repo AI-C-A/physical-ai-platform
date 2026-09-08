@@ -85,6 +85,7 @@ export { NewHumanoidCollectionPage } from './NewCollectionDialog';
 import type { CollectionSetupContext } from './NewCollectionDialog';
 import { createCollectionSessionExportRecord } from './flywheel-export-records';
 import { QuestPairingPanel } from './QuestPairingPanel';
+import { CollectionCameraPanel } from './CollectionCameraPanel';
 import { useAutomaticPreflight } from './use-automatic-preflight';
 import { collectionPreviewState } from './collection-preview-state';
 import type { MediaStreamState } from '@/shared/ui/media-panel';
@@ -1584,7 +1585,7 @@ export function HumanoidCollectionDetailPage() {
                     </section>
                   </section>
                 </RailTabPanel>
-                <RailTabPanel value="sources" labelledBy="collection-tab-sources">
+                <RailTabPanel value="sources" labelledBy="collection-tab-sources" forceMount hidden={detailsTab !== 'sources'}>
                     <div className="grid gap-5">
                       <CollectionStreamsSection telemetry={telemetry} questConnection={!needsQuestConnection ? null : (
                         <Dialog title="Quest 연결" cancelLabel="닫기" trigger={<Button disabled={pending}>Quest 연결</Button>}>
@@ -1592,6 +1593,7 @@ export function HumanoidCollectionDetailPage() {
                         </Dialog>
                       )} />
                       {session.humanDemonstration === null ? null : <CollectorCommandStatus binding={session.humanDemonstration} />}
+                      {session.humanDemonstration === null || session.stoppedAtMs !== null ? null : <CollectionCameraPanel key={session.id} />}
                     </div>
                 </RailTabPanel>
                 <RailTabPanel value="issues" labelledBy="collection-tab-issues">{issuesContent}</RailTabPanel>
