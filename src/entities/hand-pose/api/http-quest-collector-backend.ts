@@ -1,3 +1,4 @@
+import { QuestStream } from '@/shared/lib/quest-stream';
 import type {
   QuestCollectorBackendPort,
   QuestCollectorCommandState,
@@ -15,6 +16,7 @@ interface SenderCredentials {
 export class HttpQuestCollectorBackend implements QuestCollectorBackendPort, QuestLivePreviewPort {
   readonly availability = 'available' as const;
   readonly #endpoint: string;
+  #stream: QuestStream | null = null;
   #sender: SenderCredentials | null = null;
   #timer: ReturnType<typeof setInterval> | null = null;
   #preview: Promise<{ readonly receivedTimestampMs: number }> | null = null;
@@ -54,6 +56,16 @@ export class HttpQuestCollectorBackend implements QuestCollectorBackendPort, Que
     return this.#request(`/sessions/${session.sessionId}`, 'GET', session.viewerToken, undefined, signal);
   }
 
+  subscribeSession(session: QuestLiveSession, listener: (snapshot: QuestLiveSnapshot) => void): () => void {
+    const stream = new QuestStream({ endpoint: this.#endpoint, sessionId: session.sessionId,
+      token: session.viewerToken, role: 'viewer', onSnapshot: (value) => {
+        if (typeof value !== 'object' || value === null || !('frameCount' in value)
+          || typeof value.frameCount !== 'number' || !('sourceState' in value) || !('frame' in value)) return;
+        listener(value as QuestLiveSnapshot);
+      } });
+    return () => stream.close();
+  }
+
   closeSession(session: QuestLiveSession): Promise<void> {
     return this.#request(`/sessions/${session.sessionId}`, 'DELETE', session.viewerToken);
   }
@@ -68,20 +80,25 @@ export class HttpQuestCollectorBackend implements QuestCollectorBackendPort, Que
       sessionId: sender.sessionId, sourceDeviceId: sender.sourceDeviceId ?? `quest-${sender.sessionId}`, participantId: sender.sessionId,
       activeEpisodeId: null,
       policy: {
-        targetRateHz: 10, queueCapacityFrames: 600, maximumBatchFrames: 8,
-        flushIntervalMs: 100, partialAfterMs: 250, lostAfterMs: 1_500,
+        targetRateHz: 60, queueCapacityFrames: 600, maximumBatchFrames: 64,
+        flushIntervalMs: 50, partialAfterMs: 250, lostAfterMs: 1_500,
       },
     };
   }
 
   async connect(pairing: QuestPairingResult): Promise<void> {
     await this.getCommandState(pairing);
+    this.#stream?.close();
+    this.#stream = new QuestStream({ endpoint: this.#endpoint, sessionId: pairing.sessionId,
+      token: this.#senderToken(pairing), role: 'sender', onSnapshot: () => undefined });
     if (this.#timer === null) {
       this.#timer = setInterval(() => this.#listeners.forEach((listener) => listener()), 1_000);
     }
   }
 
   disconnect(): void {
+    this.#stream?.close();
+    this.#stream = null;
     if (this.#timer !== null) clearInterval(this.#timer);
     this.#timer = null;
   }
@@ -115,6 +132,10 @@ export class HttpQuestCollectorBackend implements QuestCollectorBackendPort, Que
       return Promise.reject(new Error('실시간 손 추적 연결은 Episode 원본 저장을 지원하지 않습니다.'));
     }
     return this.#request(`/sessions/${input.pairing.sessionId}/batches`, 'POST', this.#senderToken(input.pairing), { frames: input.frames });
+  }
+
+  streamHandPosePreview(observation: Parameters<NonNullable<QuestCollectorBackendPort['streamHandPosePreview']>>[0]): boolean {
+    return this.#stream?.publish(observation) ?? false;
   }
 
   sendHandPosePreview(input: Parameters<QuestCollectorBackendPort['sendHandPosePreview']>[0]): Promise<{ readonly receivedTimestampMs: number }> {

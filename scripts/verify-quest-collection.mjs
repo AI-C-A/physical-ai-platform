@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, readFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, expect } from '@playwright/test';
 import { createServer as createViteServer } from 'vite';
@@ -8,18 +8,27 @@ import { createQuestRelayHandler } from '../gateway/quest-relay.mjs';
 
 const directory = resolve('artifacts', `quest-collection-test-${Date.now()}`);
 await mkdir(directory, { recursive: true });
-const relay = createServer(createQuestRelayHandler({ collectionDirectory: directory }));
+const handler = createQuestRelayHandler({ collectionDirectory: directory });
+// 느린 저장 응답이 실시간 미리보기를 막지 않는지 검증한다.
+const batchDelayMs = Number(process.env.QUEST_VERIFY_BATCH_DELAY_MS ?? 120);
+const relay = createServer(async (request, response) => {
+  if (request.url?.endsWith('/batches')) await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+  await handler(request, response);
+});
+handler.attachStream(relay);
 await new Promise((done) => relay.listen(0, '127.0.0.1', done));
 const vite = await createViteServer({ mode: 'patrol', configLoader: 'runner', server: {
   host: '127.0.0.1', port: 5199, strictPort: true,
-  proxy: { '/api/quest': `http://127.0.0.1:${relay.address().port}` },
+  proxy: { '/api/quest': { target: `http://127.0.0.1:${relay.address().port}`, ws: true } },
 } });
 let browser;
 try {
   await vite.listen();
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const pcContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const questContext = await browser.newContext();
+  const direct = process.env.QUEST_VERIFY_DIRECT !== '0';
+  if (!direct) for (const context of [pcContext, questContext]) await context.addInitScript(() => { globalThis.RTCPeerConnection = undefined; });
   await questContext.addInitScript(() => {
     const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index', 'middle', 'ring', 'pinky'].flatMap((finger) => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map((part) => `${finger}-finger-${part}`))];
@@ -32,7 +41,7 @@ try {
           inputSources: ['left', 'right'].map((side) => ({ handedness: side, hand: new Map(names.map((name, index) => [name, { side, index }])) })),
           requestReferenceSpace: () => Promise.resolve({}), updateRenderState: () => undefined,
           requestAnimationFrame: (callback) => setTimeout(() => {
-            if (active) callback(performance.now(), { getJointPose: ({ side, index }) => ({ transform: {
+            if (active) callback(performance.now(), { getViewerPose: () => ({ transform: { position: { x: 0, y: 1.4, z: 0 }, orientation: { x: 0, y: 0, z: 0, w: 1 } } }), getJointPose: ({ side, index }) => ({ transform: {
               position: { x: (side === 'left' ? -0.18 : 0.18) + Math.floor(index / 5) * 0.015, y: 1.2 + index % 5 * 0.02, z: -0.3 },
               orientation: { x: 0, y: 0, z: 0, w: 1 },
             }, radius: 0.008 }) });
@@ -49,6 +58,7 @@ try {
   const pc = await pcContext.newPage();
   const quest = await questContext.newPage();
   const errors = [];
+  let headsetTimeOrigin = null;
   for (const page of [pc, quest]) page.on('pageerror', (error) => errors.push(error.message));
   await pc.goto('http://127.0.0.1:5199/mlops/collection');
   await expect(pc.getByRole('link', { name: '새 수집', exact: true })).toBeVisible();
@@ -64,10 +74,11 @@ try {
   assert.match(code, /^\d{6}$/u);
   await pc.screenshot({ path: resolve(directory, 'pairing.png'), fullPage: true });
   await quest.goto(`http://127.0.0.1:5199/collect/quest?code=${code}`);
+  headsetTimeOrigin = await quest.evaluate(() => performance.timeOrigin);
   await quest.getByRole('button', { name: '세션 연결', exact: true }).click();
   await quest.getByRole('button', { name: 'MR 모드 시작' }).click();
   await pc.getByRole('button', { name: '수집 콘솔 열기' }).click();
-  await expect(pc.getByLabel('Quest 양손 3D 관절 캔버스')).toBeVisible();
+  await expect(pc.getByLabel('Quest 양손 3D 손 모델 캔버스')).toBeVisible();
   await expect(pc.getByRole('button', { name: 'Episode 녹화 시작', exact: true })).toBeEnabled({ timeout: 15_000 });
   await pc.screenshot({ path: resolve(directory, 'collection-ready.png'), fullPage: true });
   const collectionId = new URL(pc.url()).pathname.split('/').at(-1);
@@ -77,6 +88,30 @@ try {
     const response = await pc.request.get(`http://127.0.0.1:5199/api/quest/collections/${collectionId}`);
     return (await response.json()).episodes[0]?.frameCount ?? 0;
   }).toBeGreaterThan(5);
+  await expect(pc.locator('[data-hand-pose-viewer]')).toHaveAttribute('data-hand-transport', direct ? 'webrtc' : 'websocket', { timeout: 15_000 });
+  await pc.evaluate(() => {
+    const samples = [];
+    Reflect.set(globalThis, '__questRenderSamples', samples);
+    const element = globalThis.document.querySelector('[data-hand-pose-viewer]');
+    new globalThis.MutationObserver(() => {
+      const source = Number(element.getAttribute('data-hand-frame-timestamp'));
+      if (samples.at(-1)?.source === source) return;
+      if (samples.length >= 1_000) samples.shift();
+      samples.push({ source, at: performance.timeOrigin + performance.now() });
+    }).observe(element, { attributes: true, attributeFilter: ['data-hand-frame-timestamp'] });
+  });
+  const measurementStart = performance.now();
+  await new Promise((resolve) => setTimeout(resolve, 4_000));
+  const samples = await pc.evaluate(() => Reflect.get(globalThis, '__questRenderSamples'));
+  const durationMs = performance.now() - measurementStart;
+  const ages = samples.map((sample) => sample.at - headsetTimeOrigin - sample.source).sort((a, b) => a - b);
+  const metrics = { transport: direct ? 'webrtc' : 'websocket', measurement: 'XR 생성부터 PC DOM 반영까지', batchDelayMs, durationMs, receivedFrames: samples.length,
+    receivedFps: samples.length / durationMs * 1_000,
+    frameAgeP50Ms: ages[Math.floor(ages.length * 0.5)], frameAgeP95Ms: ages[Math.floor(ages.length * 0.95)],
+    environment: '동일 Mac의 Chrome 두 컨텍스트, WebXR 하드웨어 모사, 로컬 Vite + 실제 gateway' };
+  await writeFile(resolve(directory, 'latency.json'), JSON.stringify(metrics, null, 2));
+  await pc.screenshot({ path: resolve(directory, 'collection-recording.png'), fullPage: true });
+  assert.ok(metrics.receivedFps > 25, `실시간 프레임 수신 부족: ${JSON.stringify(metrics)}`);
   await pc.getByRole('button', { name: 'Episode 녹화 정지' }).click();
   await expect(pc.getByRole('button', { name: '녹화본 저장', exact: true })).toBeEnabled({ timeout: 15_000 });
   await pc.getByRole('button', { name: '녹화본 저장', exact: true }).click();
@@ -88,6 +123,8 @@ try {
   const frames = (await readFile(resolve(directory, rawFile), 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
   assert.ok(frames.length > 5);
   assert.equal(frames[0].hands.left.joints.length, 25);
+  frames.forEach((frame, index) => assert.equal(frame.sequence, index, '녹화 원본 sequence 유실'));
+  console.log(`실시간 수신 측정: ${JSON.stringify(metrics)}`);
   assert.equal(metadata.episodes[0].outcome, 'success');
   await pc.reload();
   await expect(pc.getByText('저장 완료 1개', { exact: true })).toBeVisible();

@@ -484,7 +484,9 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         },
       };
       this.#scheduleFlush(pairing.policy.flushIntervalMs);
-    } else if (pairing !== null && this.#snapshot.backend.state === 'live' && this.#previewAllowed()) {
+    }
+    if (pairing !== null && this.#snapshot.backend.state === 'live' && this.#previewAllowed()
+      && !this.#backend.streamHandPosePreview?.(observation)) {
       this.#latestPreviewObservation = observation;
       this.#schedulePreview();
     }
@@ -546,7 +548,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
     this.#previewTimer = setTimeout(() => {
       this.#previewTimer = null;
       void this.#publishPreview();
-    }, 100);
+    }, 16);
   }
 
   async #publishPreview(): Promise<void> {
@@ -575,8 +577,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
   }
 
   #previewAllowed(): boolean {
-    return this.#snapshot.recording.state !== 'recording'
-      && this.#snapshot.recording.state !== 'stopping';
+    return this.#snapshot.recording.state !== 'stopping';
   }
 
   async #drainFrames(pairing: QuestPairingResult): Promise<boolean> {
@@ -599,7 +600,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
       this.#flushPromise = null;
       if (queue.size > 0 && this.#pairing === pairing && this.#snapshot.backend.state === 'live'
         && this.#snapshot.recording.state !== 'stopping') {
-        this.#scheduleFlush(pairing.policy.flushIntervalMs);
+        this.#scheduleFlush(0);
       }
     });
     this.#flushPromise = flush;

@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     allowedHosts: (loadEnv(mode, process.cwd(), 'DEV_').DEV_ALLOWED_HOSTS ?? '').split(',').map((host) => host.trim()).filter(Boolean),
     proxy: {
-      '/api/quest': 'http://127.0.0.1:8787',
+      '/api/quest': { target: 'http://127.0.0.1:8787', ws: true },
       '/api/integrations/patrol': 'http://127.0.0.1:8787',
       '/api/segmentation': {
         target: 'http://127.0.0.1:8790',

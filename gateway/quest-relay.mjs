@@ -1,5 +1,6 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { resolve } from 'node:path';
+import { createQuestStream } from './quest-stream.mjs';
 import { createQuestCollectionStore } from './quest-collection-store.mjs';
 
 const basePath = '/api/quest';
@@ -98,6 +99,35 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
   const attempts = new Map();
   const token = () => randomBytes(32).toString('hex');
 
+  const snapshot = (session) => {
+    const state = liveState(session);
+    return { sessionId: session.id, sourceState: state, frameCount: session.frameCount,
+      frame: ['ready', 'recording'].includes(state) ? session.frame : null };
+  };
+  const receivePreview = (session, input) => {
+    const observation = validateObservation(input);
+    if (session.sourceState === 'offline') return;
+    if (session.previewAtMs !== undefined && session.frame
+      && observation.deviceMonotonicTimestampMs < session.frame.deviceTimestampMs) return;
+    session.frame = { coordinateFrame: 'quest-local-floor', deviceTimestampMs: observation.deviceMonotonicTimestampMs,
+      receivedTimestampMs: nowMs(), hands: observation.hands, viewerPose: observation.viewerPose };
+    session.sourceState = session.sourceState === 'recording' ? 'recording' : 'ready';
+    session.lastSeenAtMs = nowMs();
+    session.frameCount += 1;
+    session.previewAtMs = nowMs();
+  };
+  const stream = createQuestStream({
+    authorize: (input) => {
+      const session = sessions.get(input?.sessionId);
+      if (!session || (!session.collection && session.expiresAtMs <= nowMs())) return null;
+      const valid = input.role === 'sender' ? session.senderToken !== null && input.token === session.senderToken
+        : input.role === 'viewer' && input.token === session.viewerToken;
+      return valid ? { session, role: input.role } : null;
+    },
+    isValid: (session) => sessions.get(session.id) === session && (session.collection || session.expiresAtMs > nowMs()),
+    snapshot, receive: receivePreview,
+  });
+
   function sweep(now) {
     for (const [id, session] of sessions) if (!session.collection && session.expiresAtMs <= now) sessions.delete(id);
     for (const [address, attempt] of attempts) if (attempt.until <= now) attempts.delete(address);
@@ -126,7 +156,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
     const relay = sessions.get(record.id) ?? createSession(record.id, true);
     relay.questDeviceId = record.questDeviceId;
     const sourceState = liveState(relay);
-    return { ...record, pairing: { code: relay.code, expiresAtMs: relay.pairingExpiresAtMs },
+    return { ...record, viewerToken: relay.viewerToken, pairing: { code: relay.code, expiresAtMs: relay.pairingExpiresAtMs },
       sourceState, lastSeenAtMs: relay.lastSeenAtMs,
       frame: ['ready', 'recording'].includes(sourceState) && relay.frame
         && nowMs() - relay.frame.receivedTimestampMs <= staleAfterMs ? relay.frame : null,
@@ -147,7 +177,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
     attempts.set(address, attempt);
   }
 
-  return async function handleQuestRequest(request, response) {
+  const handleQuestRequest = async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://relay.internal');
     if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return false;
     try {
@@ -237,28 +267,26 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
         await collections.acknowledge(session.id, await readJson(request));
         send(response, 200, { acknowledged: true });
       } else if (method === 'POST' && match[2] === 'batches' && isSender && session.collection) {
-        const { frames } = await readJson(request, 262_144);
-        if (!Array.isArray(frames) || frames.length < 1 || frames.length > 8) throw new RelayError(400, '1~8개의 수집 프레임이 필요합니다.');
+        const { frames } = await readJson(request, 2_097_152);
+        if (!Array.isArray(frames) || frames.length < 1 || frames.length > 64) throw new RelayError(400, '1~64개의 수집 프레임이 필요합니다.');
         const normalized = frames.map((frame) => ({
           sessionId: frame.sessionId, episodeId: frame.episodeId, sourceDeviceId: frame.sourceDeviceId,
           sequence: frame.sequence, frameEpoch: frame.frameEpoch, ...validateObservation(frame),
         }));
         const latest = await collections.appendFrames(session.id, normalized);
-        if (latest !== null) { session.frame = latest; session.frameCount += frames.length; }
+        // 새 미리보기가 살아 있으면 저장 완료된 과거 프레임으로 덮어쓰지 않는다.
+        if (latest !== null && (session.previewAtMs === undefined || nowMs() - session.previewAtMs > staleAfterMs)) {
+          session.frame = latest; session.frameCount += frames.length;
+          stream.publish(session);
+        }
         session.sourceState = 'recording'; session.lastSeenAtMs = now;
         send(response, 200, { receivedTimestampMs: now });
       } else if (method === 'DELETE' && !match[2] && isViewer) {
         sessions.delete(session.id);
         send(response, 200, { closed: true });
       } else if (method === 'POST' && match[2] === 'frames' && isSender) {
-        const observation = validateObservation(await readJson(request));
-        session.frame = {
-          coordinateFrame: 'quest-local-floor', deviceTimestampMs: observation.deviceMonotonicTimestampMs,
-          receivedTimestampMs: now, hands: observation.hands, viewerPose: observation.viewerPose,
-        };
-        session.sourceState = 'ready';
-        session.lastSeenAtMs = now;
-        session.frameCount += 1;
+        receivePreview(session, await readJson(request));
+        stream.publish(session);
         send(response, 200, { receivedTimestampMs: now });
       } else if (method === 'POST' && match[2] === 'presence' && isSender) {
         const { state } = await readJson(request);
@@ -266,6 +294,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
         session.sourceState = state;
         session.lastSeenAtMs = now;
         if (!['ready', 'recording'].includes(state)) session.frame = null;
+        stream.publish(session);
         send(response, 200, { updated: true });
       } else {
         throw new RelayError(403, '허용되지 않는 세션 작업입니다.');
@@ -277,4 +306,6 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
     }
     return true;
   };
+  handleQuestRequest.attachStream = stream.attach;
+  return handleQuestRequest;
 }

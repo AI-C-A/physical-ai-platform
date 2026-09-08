@@ -1,3 +1,4 @@
+import { QuestStream } from '@/shared/lib/quest-stream';
 import type {
   CatalogCollection, CollectionHandPoseFrame, CollectionHandPoseTelemetry, CollectionStreamTelemetry,
   CollectionTelemetrySnapshot, FlywheelEpisode, FlywheelPort, HumanDemonstrationBinding,
@@ -24,6 +25,7 @@ interface StoredEpisode {
 
 interface CollectionRecord {
   readonly id: string;
+  readonly viewerToken?: string;
   readonly name: string;
   readonly projectId: string;
   readonly siteId: string;
@@ -46,12 +48,12 @@ interface CollectionRecord {
 
 const profile: HumanDemonstrationProfile = {
   id: 'quest-hand-collection-v1', schemaVersion: 1,
-  handTracking: { requiredHands: 'both', targetRateHz: 10, queueCapacityFrames: 600,
-    maximumBatchFrames: 8, flushIntervalMs: 100, partialAfterMs: 250, lostAfterMs: 1_500 },
+  handTracking: { requiredHands: 'both', targetRateHz: 60, queueCapacityFrames: 600,
+    maximumBatchFrames: 64, flushIntervalMs: 50, partialAfterMs: 250, lostAfterMs: 1_500 },
   streams: (['left', 'right'] as const).map((side) => ({
     streamId: `quest-hand-${side}`, displayName: side === 'left' ? '왼손 추적' : '오른손 추적',
     modality: 'hand-pose', origin: 'sensor', sourceRole: 'xr-hand-tracking', required: true,
-    targetRateHz: 10, coordinateFrame: 'quest-local-floor', maximumDriftMs: null, minimumCompletenessPercent: null,
+    targetRateHz: 60, coordinateFrame: 'quest-local-floor', maximumDriftMs: null, minimumCompletenessPercent: null,
   })),
 };
 
@@ -123,7 +125,7 @@ function telemetryFrom(record: CollectionRecord): CollectionTelemetrySnapshot {
     return {
       streamId: stream.streamId, displayName: stream.displayName, modality: 'hand-pose', required: true,
       health: live && hand?.poseObserved ? 'healthy' : 'disconnected', connectionState,
-      expectedRateHz: 10, observedRateHz: null, latencyMs: null, driftMs: null,
+      expectedRateHz: 60, observedRateHz: null, latencyMs: null, driftMs: null,
       sampleCount, droppedFrameCount: 0, missingSampleCount: 0, bytesWritten: bytesWritten / 2,
       lastSampleAtMs: record.frame?.receivedTimestampMs ?? null, origin: 'sensor',
       sourceDeviceId: record.questDeviceId, coordinateFrame: 'quest-local-floor',
@@ -152,6 +154,8 @@ function catalogFrom(record: CollectionRecord): CatalogCollection {
 }
 
 export function createHttpQuestFlywheel(): FlywheelPort {
+  const live = new Map<string, { record: CollectionRecord | null; metadataAt: number; pushAt: number; metadataPending: boolean;
+    stream: QuestStream | null; listeners: Set<() => void>; stop: () => void }>();
   const listeners = new Set<() => void>();
   const timers = new Set<ReturnType<typeof setInterval>>();
   let cache: { readonly at: number; readonly promise: Promise<readonly CollectionRecord[]> } | null = null;
@@ -217,7 +221,38 @@ export function createHttpQuestFlywheel(): FlywheelPort {
     deleteEpisode: async (id) => { const parent = await recordForEpisode(id); await command(parent.id, 'delete-episode', id); },
     deleteOperationalSession: async (id) => { await request(`/${encodeURIComponent(id)}`, 'DELETE'); refresh(); },
     deleteCatalogCollection: async (id) => { await request(`/${encodeURIComponent(id)}`, 'DELETE'); refresh(); },
-    getCollectionTelemetry: async (id) => telemetryFrom(await request<CollectionRecord>(`/${encodeURIComponent(id)}`)),
+    getCollectionTelemetry: async (id) => {
+      const entry = live.get(id);
+      if (entry?.record && Date.now() - entry.pushAt < 1_000) {
+        return telemetryFrom(entry.record);
+      }
+      const pushAtStart = entry?.pushAt;
+      const record = await request<CollectionRecord>(`/${encodeURIComponent(id)}`);
+      if (!entry || live.get(id) !== entry) return telemetryFrom(record);
+      if (entry.record?.viewerToken !== record.viewerToken) {
+        entry.stream?.close();
+        entry.stream = null;
+      }
+      entry.metadataAt = Date.now();
+      entry.record = entry.record && pushAtStart !== entry.pushAt
+        ? { ...record, frame: entry.record.frame, sourceState: entry.record.sourceState,
+          lastSeenAtMs: entry.record.lastSeenAtMs, observedAtMs: entry.record.observedAtMs }
+        : record;
+      if (record.viewerToken && entry.stream === null) {
+        entry.stream = new QuestStream({ endpoint: '/api/quest', sessionId: id, token: record.viewerToken,
+          role: 'viewer', onSnapshot: (value) => {
+            if (live.get(id) !== entry || !entry.record || typeof value !== 'object' || value === null
+              || !('sourceState' in value) || !('frame' in value)
+              || !['pending', 'paired', 'ready', 'recording', 'offline', 'stale'].includes(String(value.sourceState))) return;
+            const next = value as { sourceState: CollectionRecord['sourceState']; frame: CollectionRecord['frame'] };
+            entry.pushAt = Date.now();
+            entry.record = { ...entry.record, frame: next.frame, sourceState: next.sourceState,
+              lastSeenAtMs: next.frame?.receivedTimestampMs ?? entry.record.lastSeenAtMs, observedAtMs: Date.now() };
+            entry.listeners.forEach((listener) => listener());
+          } });
+      }
+      return telemetryFrom(entry.record);
+    },
     getEpisodeHandPoseAt: async (id, offsetMs) => {
       const parent = await recordForEpisode(id);
       return request<CollectionHandPoseFrame | null>(`/${parent.id}/pose?episodeId=${encodeURIComponent(id)}&offsetMs=${String(offsetMs)}`);
@@ -231,7 +266,41 @@ export function createHttpQuestFlywheel(): FlywheelPort {
     listCatalogCollections: async () => (await readAll()).filter((record) => record.status === 'completed').map(catalogFrom),
     getCatalogCollection: async (id) => { const record = (await readAll()).find((item) => item.id === id && item.status === 'completed'); return record === undefined ? null : catalogFrom(record); },
     subscribe: (listener) => { listeners.add(listener); const unsubscribe = subscribeAt(listener, 500); return () => { listeners.delete(listener); unsubscribe(); }; },
-    subscribeCollectionTelemetry: (_id, listener) => subscribeAt(listener, 100),
-    dispose: () => { timers.forEach(clearInterval); timers.clear(); listeners.clear(); cache = null; },
+    subscribeCollectionTelemetry: (id, listener) => {
+      let entry = live.get(id);
+      if (!entry) {
+        entry = { record: null, metadataAt: 0, metadataPending: false, pushAt: -Infinity, stream: null, listeners: new Set(), stop: () => undefined };
+        live.set(id, entry);
+        const current = entry;
+        current.stop = subscribeAt(() => {
+          if (Date.now() - current.pushAt >= 1_000) {
+            current.listeners.forEach((notify) => notify());
+          } else if (Date.now() - current.metadataAt >= 1_000 && !current.metadataPending) {
+            // 메타데이터 HTTP 응답을 기다리느라 손 프레임 갱신을 막지 않는다.
+            current.metadataPending = true;
+            void request<CollectionRecord>(`/${encodeURIComponent(id)}`).then((record) => {
+              if (live.get(id) !== current || !current.record) return;
+              if (record.viewerToken !== current.record.viewerToken) {
+                current.stream?.close(); current.stream = null; current.pushAt = -Infinity;
+                current.record = record;
+              } else {
+                current.record = { ...record, frame: current.record.frame, sourceState: current.record.sourceState,
+                  lastSeenAtMs: current.record.lastSeenAtMs, observedAtMs: current.record.observedAtMs };
+              }
+              current.listeners.forEach((notify) => notify());
+            }).catch(() => undefined).finally(() => {
+              current.metadataPending = false; current.metadataAt = Date.now();
+            });
+          }
+        }, 100);
+      }
+      entry.listeners.add(listener);
+      const current = entry;
+      return () => {
+        current.listeners.delete(listener);
+        if (current.listeners.size === 0) { current.stop(); current.stream?.close(); live.delete(id); }
+      };
+    },
+    dispose: () => { live.forEach((entry) => { entry.stop(); entry.stream?.close(); }); live.clear(); timers.forEach(clearInterval); timers.clear(); listeners.clear(); cache = null; },
   };
 }

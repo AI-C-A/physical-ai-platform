@@ -14,6 +14,7 @@ export interface QuestLiveSnapshot {
   readonly activeEpisodeId?: string | null;
   readonly frameCount: number;
   readonly frame: {
+    readonly delivery?: { readonly transport: 'webrtc' | 'websocket'; readonly roundTripMs: number | null };
     readonly coordinateFrame: 'quest-local-floor';
     readonly deviceTimestampMs: number;
     readonly receivedTimestampMs: number;
@@ -25,5 +26,6 @@ export interface QuestLiveSnapshot {
 export interface QuestLivePreviewPort {
   createSession(): Promise<QuestLiveSession>;
   readSession(session: QuestLiveSession, signal: AbortSignal): Promise<QuestLiveSnapshot>;
+  subscribeSession?(session: QuestLiveSession, listener: (snapshot: QuestLiveSnapshot) => void): () => void;
   closeSession(session: QuestLiveSession): Promise<void>;
 }

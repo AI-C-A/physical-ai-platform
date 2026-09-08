@@ -289,6 +289,8 @@ export interface CollectionHandPoseObservation {
 
 /** Latest raw Quest pose used only for live/replay visualization. */
 export interface CollectionHandPoseTelemetry {
+  /** 직접 수신일 때 receivedTimestampMs는 PC 수신 시각이다. 왕복 시간은 센서 지연과 다르다. */
+  readonly delivery?: { readonly transport: 'webrtc' | 'websocket'; readonly roundTripMs: number | null };
   readonly viewerPose?: {
     readonly positionMeters: readonly [number, number, number];
     readonly orientationQuaternion: readonly [number, number, number, number];

@@ -189,6 +189,7 @@ export interface QuestCollectorBackendPort {
     readonly frames: readonly HandPoseFrame[];
     readonly payload: ArrayBuffer;
   }): Promise<{ readonly receivedTimestampMs: number }>;
+  streamHandPosePreview?(observation: WebXrFrameObservation): boolean;
   sendHandPosePreview(input: {
     readonly pairing: QuestPairingResult;
     readonly observation: WebXrFrameObservation;

@@ -186,7 +186,7 @@ export function createGatewayRequestHandler(integration, options = {}) {
   const handleQuestRequest = createQuestRelayHandler();
   const eventLog = options.eventLog;
   const statusPolling = options.statusPolling;
-  return async (request, response) => {
+  const handler = async (request, response) => {
     try {
       if (await handleQuestRequest(request, response)) return;
       const method = request.method ?? 'GET';
@@ -246,6 +246,8 @@ export function createGatewayRequestHandler(integration, options = {}) {
       sendError(response, error);
     }
   };
+  handler.attachStream = handleQuestRequest.attachStream;
+  return handler;
 }
 
 export function createGatewayFromEnvironment(environment = process.env) {
@@ -281,7 +283,9 @@ async function main() {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PATROL_GATEWAY_PORT는 유효한 TCP port여야 합니다.');
   }
-  const server = createServer(createGatewayRequestHandler(integration, { eventLog, statusPolling }));
+  const handler = createGatewayRequestHandler(integration, { eventLog, statusPolling });
+  const server = createServer(handler);
+  handler.attachStream(server);
   server.on('close', () => {
     eventLog.dispose();
     statusPolling.dispose();

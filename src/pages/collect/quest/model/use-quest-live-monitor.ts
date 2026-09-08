@@ -36,19 +36,32 @@ export function useQuestLiveMonitor(port: QuestLivePreviewPort) {
   useEffect(() => {
     if (session === null) return;
     const controller = new AbortController();
+    let lastPushAt = -Infinity;
+    const unsubscribe = port.subscribeSession?.(session, (next) => {
+      if (controller.signal.aborted) return;
+      lastPushAt = Date.now();
+      setSnapshot(next);
+      setError(null);
+    });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async (): Promise<void> => {
       if (controller.signal.aborted) return;
       if (Date.now() >= session.expiresAtMs) {
+        unsubscribe?.();
         setSnapshot(null);
         setError('연결 시간이 만료되었습니다. 새 연결 코드를 만드세요.');
         return;
       }
       let delayMs = 100;
       try {
+        if (Date.now() - lastPushAt < 1_000) {
+          timer = setTimeout(() => void poll(), 500);
+          return;
+        }
+        const pushAtStart = lastPushAt;
         const next = await port.readSession(session, controller.signal);
         if (controller.signal.aborted) return;
-        setSnapshot(next);
+        if (pushAtStart === lastPushAt) setSnapshot(next);
         setError(null);
       } catch {
         if (controller.signal.aborted) return;
@@ -61,6 +74,7 @@ export function useQuestLiveMonitor(port: QuestLivePreviewPort) {
     void poll();
     return () => {
       controller.abort();
+      unsubscribe?.();
       clearTimeout(timer);
     };
   }, [port, session]);

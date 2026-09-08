@@ -50,6 +50,7 @@ PC와 Quest의 `/api/quest` 요청은 같은 gateway에 도달해야 한다. 동
 
 배포 시 `npm run build:real` 결과인 `dist/`를 제공하고 다음 경로를 연결한다.
 
+- `/api/quest/stream`: WebSocket Upgrade를 허용하고 gateway와 같은 프로세스로 전달한다. HTTPS 페이지에서는 WSS를 사용한다.
 - `/api/quest/*`: gateway `127.0.0.1:8787`로 전달한다. HTTP 메서드, JSON 본문, Authorization 헤더를 유지하고 캐시하지 않는다.
 - `/collect/quest`와 기타 frontend 경로: SPA의 `index.html`로 fallback한다.
 - 동일 gateway 프로세스로 라우팅한다. 현재 연결 상태는 여러 인스턴스 사이에 공유되지 않는다.
@@ -62,7 +63,7 @@ HTTPS와 사용자 동작에 따른 immersive 세션 시작은 [WebXR Device API
 
 녹화 중단 시 Quest의 전송 완료 응답과 실제 원본 프레임이 있어야 저장 가능 상태가 된다. 서버 재시작으로 녹화가 중단되면 완료로 처리하지 않는다. 전송 완료 응답이 없는 녹화본은 자동 복구할 수 없으며, 원본을 확인하고 무효 처리한 뒤 다음 Episode를 시작한다. Episode당 최대 64MB, 수집당 최대 100개 Episode를 보관한다.
 
-실시간 전송과 PC 조회는 약 100ms 간격이며 실제 속도는 네트워크와 브라우저에 따라 달라진다. 1.5초 이상 오래된 손 프레임은 화면에서 숨긴다. 실제 Dataset 생성과 외골격·카메라 수집은 별도 어댑터가 필요하다.
+실시간 손 미리보기는 같은 LAN에서 WebRTC DataChannel 직접 연결을 우선 사용해 최대 60Hz 전송한다. PC는 각 화면 갱신 주기에 도착한 최신 프레임만 반영한다. 실제 속도는 Quest의 XR 프레임 주기와 네트워크·브라우저에 따라 달라진다. 전송 버퍼가 차면 미리보기만 버려 오래된 동작이 쌓이지 않게 한다. 직접 연결에 실패하면 WebSocket 중계로 전환하고, WebSocket도 끊기면 자동 재연결과 HTTP 미리보기·조회로 대체한다. 1.5초 이상 오래된 손 프레임은 화면에서 숨긴다. 실제 Dataset 생성과 외골격·카메라 녹화 수집은 별도 어댑터가 필요하다.
 
 수집을 만들지 않는 임시 실시간 미리보기는 `/collect/quest?view=pc`에서 별도로 사용할 수 있다. 이 임시 모드는 녹화하지 않으며 최신 프레임만 메모리에 보관한다.
 
@@ -78,7 +79,15 @@ node scripts/verify-quest-collection.mjs
 
 WebXR 하드웨어 API만 모사하며 frontend, HTTP 통신과 파일 저장은 실제 구현을 사용한다. Quest 기기의 브라우저 권한과 센서 동작은 실기기에서 별도로 확인해야 한다.
 
+### 손 추적 지연 개선
 
-### 머리 자세 보존
+- 미리보기는 녹화 중에도 독립적으로 전송한다. 저장을 마친 과거 배치가 최신 손 위치를 덮어쓰지 않는다.
+- 녹화 원본은 HTTP로 최대 64개씩 전송한다. 첫 배치는 50ms 이내 예약하며, 응답 뒤 대기열이 남아 있으면 추가 100ms 대기 없이 계속 비운다. 원본 큐는 기존 600개 상한과 유실 카운터를 유지한다. 네트워크가 장시간 중단되면 원본 유실 가능성은 남는다.
+- PC의 메타데이터는 약 1초마다 별도로 갱신한다. 메타데이터 응답 대기가 손 위치 갱신을 막지 않는다.
+- HTTPS 접속 주소와 연결 코드는 그대로 사용한다. gateway와 Vite를 재시작하고 PC·Quest 페이지를 새로고침해야 새 WebSocket 프록시가 적용된다. 진행 중인 Episode는 먼저 정지·저장한다.
+- 같은 LAN에서는 기존 HTTPS 페이지로 접속한 뒤 인증된 WebSocket으로 연결 정보만 교환하고 손 미리보기는 Quest↔PC WebRTC로 직접 보낸다. 외부 STUN/TURN이나 Quest 앱·인증서 설치는 사용하지 않는다. AP의 클라이언트 격리, 방화벽, 브라우저의 로컬 네트워크 제한 때문에 직접 연결이 안 되면 중계 연결로 동작한다.
+- 직접 미리보기는 순서를 기다리거나 손실 패킷을 재전송하지 않는다. 역순 프레임과 전송 버퍼가 찬 시점의 프레임은 버린다. 녹화 원본 전송에는 이 정책을 적용하지 않는다.
+- 중계 연결도 서버·PC 수신 ACK 전에는 다음 프레임을 쌓지 않는다. 브라우저의 `bufferedAmount`만 확인할 때 보이지 않던 프록시 적체를 제한한다. 직접 연결 중에도 준비 상태와 대체 미리보기를 위해 서버로 약 5Hz의 최신 프레임을 보낸다.
+- 손 뷰어의 `직접 연결 · 왕복 Nms`로 현재 경로와 왕복 시간을 확인한다. 왕복 시간은 같은 PC 시계로 측정한 DataChannel ping/pong이며 센서 처리나 디스플레이 지연은 포함하지 않는다. `중계 연결`이면 직접 연결에 성공하지 못했거나 재연결 중이다.
 
-손 관절과 같은 local-floor 프레임의 머리 위치·회전을 `viewerPose`로 전달하고 HTTP/NDJSON 녹화에 보존한다. binary v1은 손 전용이며 시뮬레이터는 같은 원본 프레임의 부가 필드를 함께 유지한다.
+`node scripts/verify-quest-collection.mjs`는 Chrome의 별도 PC·Quest 컨텍스트에서 XR 하드웨어만 모사하고 실제 WebRTC, WebSocket, HTTP, 파일 저장을 검사한다. `QUEST_VERIFY_DIRECT=0`으로 WebRTC를 비활성화한 대체 경로도 검사할 수 있다. 기본적으로 녹화 요청에 120ms 지연을 추가한다(`QUEST_VERIFY_BATCH_DELAY_MS`로 변경). 4초 동안 수신 FPS와 모사 XR 프레임 생성부터 PC DOM 반영까지의 p50/p95를 `artifacts/quest-collection-test-*/latency.json`에 남기며, 원본 sequence 연속성과 저장 후 새로고침을 확인한다. 같은 Mac의 로컬 실험이므로 실제 Quest 센서 지연이나 Funnel을 포함한 측정값이 아니다.

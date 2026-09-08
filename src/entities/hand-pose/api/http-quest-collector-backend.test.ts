@@ -12,6 +12,7 @@ describe('HTTP Quest collector', () => {
 
   it('페어링 토큰을 사용해 프리뷰를 보내고 종료 후 전송을 멈춘다', async () => {
     vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', undefined); // WebSocket이 없는 환경의 HTTP 대체 경로
     const fetcher = vi.fn((_url: string, init?: RequestInit) => Promise.resolve(Response.json(
       _url.endsWith('/pair') ? { sessionId: 'session-1', senderToken: 'sender-secret' }
         : _url.endsWith('/frames') ? { receivedTimestampMs: Date.now() }
