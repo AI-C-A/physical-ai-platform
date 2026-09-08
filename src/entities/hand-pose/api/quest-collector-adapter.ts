@@ -471,6 +471,7 @@ export class QuestCollectorAdapter implements QuestCollectorPort {
         coordinateFrame: 'quest-local-floor',
         frameEpoch: this.#frameEpoch,
         hands: observation.hands,
+        ...(observation.viewerPose === undefined ? {} : { viewerPose: observation.viewerPose }),
       };
       this.#sequence = (this.#sequence + 1) >>> 0;
       this.#queue.enqueue(frame);

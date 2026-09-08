@@ -116,7 +116,14 @@ export class InMemoryQuestCollectorBackend implements QuestCollectorBackendPort 
     readonly payload: ArrayBuffer;
   }): Promise<{ readonly receivedTimestampMs: number }> {
     this.#assertConnected();
-    const frames = decodeHandPoseBatch(input.payload);
+    const frames = decodeHandPoseBatch(input.payload).map((frame, index) => {
+      const source = input.frames[index];
+      if (source === undefined || source.sequence !== frame.sequence || source.frameEpoch !== frame.frameEpoch
+        || source.sessionId !== frame.sessionId || source.episodeId !== frame.episodeId
+        || source.sourceDeviceId !== frame.sourceDeviceId) throw new Error('Hand Pose 원본과 binary 프레임이 일치하지 않습니다.');
+      // binary v1에 없는 머리 자세는 같은 원본 프레임의 부가 필드로 유지한다.
+      return { ...frame, ...(source.viewerPose === undefined ? {} : { viewerPose: source.viewerPose }) };
+    });
     if (frames.length !== input.frames.length) throw new Error('Hand Pose batch frame 수가 일치하지 않습니다.');
     if (frames.some((frame) => (
       frame.sessionId !== input.pairing.sessionId
@@ -154,6 +161,7 @@ export class InMemoryQuestCollectorBackend implements QuestCollectorBackendPort 
         deviceTimestampMs: last.deviceMonotonicTimestampMs,
         receivedTimestampMs,
         hands: last.hands,
+        ...(last.viewerPose === undefined ? {} : { viewerPose: last.viewerPose }),
       },
       frames: retainedFrames,
     });
@@ -173,6 +181,7 @@ export class InMemoryQuestCollectorBackend implements QuestCollectorBackendPort 
       receivedTimestampMs,
       coordinateFrame: 'quest-local-floor',
       hands: input.observation.hands,
+      ...(input.observation.viewerPose === undefined ? {} : { viewerPose: input.observation.viewerPose }),
     });
     return { receivedTimestampMs };
   }
@@ -241,6 +250,7 @@ export class InMemoryQuestCollectorBackend implements QuestCollectorBackendPort 
         deviceTimestampMs: frame.deviceMonotonicTimestampMs,
         receivedTimestampMs,
         hands: frame.hands,
+        ...(frame.viewerPose === undefined ? {} : { viewerPose: frame.viewerPose }),
       } satisfies CollectionHandPoseFrame;
     });
     if (timeline !== null) this.#episodeTimeline.set(episodeId, timeline);

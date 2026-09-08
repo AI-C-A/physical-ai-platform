@@ -1257,6 +1257,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       deviceTimestampMs: input.deviceTimestampMs,
       receivedTimestampMs: input.receivedTimestampMs,
       hands: input.hands,
+      ...(input.viewerPose === undefined ? {} : { viewerPose: input.viewerPose }),
     });
     this.#notifyCollector(session.id, input.sourceDeviceId);
   }

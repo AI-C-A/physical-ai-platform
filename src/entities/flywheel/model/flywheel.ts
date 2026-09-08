@@ -289,6 +289,10 @@ export interface CollectionHandPoseObservation {
 
 /** Latest raw Quest pose used only for live/replay visualization. */
 export interface CollectionHandPoseTelemetry {
+  readonly viewerPose?: {
+    readonly positionMeters: readonly [number, number, number];
+    readonly orientationQuaternion: readonly [number, number, number, number];
+  } | null;
   readonly coordinateFrame: 'quest-local-floor';
   readonly deviceTimestampMs: number;
   readonly receivedTimestampMs: number;
@@ -817,6 +821,7 @@ export interface HandPosePreviewInput {
   readonly deviceTimestampMs: number;
   readonly receivedTimestampMs: number;
   readonly coordinateFrame: 'quest-local-floor';
+  readonly viewerPose?: CollectionHandPoseTelemetry['viewerPose'];
   readonly hands: CollectionHandPoseTelemetry['hands'];
 }
 

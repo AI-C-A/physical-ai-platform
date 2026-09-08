@@ -147,7 +147,7 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
         const episodeOffsetMs = Math.max(episode.lastOffsetMs, episode.epochOffsetMs + frame.deviceMonotonicTimestampMs - episode.epochDeviceTimestampMs);
         const stored = { sequence: frame.sequence, frameEpoch: frame.frameEpoch, episodeOffsetMs,
           coordinateFrame: 'quest-local-floor', deviceTimestampMs: frame.deviceMonotonicTimestampMs,
-          receivedTimestampMs: nowMs(), hands: frame.hands };
+          receivedTimestampMs: nowMs(), hands: frame.hands, viewerPose: frame.viewerPose };
         retained.push(stored);
         episode.lastSequence = frame.sequence;
         episode.lastOffsetMs = episodeOffsetMs;

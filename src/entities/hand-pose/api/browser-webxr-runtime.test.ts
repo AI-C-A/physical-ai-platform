@@ -75,6 +75,10 @@ describe('BrowserWebXrRuntime', () => {
     const scheduledFrame = animationFrame as ((time: number, frame: unknown) => void) | null;
     if (scheduledFrame === null) throw new Error('WebXR animation frame이 예약되지 않았습니다.');
     scheduledFrame(123.5, {
+      getViewerPose: () => ({ transform: {
+        position: { x: 0.2, y: 1.65, z: 0.1 },
+        orientation: { x: 0, y: 0.707, z: 0, w: 0.707 },
+      } }),
       getJointPose: (joint: unknown) => ({
         transform: {
           position: { x: 0.1, y: 1.2, z: -0.3 },
@@ -85,12 +89,16 @@ describe('BrowserWebXrRuntime', () => {
     });
     expect(observations[0]).toMatchObject({
       deviceMonotonicTimestampMs: 123.5,
+      viewerPose: { positionMeters: [0.2, 1.65, 0.1], orientationQuaternion: [0, 0.707, 0, 0.707] },
       hands: {
         left: { sourcePresent: true, poseObserved: true },
         right: { sourcePresent: false, poseObserved: false, joints: [] },
       },
     });
     expect(observations[0]?.hands.left.joints).toHaveLength(25);
+
+    scheduledFrame(124, { getViewerPose: () => null });
+    expect(observations[1]?.viewerPose).toBeNull();
 
     await active.end();
     expect(end).toHaveBeenCalledOnce();

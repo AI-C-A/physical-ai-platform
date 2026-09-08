@@ -123,7 +123,16 @@ function readFrameObservation(
     if (inputSource.hand === null || inputSource.hand === undefined) continue;
     hands[handedness] = observeHand(frame, inputSource.hand, referenceSpace);
   }
-  return { deviceMonotonicTimestampMs, hands };
+  const getViewerPose = getFunction<(space: unknown) => unknown>(frame, 'getViewerPose');
+  const rawViewer = getViewerPose?.call(frame, referenceSpace);
+  const transform = isRecord(rawViewer) ? rawViewer.transform : null;
+  const position = isRecord(transform) ? readVector(transform.position, ['x', 'y', 'z']) : null;
+  const orientation = isRecord(transform) ? readVector(transform.orientation, ['x', 'y', 'z', 'w']) : null;
+  const viewerPose = position !== null && orientation !== null && orientation.some((value) => value !== 0)
+    ? { positionMeters: position as readonly [number, number, number],
+      orientationQuaternion: orientation as readonly [number, number, number, number] }
+    : null;
+  return { deviceMonotonicTimestampMs, hands, viewerPose };
 }
 
 function getXrSystem(): UnknownRecord | null {

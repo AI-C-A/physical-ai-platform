@@ -91,12 +91,16 @@ test('25개 관절의 좌표를 전달하고 잘못된 프레임은 최근 데�
     ...['index', 'middle', 'ring', 'pinky'].flatMap((finger) => ['metacarpal', 'phalanx-proximal',
       'phalanx-intermediate', 'phalanx-distal', 'tip'].map((part) => `${finger}-finger-${part}`))];
   const frame = structuredClone(observation);
+  frame.viewerPose = { positionMeters: [0, 1.65, 0], orientationQuaternion: [0, 0, 0, 1] };
   frame.hands.left = {
     sourcePresent: true, poseObserved: true,
     joints: names.map((name) => ({ name, positionMeters: [0.1, 1.2, -0.3], orientationQuaternion: [0, 0, 0, 1], radiusMeters: 0.008 })),
   };
   await request(`${path}/frames`, 'POST', sender.senderToken, frame);
   assert.deepEqual((await request(path, 'GET', session.viewerToken)).body.frame.hands.left, frame.hands.left);
+  assert.deepEqual((await request(path, 'GET', session.viewerToken)).body.frame.viewerPose, frame.viewerPose);
+  assert.equal((await request(`${path}/frames`, 'POST', sender.senderToken,
+    { ...frame, viewerPose: { ...frame.viewerPose, orientationQuaternion: [0, 0, 0, 0] } })).status, 400);
   frame.hands.left.joints[0].positionMeters[0] = null;
   assert.equal((await request(`${path}/frames`, 'POST', sender.senderToken, frame)).status, 400);
   frame.hands.left.joints = [];

@@ -58,6 +58,10 @@ export interface HandPoseFrame {
   readonly coordinateFrame: 'quest-local-floor';
   /** immersive session 재시작 시 증가하여 같은 monotonic clock 구간을 구분한다. */
   readonly frameEpoch: number;
+  readonly viewerPose?: {
+    readonly positionMeters: readonly [number, number, number];
+    readonly orientationQuaternion: readonly [number, number, number, number];
+  } | null;
   readonly hands: Readonly<Record<Handedness, HandPoseObservation>>;
 }
 
@@ -135,6 +139,10 @@ export interface QuestCollectorSnapshot {
 
 export interface WebXrFrameObservation {
   readonly deviceMonotonicTimestampMs: number;
+  readonly viewerPose?: {
+    readonly positionMeters: readonly [number, number, number];
+    readonly orientationQuaternion: readonly [number, number, number, number];
+  } | null;
   readonly hands: Readonly<Record<Handedness, HandPoseObservation>>;
 }
 

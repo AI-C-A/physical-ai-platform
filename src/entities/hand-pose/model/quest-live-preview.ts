@@ -17,6 +17,7 @@ export interface QuestLiveSnapshot {
     readonly coordinateFrame: 'quest-local-floor';
     readonly deviceTimestampMs: number;
     readonly receivedTimestampMs: number;
+    readonly viewerPose?: Exclude<WebXrFrameObservation['viewerPose'], undefined>;
     readonly hands: WebXrFrameObservation['hands'];
   } | null;
 }

@@ -81,7 +81,15 @@ function validateObservation(observation) {
     });
     hands[side] = { sourcePresent: hand.sourcePresent, poseObserved: hand.poseObserved, joints };
   }
-  return { deviceMonotonicTimestampMs: observation.deviceMonotonicTimestampMs, hands };
+  const pose = observation.viewerPose;
+  if (pose != null && (!vector(pose.positionMeters, 3) || !vector(pose.orientationQuaternion, 4)
+    || !pose.orientationQuaternion.some((value) => value !== 0))) {
+    throw new RelayError(400, '머리 위치 데이터가 올바르지 않습니다.');
+  }
+  return { deviceMonotonicTimestampMs: observation.deviceMonotonicTimestampMs, hands,
+    ...(pose === undefined ? {} : { viewerPose: pose === null ? null : {
+      positionMeters: pose.positionMeters, orientationQuaternion: pose.orientationQuaternion,
+    } }) };
 }
 
 export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory = resolve(process.env.QUEST_COLLECTION_DATA_DIR ?? 'data/quest') } = {}) {
@@ -246,7 +254,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
         const observation = validateObservation(await readJson(request));
         session.frame = {
           coordinateFrame: 'quest-local-floor', deviceTimestampMs: observation.deviceMonotonicTimestampMs,
-          receivedTimestampMs: now, hands: observation.hands,
+          receivedTimestampMs: now, hands: observation.hands, viewerPose: observation.viewerPose,
         };
         session.sourceState = 'ready';
         session.lastSeenAtMs = now;

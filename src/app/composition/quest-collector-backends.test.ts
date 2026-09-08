@@ -48,6 +48,7 @@ describe('Quest collector vertical flow', () => {
         right: { poseObserved: true, sourcePresent: true },
       },
     });
+    expect(previewTelemetry?.handPose?.viewerPose?.positionMeters).toEqual([0, 1.6, 0]);
     expect(previewTelemetry?.streams.find((stream) => stream.streamId === 'quest-hand-left'))
       .toMatchObject({ sampleCount: 0, handTracking: { validJointCount: 25 } });
     expect(collector.getSnapshot().backend.sentFrameCount).toBe(0);
@@ -103,7 +104,7 @@ describe('Quest collector vertical flow', () => {
     expect(telemetry?.handPose?.hands.right.joints).toHaveLength(25);
     const firstHandFrame = await flywheel.getEpisodeHandPoseAt(episode.id, 0);
     const latestBeforeRestart = await flywheel.getEpisodeHandPoseAt(episode.id, Number.MAX_SAFE_INTEGER);
-    expect(firstHandFrame).toMatchObject({ sequence: 0, episodeOffsetMs: 0 });
+    expect(firstHandFrame).toMatchObject({ sequence: 0, episodeOffsetMs: 0, viewerPose: { positionMeters: [0, 1.6, 0] } });
     expect(latestBeforeRestart?.episodeOffsetMs).toBeGreaterThan(0);
     await expect(flywheel.getEpisodeHandPoseAt(episode.id, -1)).resolves.toBeNull();
     expect(telemetry?.streams.find((stream) => stream.streamId === 'head-depth-estimated')).toMatchObject({

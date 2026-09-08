@@ -101,6 +101,8 @@ export class SimulatedWebXrRuntime implements WebXrRuntimePort {
       };
       onFrame({
         deviceMonotonicTimestampMs: startedAt + frame * (1_000 / 30),
+        // 모사 손 위치를 약간 내려다보는 머리 자세도 같은 기준 좌표계로 제공한다.
+        viewerPose: { positionMeters: [0, 1.6, 0], orientationQuaternion: [-Math.sin(0.4), 0, 0, Math.cos(0.4)] },
         hands: { left: makeObservation('left'), right: makeObservation('right') },
       });
     }, 1_000 / 30);

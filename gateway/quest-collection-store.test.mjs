@@ -65,3 +65,13 @@ test('원본 없는 녹화는 전송 완료 응답이 와도 저장할 수 없�
   await assert.rejects(store.command(id, 'save-episode', { episodeId }), /전송이 끝난/);
   assert.equal((await store.get(id)).episodes[0].status, 'finalizing');
 });
+
+
+test('머리 자세를 손 프레임과 같은 시각으로 저장하고 재생한다', async (t) => {
+  const { directory, store, id, episodeId, frame } = await setup(t);
+  const viewerPose = { positionMeters: [0.2, 1.65, 0], orientationQuaternion: [0, 0.707, 0, 0.707] };
+  await store.appendFrames(id, [{ ...frame(0), viewerPose }, { ...frame(1), viewerPose: null }]);
+  const reopened = createQuestCollectionStore(directory);
+  assert.deepEqual((await reopened.poseAt(id, episodeId, 0)).viewerPose, viewerPose);
+  assert.equal((await reopened.poseAt(id, episodeId, 100)).viewerPose, null);
+});

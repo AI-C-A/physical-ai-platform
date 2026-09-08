@@ -77,3 +77,8 @@ node scripts/verify-quest-collection.mjs
 수집 브라우저 검증은 자체 임시 gateway와 Real frontend를 실행하고 종료한다. 별도 PC·Quest 브라우저 컨텍스트에서 **새 수집 → 세션 생성 → 페어링 → 수집 콘솔 → 녹화 → 정지·저장 → PC 새로고침**을 수행하고 실제 NDJSON 파일 생성을 확인한다. 화면 캡처와 원본은 `artifacts/quest-collection-test-<timestamp>/`에 생성한다.
 
 WebXR 하드웨어 API만 모사하며 frontend, HTTP 통신과 파일 저장은 실제 구현을 사용한다. Quest 기기의 브라우저 권한과 센서 동작은 실기기에서 별도로 확인해야 한다.
+
+
+### 머리 자세 보존
+
+손 관절과 같은 local-floor 프레임의 머리 위치·회전을 `viewerPose`로 전달하고 HTTP/NDJSON 녹화에 보존한다. binary v1은 손 전용이며 시뮬레이터는 같은 원본 프레임의 부가 필드를 함께 유지한다.
