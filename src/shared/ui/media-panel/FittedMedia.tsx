@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { cn } from '@/shared/ui/class-names';
 
-/** 카드 내부가 아니라 카드 바깥에 여유 공간을 둔다. 헤더가 줄바꿈해도 영상은 16:9다. */
-export function FittedMedia({ children, className, constrained = true }: {
+/** 카드 내부가 아니라 카드 바깥에 여유 공간을 둔다. 헤더가 줄바꿈해도 영상은 지정한 원본 비율을 유지한다. */
+export function FittedMedia({ children, className, constrained = true, aspectRatio = 16 / 9 }: {
   readonly children: ReactNode;
   readonly className?: string;
   readonly constrained?: boolean;
+  readonly aspectRatio?: number;
 }) {
   const slotRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -24,7 +25,7 @@ export function FittedMedia({ children, className, constrained = true }: {
       for (let pass = 0; pass < 8; pass += 1) {
         card.style.width = `${String(width)}px`;
         const chrome = card.getBoundingClientRect().height - viewport.getBoundingClientRect().height;
-        const next = Math.min(width, Math.max(0, (slot.clientHeight - chrome) * 16 / 9));
+        const next = Math.min(width, Math.max(0, (slot.clientHeight - chrome) * aspectRatio));
         if (Math.abs(next - width) < 0.5) break;
         width = next;
       }
@@ -42,7 +43,7 @@ export function FittedMedia({ children, className, constrained = true }: {
       cancelAnimationFrame(frame);
       card.style.width = '';
     };
-  }, [constrained]);
+  }, [constrained, aspectRatio]);
 
   return (
     <div className={cn('flex min-h-0 min-w-0 items-start justify-center', constrained ? 'h-full' : undefined, className)} data-fitted-media ref={slotRef}>
