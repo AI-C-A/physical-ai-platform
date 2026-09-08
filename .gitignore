@@ -27,3 +27,6 @@ data/quest/
 id_rsa
 id_ed25519
 id_ecdsa
+
+# macOS 로컬 폴더 메타데이터
+.DS_Store
