@@ -15,7 +15,7 @@ export function getSegmentationPythonCandidates({
   const virtualEnvironmentDirectory = platform === 'win32' ? 'Scripts' : 'bin';
   return [
     selectedInterpreter?.trim() || null,
-    path.join(
+    (platform === 'win32' ? path.win32 : path.posix).join(
       repositoryDirectory,
       '.venv',
       virtualEnvironmentDirectory,

@@ -8,7 +8,7 @@ test('Windows에서 프로젝트 가상환경과 시스템 Python을 순서대�
     getSegmentationPythonCandidates({
       platform: 'win32',
       repositoryDirectory: 'C:\\workspace\\frontend',
-      selectedInterpreter: undefined,
+      selectedInterpreter: '',
     }),
     [
       'C:\\workspace\\frontend\\.venv\\Scripts\\python.exe',
