@@ -5,6 +5,7 @@ import { Input } from '@/shared/ui/input';
 import { StatusIndicator } from '@/shared/ui/status-indicator';
 
 import { cameraEndpoint, connectCollectionCamera, type CollectionCameraConnection } from './collection-camera-connection';
+import { BrowserCameraPanel } from './BrowserCameraPanel';
 
 function CameraSource({ label }: { readonly label: string }) {
   const [address, setAddress] = useState('');
@@ -81,10 +82,11 @@ function CameraSource({ label }: { readonly label: string }) {
   );
 }
 
-export function CollectionCameraPanel() {
+export function CollectionCameraPanel({ sessionId }: { readonly sessionId?: string }) {
   return (
     <section aria-label="시연 카메라" className="grid gap-3">
-      <details open>
+      {sessionId ? <BrowserCameraPanel key={sessionId} sessionId={sessionId} /> : null}
+      <details open={sessionId === undefined}>
       <summary className="cursor-pointer py-2 text-xs text-muted">외부 WebRTC 주소로 연결</summary>
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold">시연 카메라</h2>

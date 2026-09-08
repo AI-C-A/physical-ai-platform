@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createQuestStream } from './quest-stream.mjs';
 import { createQuestCollectionStore } from './quest-collection-store.mjs';
+import { createCameraRelay } from './camera-relay.mjs';
 
 const basePath = '/api/quest';
 const lifetimeMs = 60 * 60 * 1_000;
@@ -167,6 +168,17 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
     && relay.frame?.hands.left.poseObserved === true && relay.frame?.hands.right.poseObserved === true
     && nowMs() - relay.frame.receivedTimestampMs <= staleAfterMs;
 
+  const handleCameraRequest = createCameraRelay({ nowMs,
+    iceServers: JSON.parse(process.env.CAMERA_ICE_SERVERS ?? '[]'),
+    authorizeCollection: async (id, authorization) => {
+      if (typeof id !== 'string' || !/^[a-f0-9]{64}$/u.test(id)) return false;
+      const record = await collections.get(id);
+      if (!record || record.stoppedAtMs !== null) return false;
+      if (authorization === undefined) return true;
+      return authorization === `Bearer ${publicCollection(record).viewerToken}`;
+    },
+  });
+
   function limit(request, now) {
     const address = request.socket.remoteAddress;
     const attempt = attempts.get(address) ?? { count: 0, until: now + 60_000 };
@@ -178,6 +190,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
   }
 
   const handleQuestRequest = async (request, response) => {
+    if (await handleCameraRequest(request, response)) return true;
     const url = new URL(request.url ?? '/', 'http://relay.internal');
     if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return false;
     try {

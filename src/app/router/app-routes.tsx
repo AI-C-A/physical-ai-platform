@@ -18,6 +18,7 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { ROUTE_PATHS } from './route-paths';
 
 const FlywheelPages = () => import('@/pages/mlops/flywheel');
+const CameraCollectorPage = lazy(async () => ({ default: (await import('@/pages/collect/camera')).CameraCollectorPage }));
 const QuestCollectorPage = lazy(async () => ({
   default: (await import('@/pages/collect/quest')).QuestCollectorPage,
 }));
@@ -133,6 +134,7 @@ function PlatformShellRoute() {
 }
 
 export const APP_ROUTES: RouteObject[] = [
+  { path: ROUTE_PATHS.collectCamera, element: <CameraCollectorPage />, errorElement: <RouteErrorBoundary /> },
   {
     path: ROUTE_PATHS.collectQuest,
     element: <QuestCollectorPage />,

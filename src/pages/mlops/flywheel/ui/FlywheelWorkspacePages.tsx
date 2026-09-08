@@ -86,6 +86,7 @@ import type { CollectionSetupContext } from './NewCollectionDialog';
 import { createCollectionSessionExportRecord } from './flywheel-export-records';
 import { QuestPairingPanel } from './QuestPairingPanel';
 import { CollectionCameraPanel } from './CollectionCameraPanel';
+import { BrowserCameraWorkspace } from './BrowserCameraPanel';
 import { useAutomaticPreflight } from './use-automatic-preflight';
 import { collectionPreviewState } from './collection-preview-state';
 import type { MediaStreamState } from '@/shared/ui/media-panel';
@@ -1185,6 +1186,7 @@ export function CollectionConnectionPage() {
 }
 
 export function HumanoidCollectionDetailPage() {
+  const [cameraSettingsTarget, setCameraSettingsTarget] = useState<HTMLDivElement | null>(null);
   const { sessionId = '' } = useParams();
   const now = useNow();
   const port = useFlywheelPort();
@@ -1194,7 +1196,7 @@ export function HumanoidCollectionDetailPage() {
   const sessionQuery = useFlywheelQuery(loadSession);
   const automaticPreflight = useAutomaticPreflight(sessionQuery.status === 'ready' ? sessionQuery.data : null);
   const episodesQuery = useFlywheelQuery(loadEpisodes);
-  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(() => port.collectionMode !== 'quest-hands');
   const [detailsTab, setDetailsTab] = useState('session');
   const closeDetails = () => {
     setDetailsOpen(false);
@@ -1484,6 +1486,7 @@ export function HumanoidCollectionDetailPage() {
                 <div className={reviewEpisode === null
                   ? 'h-full min-h-0'
                   : 'collection-review-layout grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2'}>
+                  <BrowserCameraWorkspace settingsTarget={cameraSettingsTarget} {...(port.collectionMode === 'quest-hands' && reviewEpisode === null && session.stoppedAtMs === null ? { sessionId: session.id } : {})}>
                   <SessionCollectionPreview
                     ariaLabel={recordedPreview ? 'Episode 기록 미리보기' : '실시간 수집 모니터'}
                     cameraSources={cameraSources}
@@ -1495,6 +1498,7 @@ export function HumanoidCollectionDetailPage() {
                     telemetry={telemetry}
                     previewStates={previewStates}
                   />
+                  </BrowserCameraWorkspace>
 
                   {reviewEpisode === null ? null : (
                     <PlaybackBar
@@ -1593,7 +1597,12 @@ export function HumanoidCollectionDetailPage() {
                         </Dialog>
                       )} />
                       {session.humanDemonstration === null ? null : <CollectorCommandStatus binding={session.humanDemonstration} />}
-                      {session.humanDemonstration === null || session.stoppedAtMs !== null ? null : <CollectionCameraPanel key={session.id} />}
+                      {session.humanDemonstration === null || session.stoppedAtMs !== null ? null : <>
+                        {port.collectionMode === 'quest-hands' && reviewEpisode === null ? <Dialog title="카메라 연결" cancelLabel="닫기" trigger={<Button variant="secondary">카메라 연결</Button>}>
+                          <div ref={setCameraSettingsTarget} />
+                        </Dialog> : null}
+                        {port.collectionMode === 'quest-hands' ? null : <CollectionCameraPanel key={session.id} />}
+                      </>}
                     </div>
                 </RailTabPanel>
                 <RailTabPanel value="issues" labelledBy="collection-tab-issues">{issuesContent}</RailTabPanel>

@@ -188,3 +188,26 @@
   .collection-details-rail { position: sticky; top: 0; grid-column: 2; grid-row: 1 / span 2; }
   .collection-inspector-tabs [role='tabpanel'] { overflow: visible; }
 }
+
+/* 관제 그리드처럼 전체 높이를 분배하고 마지막 행도 남은 타일로 채운다. */
+.collection-camera-grid {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--grid-rows-compact), minmax(0, 1fr));
+}
+.collection-camera-tile {
+  grid-column: span var(--tile-span-compact);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.375rem;
+}
+@container (min-width: 44rem) {
+  .collection-camera-grid { grid-template-rows: repeat(var(--grid-rows), minmax(0, 1fr)); }
+  .collection-camera-tile { grid-column: span var(--tile-span); }
+}
+@media (width < 56rem) {
+  .collection-camera-grid { height: max(65dvh, calc(var(--grid-rows-compact) * 12rem)); }
+}

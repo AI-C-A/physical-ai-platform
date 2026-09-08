@@ -28,6 +28,7 @@
     "test:e2e:soak": "npm run build && playwright test e2e/telemetry-video-soak.spec.ts --project=chrome-1440 --config=playwright.soak.config.ts",
     "verify": "npm run typecheck && npm run lint && npm run check:design-system && npm run check:repository-safety && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation",
     "verify:browser": "npm run test:e2e",
+    "verify:cameras": "node scripts/verify-browser-cameras.mjs",
     "preview": "vite preview --configLoader runner"
   },
   "dependencies": {

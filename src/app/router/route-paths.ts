@@ -1,6 +1,7 @@
 export const ROUTE_PATHS = {
   root: '/',
   collectQuest: '/collect/quest',
+  collectCamera: '/collect/camera',
   controlMonitoring: '/control/monitoring',
   controlMultiRobotMonitoring: '/control/monitoring/multi',
   controlRobotMonitoring: '/control/monitoring/:robotId',
