@@ -6,8 +6,11 @@ import { FittedMedia, MediaPanel } from '@/shared/ui/media-panel';
 import { Input } from '@/shared/ui/input';
 import { Select } from '@/shared/ui/select';
 import { StatusIndicator } from '@/shared/ui/status-indicator';
+import { CameraAnalysisCard } from './CameraAnalysisCard';
 
-function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tileStyle }: {
+function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tileStyle, analysisStyle, visible }: {
+  readonly analysisStyle: CSSProperties;
+  readonly visible: boolean;
   readonly tileStyle: CSSProperties;
   readonly camera: CameraBinding;
   readonly managementTarget: HTMLDivElement | null;
@@ -89,6 +92,7 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tile
         onLoadedMetadata={(event) => updateAspectRatio(event.currentTarget)} onResize={(event) => updateAspectRatio(event.currentTarget)}
         onPlaying={() => { if (!paused) { setPlaying(true); setError(null); } }} onWaiting={() => setPlaying(false)} onPause={() => setPlaying(false)} />
     </div></MediaPanel></FittedMedia></div>
+    <div className="collection-camera-tile" style={analysisStyle}><CameraAnalysisCard key={`${camera.viewerToken}:${attempt}`} label={camera.label} role={camera.role} videoRef={videoRef} playing={visible && playing && !paused && state === 'connected'} rotation={rotation} /></div>
     {managementTarget ? createPortal(<section aria-label={`${camera.label} 설정`} className="grid gap-3 rounded-[var(--design-radius-control)] bg-layer-raised p-3">
       <header className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{camera.label}</h3><span className="text-xs text-muted">{cameraRoleLabel(camera.role)}</span></header>
       {paired ? <StatusIndicator label={paused ? '미리보기 정지' : playing ? '영상 수신 중' : state === 'error' ? '연결 오류' : '영상 수신 대기'} tone={state === 'error' ? 'warning' : 'neutral'} /> : null}
@@ -146,7 +150,7 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget }: { rea
     } catch (cause) { setError(cause instanceof Error ? cause.message : '카메라를 추가하지 못했습니다.'); }
     finally { busy.current = false; setPending(false); }
   };
-  const count = cameras.length + 1;
+  const count = cameras.length * 2 + 1;
   const columns = Math.min(4, Math.ceil(Math.sqrt(count)));
   const compactColumns = count <= 2 ? 1 : 2;
   const tileStyle = (index: number): CSSProperties => {
@@ -172,7 +176,7 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget }: { rea
       {preview === undefined ? settings : settingsTarget ? createPortal(settings, settingsTarget) : null}
       <div className={preview === undefined ? 'hidden' : 'collection-camera-grid'} style={gridStyle} aria-label="수집 영상 그리드">
       {preview === undefined ? null : <div className="collection-camera-tile" style={tileStyle(0)} aria-label="손 추적 미리보기">{preview}</div>}
-      {cameras.map((camera, index) => <BrowserCameraCard tileStyle={tileStyle(index + 1)} key={camera.id} camera={camera} managementTarget={managementTarget}
+      {cameras.map((camera, index) => <BrowserCameraCard tileStyle={tileStyle(index * 2 + 1)} analysisStyle={tileStyle(index * 2 + 2)} visible={preview !== undefined} key={camera.id} camera={camera} managementTarget={managementTarget}
         onRemove={(id) => setCameras((current) => current.filter((item) => item.id !== id))}
         onReplace={(updated) => setCameras((current) => current.map((item) => item.id === updated.id ? updated : item))} />)}
       </div>

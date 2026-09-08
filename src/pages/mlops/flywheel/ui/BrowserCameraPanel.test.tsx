@@ -47,3 +47,13 @@ it('retries renewal after a network failure without displaying the expired code'
   await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
   expect(screen.getByLabelText('Head 연결 코드')).toHaveTextContent('654321');
 });
+
+it('adds role-specific analysis cards without opening duplicate camera peers', async () => {
+  vi.mocked(cameraRequest).mockResolvedValueOnce([camera, { ...camera, id: 'body', role: 'full-body', label: 'Body' }]);
+  await act(async () => { render(<BrowserCameraPanel sessionId="collection" preview={<div>Quest</div>} />); await Promise.resolve(); });
+  expect(screen.getByLabelText('Head 카메라')).toBeInTheDocument();
+  expect(screen.getByLabelText('Body 카메라')).toBeInTheDocument();
+  expect(screen.getByLabelText('Head · 세그멘테이션 + 핸드')).toBeInTheDocument();
+  expect(screen.getByLabelText('Body · 4D Humans')).toBeInTheDocument();
+  expect(startCameraPeer).toHaveBeenCalledTimes(2);
+});

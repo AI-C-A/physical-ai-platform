@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       '/api/quest': { target: 'http://127.0.0.1:8787', ws: true },
       '/api/integrations/patrol': 'http://127.0.0.1:8787',
+      '/api/perception/full-body': {
+        target: process.env.PERCEPTION_BODY_TARGET || 'http://127.0.0.1:8791',
+        rewrite: (path) => path.replace(/^\/api\/perception\/full-body/u, ''),
+      },
+      '/api/perception/head': {
+        target: process.env.PERCEPTION_HEAD_TARGET || 'http://127.0.0.1:8792',
+        rewrite: (path) => path.replace(/^\/api\/perception\/head/u, ''),
+      },
       '/api/segmentation': {
         target: 'http://127.0.0.1:8790',
         rewrite: (path) => path.replace(/^\/api\/segmentation/u, ''),

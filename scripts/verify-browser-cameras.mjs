@@ -23,6 +23,14 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true,
     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   const pc = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // 테스트용 PNG 응답으로 실제 GPU 없이 캡처→분석 카드 경로를 검증한다.
+  await pc.route('**/api/perception/*/infer', async (route) => {
+    const mode = route.request().url().includes('/full-body/') ? 'full-body' : 'head';
+    assert.equal(route.request().headers()['content-type'], 'image/jpeg');
+    assert.ok(route.request().postDataBuffer().length > 0);
+    await route.fulfill({ contentType: 'image/png', headers: { 'x-perception-mode': mode, 'x-detection-count': '0' },
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64') });
+  });
   pc.on('pageerror', (error) => errors.push(error.message));
   const origin = 'http://127.0.0.1:5201';
   const created = await pc.request.post(`${origin}/api/quest/collections`, { data: {
@@ -68,7 +76,13 @@ try {
   await expect(settings).toHaveCount(0);
   for (const sender of senders) {
     const { name } = sender;
+    const analysis = mainPreview.getByRole('region', { name: `${name} · ${name.startsWith('Head') ? '세그멘테이션 + 핸드' : '4D Humans'}`, exact: true });
+    await expect(analysis.getByText('분석 수신 중', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await analysis.getByRole('button', { name: `${name} 분석 정지` }).click();
+    await expect(analysis.locator('img')).not.toHaveAttribute('src');
     await expect(sender.card.getByText('영상 수신 중', { exact: true })).toBeVisible();
+    await analysis.getByRole('button', { name: `${name} 분석 시작` }).click();
+    await expect(analysis.getByText('분석 수신 중', { exact: true })).toBeVisible();
   }
   for (const sender of senders) {
     await expect(sender.card.locator('button, input, output')).toHaveCount(0);

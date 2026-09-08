@@ -1,0 +1,4 @@
+# RF-DETR와 4D Humans는 각각 별도 환경을 사용한다.
+mediapipe==0.10.21
+Pillow>=10.4,<12
+numpy>=1.26,<2

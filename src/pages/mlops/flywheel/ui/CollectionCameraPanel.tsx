@@ -5,9 +5,11 @@ import { Input } from '@/shared/ui/input';
 import { StatusIndicator } from '@/shared/ui/status-indicator';
 
 import { cameraEndpoint, connectCollectionCamera, type CollectionCameraConnection } from './collection-camera-connection';
+import { CameraAnalysisCard } from './CameraAnalysisCard';
+import type { CameraRole } from '@/entities/collection-camera';
 import { BrowserCameraPanel } from './BrowserCameraPanel';
 
-function CameraSource({ label }: { readonly label: string }) {
+function CameraSource({ label, role }: { readonly label: string; readonly role: CameraRole }) {
   const [address, setAddress] = useState('');
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const updateAspectRatio = (video: HTMLVideoElement) => {
@@ -69,6 +71,7 @@ function CameraSource({ label }: { readonly label: string }) {
           onWaiting={() => { if (connectionRef.current) setState('connecting'); }} />
         {state === 'live' ? null : <p className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs text-muted">{state === 'connecting' ? '카메라 영상 수신 대기 중' : '카메라를 연결하면 영상이 표시됩니다.'}</p>}
       </div>
+      {state === 'idle' ? null : <div className="h-64"><CameraAnalysisCard label={label} role={role} videoRef={videoRef} playing={state === 'live'} /></div>}
       <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); connect(); }}>
         <Input label={`${label} WebRTC 주소`} type="url" value={address} required disabled={active}
           placeholder="https://camera.example/head/whep" onChange={(event) => setAddress(event.target.value)} />
@@ -92,8 +95,8 @@ export function CollectionCameraPanel({ sessionId }: { readonly sessionId?: stri
         <h2 className="text-sm font-semibold">시연 카메라</h2>
         <p className="text-xs leading-5 text-muted">라즈베리파이 등에서 보내는 WebRTC 영상을 연결하세요. 실시간 확인용이며 Episode에는 영상이 저장되지 않습니다.</p>
       </div>
-      <CameraSource label="헤드캠" />
-      <CameraSource label="전신 카메라" />
+      <CameraSource label="헤드캠" role="head" />
+      <CameraSource label="전신 카메라" role="full-body" />
       </details>
     </section>
   );
