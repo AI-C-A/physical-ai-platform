@@ -61,15 +61,17 @@ PERCEPTION_SEGMENTATION_URL=http://127.0.0.1:8790/infer \
 
 ## Mac에서 연결
 
-프런트엔드 개발 서버를 시작할 때 데스크탑 LAN 주소를 지정한다. 아래 `desktop.local`을 실제 데스크탑 호스트명 또는 IP로 바꾼다:
+저장소 루트의 `.env.local`에 분석 서버 주소를 지정한다. 아래 `desktop.local`을 실제 데스크탑의 LAN 주소 또는 Tailscale IP·호스트명으로 바꾼다:
 
-```bash
-PERCEPTION_BODY_TARGET=http://desktop.local:8791 \
-PERCEPTION_HEAD_TARGET=http://desktop.local:8792 \
-  npm run dev:real
+```env
+SEGMENTATION_TARGET=http://desktop.local:8790
+PERCEPTION_BODY_TARGET=http://desktop.local:8791
+PERCEPTION_HEAD_TARGET=http://desktop.local:8792
 ```
 
-주소 변경 후 Vite를 재시작한다. 브라우저는 HTTPS 사이트의 `/api/perception/*`만 호출하고 Vite가 데스크탑으로 전달하므로 브라우저의 혼합 콘텐츠/CORS 문제를 피한다. 배포 시에도 같은 경로를 리버스 프록시해야 한다. Python 서비스는 인증 없는 개발용 서버이므로 8791·8792 접근은 Mac이 있는 신뢰 네트워크로 제한한다.
+`npm run dev:real`로 실행한다. `SEGMENTATION_TARGET`은 로봇 관제 화면의 프록시 주소이며, 헤드 분석 서버가 사용하는 `PERCEPTION_SEGMENTATION_URL`과 별개다. 헤드와 세그멘테이션 서버가 같은 PC에 있으면 후자는 `http://127.0.0.1:8790/infer`를 유지한다. 관제 화면에서도 원격 세그멘테이션에 접속한다면 8790도 Mac에서 접근할 수 있도록 바인딩한다.
+
+주소 변경 후 Vite를 재시작한다. 값이 없거나 비어 있으면 각 포트의 localhost를 사용한다. 실행 환경에 같은 변수가 있으면 `.env.local`보다 우선한다. 이 변수들은 `VITE_` 접두사가 없어 브라우저 코드에 환경변수로 노출되지 않는다. 브라우저는 HTTPS 사이트의 `/api/perception/*`만 호출하고 Vite가 데스크탑으로 전달하므로 브라우저의 혼합 콘텐츠/CORS 문제를 피한다. 배포 시에도 같은 경로를 리버스 프록시해야 한다. Python 서비스는 인증 없는 개발용 서버이므로 8791·8792 접근은 Mac이 있는 신뢰 네트워크로 제한한다.
 
 수집 콘솔의 연결된 카메라마다 **원본 → 분석** 카드가 추가된다. 헤드 역할은 세그멘테이션+핸드, 전신 역할은 4D Humans로 자동 선택한다. 각 분석 카드에서 독립적으로 정지/시작할 수 있고 원본 연결은 유지된다. 외부 WHEP 카메라도 분석 카드를 제공한다.
 

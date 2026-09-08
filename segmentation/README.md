@@ -2,6 +2,8 @@
 
 카메라 프레임을 RF-DETR-Seg로 처리하고 PNG mask와 label metadata를 반환하는 Python HTTP service다. frontend 개발 서버는 `/api/segmentation`을 기본 `http://127.0.0.1:8790`으로 전달한다.
 
+원격 서버를 사용할 때는 저장소 루트의 `.env.local`에 `SEGMENTATION_TARGET=http://서버주소:8790`을 입력한 뒤 Vite를 재시작한다. 서버주소에는 LAN 주소 또는 Tailscale IP·호스트명을 사용할 수 있다. `/infer`는 붙이지 않는다. 설정이 없거나 비어 있으면 기본 localhost 주소를 사용하며, 실행 환경의 같은 변수가 파일보다 우선한다.
+
 ## Python 환경
 
 저장소 루트에 가상환경을 만든다.
