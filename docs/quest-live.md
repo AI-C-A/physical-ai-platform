@@ -32,6 +32,20 @@ Vite가 `/api/quest`를 gateway로 전달한다. PC 수집 화면에서 서버 �
 
 ## Quest가 접속할 주소
 
+### 로컬 개발: Tailscale Funnel
+
+Mac에서 Tailscale에 로그인하고 HTTPS/Funnel 사용을 활성화한 뒤 `npm run dev:funnel`을 실행한다. frontend는 `npm run dev:real`로 5173 포트에서 실행한다. 포트가 이미 사용 중이면 기존 frontend를 중지한 뒤 다시 시작한다.
+
+Funnel이 출력하는 HTTPS 주소 뒤에 `/collect/quest`를 붙여 Quest에서 접속한다. Git에서 제외되는 `.env.local`에 `DEV_ALLOWED_HOSTS=<Funnel 호스트명>`을 설정한 뒤 frontend를 실행해 해당 호스트만 허용한다.
+
+주소는 매 실행마다 바뀌지 않는다. Tailscale 기기 이름이나 tailnet 이름을 변경하면 접속 주소와 `DEV_ALLOWED_HOSTS`도 갱신한다. Quest에는 Tailscale 앱이나 별도 인증서를 설치할 필요가 없다.
+
+WebStorm에서도 frontend, gateway와 `npm run dev:funnel`을 compound 실행 설정으로 묶을 수 있다. `.idea`는 Git에서 제외되므로 checkout마다 설정한다. Funnel은 foreground로 실행하며 해당 실행 탭에서 중지한다. 이미 수동 실행 중인 Funnel이 있다면 먼저 중지한다.
+
+Funnel은 인터넷에 frontend와 프록시 API를 공개한다. 사설 tailnet 전용 접근이 아니며, Mac의 Tailscale 연결과 인터넷 연결이 필요하다.
+
+### 공통 연결 조건
+
 PC와 Quest의 `/api/quest` 요청은 같은 gateway에 도달해야 한다. 동일한 HTTPS 사이트 주소를 사용하는 구성이 가장 간단하다. Quest의 `localhost`나 `127.0.0.1`은 Quest 자신을 가리킨다. 일반 HTTP LAN 주소는 WebXR 보안 연결 조건을 충족하지 않으므로 Quest가 신뢰하는 HTTPS 인증서를 사용하는 reverse proxy 또는 HTTPS 배포 환경이 필요하다.
 
 배포 시 `npm run build:real` 결과인 `dist/`를 제공하고 다음 경로를 연결한다.

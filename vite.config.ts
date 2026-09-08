@@ -3,12 +3,14 @@ import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 
 import { selectPublicAssets } from './scripts/select-public-assets';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), selectPublicAssets(mode)],
   server: {
+    allowedHosts: (loadEnv(mode, process.cwd(), 'DEV_').DEV_ALLOWED_HOSTS ?? '').split(',').map((host) => host.trim()).filter(Boolean),
     proxy: {
       '/api/quest': 'http://127.0.0.1:8787',
       '/api/integrations/patrol': 'http://127.0.0.1:8787',

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --configLoader runner",
     "dev:mock": "npm run dev",
-    "dev:real": "vite --configLoader runner --mode patrol",
+    "dev:real": "vite --configLoader runner --mode patrol --host --port 5173 --strictPort",
+    "dev:funnel": "tailscale funnel 5173",
     "build": "npm run build:mock",
     "build:mock": "npm run typecheck && vite build --configLoader runner --mode mock",
     "build:real": "npm run typecheck && vite build --configLoader runner --mode patrol",
