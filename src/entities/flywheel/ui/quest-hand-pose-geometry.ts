@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { CollectionHandJointPose } from '../model/flywheel';
+import type { CollectionHandJointPose, CollectionHandPoseTelemetry } from '../model/flywheel';
 
 export type HandPoseCoordinateMode = 'world' | 'hand-local';
 export type HandPoseVisibility = 'both' | 'left' | 'right';
@@ -57,4 +57,14 @@ export function transformHandJoint(
   );
   relative.applyQuaternion(normalizedQuaternion(wrist.orientationQuaternion).invert());
   return [relative.x + localHandOffsets[handedness], relative.y, relative.z];
+}
+
+/** World joint -> head-local: inverse(head rotation) * (joint - head position). */
+export function transformJointToViewer(
+  position: readonly [number, number, number],
+  pose: NonNullable<CollectionHandPoseTelemetry['viewerPose']>,
+): THREE.Vector3 {
+  return new THREE.Vector3(...position)
+    .sub(new THREE.Vector3(...pose.positionMeters))
+    .applyQuaternion(normalizedQuaternion(pose.orientationQuaternion).invert());
 }

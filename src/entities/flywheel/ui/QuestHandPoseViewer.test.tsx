@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -5,6 +6,7 @@ import type { CollectionHandPoseTelemetry } from '../model/flywheel';
 import { QuestHandPoseViewer } from './QuestHandPoseViewer';
 import {
   QUEST_HAND_JOINT_NAMES,
+  transformJointToViewer,
   transformHandJoint,
 } from './quest-hand-pose-geometry';
 
@@ -24,6 +26,7 @@ function createPose(): CollectionHandPoseTelemetry {
     })),
   });
   return {
+    viewerPose: { positionMeters: [0, 1.65, 0], orientationQuaternion: [0, 0, 0, 1] },
     coordinateFrame: 'quest-local-floor',
     deviceTimestampMs: 123.456,
     receivedTimestampMs: 1_800_000_000_000,
@@ -32,6 +35,10 @@ function createPose(): CollectionHandPoseTelemetry {
 }
 
 describe('QuestHandPoseViewer', () => {
+  it('머리 자세 없는 실시간 데이터를 고정 시점으로 대신 표시하지 않는다', () => {
+    render(<QuestHandPoseViewer handPose={{ ...createPose(), viewerPose: null }} streamState="live" />);
+    expect(screen.getByText(/머리 추적 수신 대기/)).toBeVisible();
+  });
   it.each(['offline', 'stale'] as const)('연결 상태 %s에서는 마지막 정상 포즈를 추적으로 표시하지 않는다', (streamState) => {
     const { rerender } = render(<QuestHandPoseViewer handPose={createPose()} streamState={streamState} />);
     expect(screen.queryByText('L 추적')).not.toBeInTheDocument();
@@ -95,5 +102,28 @@ describe('QuestHandPoseViewer', () => {
     expect(transformed[0]).toBeCloseTo(0.89, 6);
     expect(transformed[1]).toBeCloseTo(0, 6);
     expect(transformed[2]).toBeCloseTo(0, 6);
+  });
+});
+
+
+describe('Quest egocentric projection', () => {
+  it('머리와 손이 함께 이동·회전해도 눈에 보이는 손 위치는 유지된다', () => {
+    const camera = new THREE.PerspectiveCamera(38, 1.6, 0.001, 10);
+    const left = new THREE.Vector3(-0.15, -0.2, -0.45);
+    const right = new THREE.Vector3(0.15, -0.2, -0.45);
+    camera.fov = 85;
+    camera.updateProjectionMatrix();
+    const expected = [left, right].map((point) => point.clone().project(camera));
+    expect(expected[0]!.x).toBeLessThan(0);
+    expect(expected[1]!.x).toBeGreaterThan(0);
+    expect(expected[0]!.y).toBeLessThan(0);
+    const position = new THREE.Vector3(2, 1.65, -3);
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.3, 1.2, 0.1));
+    const pose = { positionMeters: position.toArray(), orientationQuaternion: rotation.toArray() };
+    [left, right].forEach((point, index) => {
+      const world = point.clone().applyQuaternion(rotation).add(position);
+      const actual = transformJointToViewer(world.toArray(), pose).project(camera);
+      expect(actual.distanceTo(expected[index]!)).toBeLessThan(1e-10);
+    });
   });
 });

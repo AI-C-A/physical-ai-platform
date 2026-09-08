@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { Badge } from '@/shared/ui/badge';
-import { MediaPanel, MediaStreamPlaceholder, getMediaStreamLabel, type MediaStreamState } from '@/shared/ui/media-panel';
+import { FittedMedia, MediaPanel, MediaStreamPlaceholder, getMediaStreamLabel, type MediaStreamState } from '@/shared/ui/media-panel';
 import { readCollectionVisualPalette } from './collection-visual-palette';
 
 import type {
-  CollectionHandJointPose,
   CollectionHandPoseTelemetry,
   CollectionStreamTelemetry,
 } from '../model/flywheel';
-import {
-  QUEST_HAND_BONES,
-  QUEST_HAND_JOINT_NAMES,
-  transformHandJoint,
-} from './quest-hand-pose-geometry';
+import { transformJointToViewer } from './quest-hand-pose-geometry';
+import { loadQuestSmoothHand, type QuestSmoothHand } from './quest-smooth-hand';
 
 type Handedness = 'left' | 'right';
 
@@ -26,8 +21,6 @@ interface QuestHandPoseViewerProps {
   readonly streamState?: MediaStreamState;
   readonly availability?: Readonly<Record<Handedness, MediaStreamState>>;
 }
-
-const fallbackRadiusMeters = 0.006;
 
 function handStream(
   streams: readonly CollectionStreamTelemetry[],
@@ -58,10 +51,6 @@ function stateTone(label: string): 'positive' | 'warning' | 'negative' | 'neutra
   return 'negative';
 }
 
-function jointKey(handedness: Handedness, name: string): string {
-  return `${handedness}:${name}`;
-}
-
 export function QuestHandPoseViewer({
   className,
   handPose: receivedPose = null,
@@ -83,6 +72,7 @@ export function QuestHandPoseViewer({
   }, [receivedPose, leftAvailability, rightAvailability]);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const updateSceneRef = useRef<(fitCamera: boolean) => void>(() => undefined);
+  const [modelLoadFailed, setModelLoadFailed] = useState(false);
   const [webGlUnavailable, setWebGlUnavailable] = useState(false);
   const hasObservedJoints = (['left', 'right'] as const).some((handedness) => (
     handPose?.hands[handedness].poseObserved === true && handPose.hands[handedness].joints.length > 0
@@ -106,123 +96,77 @@ export function QuestHandPoseViewer({
     renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
     renderer.setClearAlpha(0);
     renderer.domElement.className = 'block size-full touch-none';
-    renderer.domElement.setAttribute('aria-label', 'Quest 양손 3D 관절 캔버스');
+    renderer.domElement.setAttribute('aria-label', 'Quest 양손 3D 손 모델 캔버스');
     host.replaceChildren(renderer.domElement);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, 1, 0.001, 10);
-    camera.position.set(0.28, 0.18, 0.36);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = false;
-    controls.minDistance = 0.08;
-    controls.maxDistance = 2;
+    camera.position.set(0, 0.16, 0.36);
+    camera.lookAt(0, 0, 0);
     const palette = readCollectionVisualPalette(host);
     const light = new THREE.HemisphereLight(palette.light, palette.groundLight, 2.2);
     scene.add(light);
-    const grid = new THREE.GridHelper(0.6, 12, palette.gridMajor, palette.gridMinor);
-    grid.position.y = -0.12;
-    scene.add(grid);
 
-    const sphereGeometry = new THREE.SphereGeometry(1, 18, 12);
-    const boneGeometry = new THREE.CylinderGeometry(1, 1, 1, 10);
-    const jointMeshes = new Map<string, THREE.Mesh>();
-    const boneMeshes = new Map<string, THREE.Mesh>();
-    const materials = (['left', 'right'] as const).reduce<Record<Handedness, THREE.MeshStandardMaterial>>(
-      (result, handedness) => ({
-        ...result,
-        [handedness]: new THREE.MeshStandardMaterial({
-          color: palette[handedness],
-          emissive: palette[handedness],
-          emissiveIntensity: 0.18,
-          metalness: 0.08,
-          roughness: 0.42,
-        }),
-      }),
-      {} as Record<Handedness, THREE.MeshStandardMaterial>,
-    );
-    (['left', 'right'] as const).forEach((handedness) => {
-      QUEST_HAND_JOINT_NAMES.forEach((name) => {
-        const mesh = new THREE.Mesh(sphereGeometry, materials[handedness]);
-        mesh.visible = false;
-        scene.add(mesh);
-        jointMeshes.set(jointKey(handedness, name), mesh);
-      });
-      QUEST_HAND_BONES.forEach(([from, to]) => {
-        const mesh = new THREE.Mesh(boneGeometry, materials[handedness]);
-        mesh.visible = false;
-        scene.add(mesh);
-        boneMeshes.set(`${handedness}:${from}:${to}`, mesh);
+    const hands = new Map<Handedness, QuestSmoothHand>();
+    let disposed = false;
+    const keyLight = new THREE.DirectionalLight(palette.light, 2);
+    keyLight.position.set(-0.3, 0.6, 1);
+    scene.add(keyLight);
+    (['left', 'right'] as const).forEach((side) => {
+      void loadQuestSmoothHand(side, palette[side]).then((hand) => {
+        if (disposed) { hand.dispose(); return; }
+        hands.set(side, hand);
+        scene.add(hand.root);
+        updateScene(true);
+      }).catch(() => {
+        if (!disposed) setModelLoadFailed(true);
       });
     });
 
     const allPoints: THREE.Vector3[] = [];
     const center = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
     let hadPoints = false;
+    let wasEgocentric = false;
     const render = () => renderer.render(scene, camera);
     const updateScene = (fitCamera: boolean) => {
       const currentPose = poseRef.current;
+      const viewerPose = currentPose?.viewerPose;
+      const toPoint = (position: readonly [number, number, number]) => viewerPose != null
+        ? transformJointToViewer(position, viewerPose) : new THREE.Vector3(...position);
       allPoints.length = 0;
-      jointMeshes.forEach((mesh) => { mesh.visible = false; });
-      boneMeshes.forEach((mesh) => { mesh.visible = false; });
-      (['left', 'right'] as const).forEach((handedness) => {
-        const observation = currentPose?.hands[handedness];
-        const joints = observation?.poseObserved === true
-          ? new Map(observation.joints.map((joint) => [joint.name, joint]))
-          : new Map<string, CollectionHandJointPose>();
-        const wrist = joints.get('wrist');
-        observation?.joints.forEach((joint) => {
-          const mesh = jointMeshes.get(jointKey(handedness, joint.name));
-          if (mesh === undefined || wrist === undefined || !observation.poseObserved) return;
-          const point = new THREE.Vector3(...transformHandJoint(joint, wrist, handedness, 'world'));
-          mesh.position.copy(point);
-          const radius = joint.radiusMeters ?? fallbackRadiusMeters;
-          mesh.scale.setScalar(Math.max(0.0025, radius));
-          mesh.visible = true;
-          allPoints.push(point);
-        });
-        QUEST_HAND_BONES.forEach(([fromName, toName]) => {
-          const mesh = boneMeshes.get(`${handedness}:${fromName}:${toName}`);
-          const from = joints.get(fromName);
-          const to = joints.get(toName);
-          if (mesh === undefined) return;
-          if (from === undefined || to === undefined || wrist === undefined) {
-            mesh.visible = false;
-            return;
-          }
-          const fromPoint = new THREE.Vector3(...transformHandJoint(from, wrist, handedness, 'world'));
-          const toPoint = new THREE.Vector3(...transformHandJoint(to, wrist, handedness, 'world'));
-          const delta = toPoint.clone().sub(fromPoint);
-          const length = delta.length();
-          mesh.position.copy(fromPoint).addScaledVector(delta, 0.5);
-          mesh.quaternion.setFromUnitVectors(up, delta.normalize());
-          const radius = Math.max(0.0018, Math.min(from.radiusMeters ?? fallbackRadiusMeters, to.radiusMeters ?? fallbackRadiusMeters) * 0.42);
-          mesh.scale.set(radius, length, radius);
-          mesh.visible = length > 0;
-        });
+      (['left', 'right'] as const).forEach((side) => {
+        const hand = currentPose?.hands[side];
+        if (hand?.poseObserved) hand.joints.forEach((joint) => allPoints.push(toPoint(joint.positionMeters)));
       });
-      if (allPoints.length > 0) {
-        center.set(0, 0, 0);
+      const egocentric = viewerPose != null;
+      center.set(0, 0, 0);
+      if (!egocentric && allPoints.length > 0) {
         allPoints.forEach((point) => center.add(point));
         center.multiplyScalar(1 / allPoints.length);
-        [...jointMeshes.values(), ...boneMeshes.values()].forEach((mesh) => {
-          if (mesh.visible) mesh.position.sub(center);
-        });
       }
-      if (fitCamera || (!hadPoints && allPoints.length > 0)) {
+      hands.forEach((hand, side) => hand.update(currentPose, side, center));
+      if (viewerPose != null) {
+        camera.position.set(0, 0, 0);
+        camera.quaternion.identity();
+        camera.fov = 85;
+        camera.updateProjectionMatrix();
+      } else if (fitCamera || wasEgocentric || (!hadPoints && allPoints.length > 0)) {
+        camera.fov = 38;
+        camera.updateProjectionMatrix();
         const box = new THREE.Box3().setFromPoints(allPoints.map((point) => point.clone().sub(center)));
         const size = box.isEmpty() ? 0.28 : Math.max(box.getSize(new THREE.Vector3()).length(), 0.12);
-        controls.target.set(0, 0, 0);
-        camera.position.set(size * 1.3, size * 0.8, size * 1.8);
-        controls.update();
+        // local-floor의 +X는 오른쪽, -Z는 정면이다. 기존 녹화는
+        // 착용자 쪽에서 손을 약간 내려다보는 고정 방향으로 표시한다.
+        camera.position.set(0, size * 0.8, size * 1.8);
+        camera.lookAt(0, 0, 0);
       }
+      wasEgocentric = egocentric;
       hadPoints = allPoints.length > 0;
       render();
     };
 
     updateSceneRef.current = updateScene;
     updateScene(true);
-    controls.addEventListener('change', render);
     const resize = () => {
       const width = Math.max(1, host.clientWidth);
       const height = Math.max(1, host.clientHeight);
@@ -237,12 +181,9 @@ export function QuestHandPoseViewer({
 
     return () => {
       updateSceneRef.current = () => undefined;
-      controls.removeEventListener('change', render);
-      controls.dispose();
       observer.disconnect();
-      sphereGeometry.dispose();
-      boneGeometry.dispose();
-      Object.values(materials).forEach((material) => material.dispose());
+      disposed = true;
+      hands.forEach((hand) => hand.dispose());
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -259,29 +200,48 @@ export function QuestHandPoseViewer({
   const rightState = rightAvailability === 'live' || rightAvailability === 'recorded' ? handStateLabel(handPose, 'right', streamState === 'recorded' ? null : rightStream) : getMediaStreamLabel(rightAvailability);
   const displayState = leftAvailability === 'recorded' ? 'recorded' : leftAvailability === 'live' || rightAvailability === 'live' ? 'live'
     : leftAvailability === 'stale' || rightAvailability === 'stale' ? 'stale' : leftAvailability === 'offline' || rightAvailability === 'offline' ? 'offline' : 'idle';
+  const missingViewerPose = displayState === 'live' && handPose?.viewerPose == null;
   const unavailable = displayState === 'idle' || displayState === 'offline' || displayState === 'stale' ? displayState : null;
 
   return (
+    <FittedMedia className={`items-center ${className ?? ''}`}>
     <MediaPanel
       aria-label="Quest 손 포즈 3D"
-      className={className}
+      className="h-auto"
       data-hand-pose-viewer
       data-stream-state={displayState}
+      data-hand-transport={handPose?.delivery?.transport}
+      data-hand-frame-timestamp={handPose?.deviceTimestampMs}
       title="손 추적"
       status={(
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={stateTone(leftState)}>L {leftState}</Badge>
           <Badge tone={stateTone(rightState)}>R {rightState}</Badge>
+          {displayState === 'live' && handPose?.delivery && (
+            <Badge tone={handPose.delivery.transport === 'webrtc' ? 'positive' : 'neutral'}>
+              {handPose.delivery.transport === 'webrtc' ? '직접 연결' : '중계 연결'}
+              {handPose.delivery.roundTripMs !== null ? ` · 왕복 ${Math.round(handPose.delivery.roundTripMs)}ms` : ''}
+            </Badge>
+          )}
         </div>
       )}
     >
 
-      <div className="relative min-h-0">
-        <div className="absolute inset-0" ref={canvasHostRef} hidden={unavailable !== null} />
-        {unavailable !== null ? <MediaStreamPlaceholder state={unavailable} /> : !hasObservedJoints ? (
+      <div data-aspect-media-viewport className="relative aspect-video min-h-0">
+        <div className="absolute inset-0" ref={canvasHostRef} hidden={unavailable !== null || missingViewerPose} />
+        {unavailable !== null ? <MediaStreamPlaceholder state={unavailable} /> : missingViewerPose ? (
+          <div className="absolute inset-0 grid place-items-center p-2 text-center">
+            <p className="text-xs font-semibold" role="status">머리 추적 수신 대기 · Quest를 새로고침하고 다시 연결하세요.</p>
+          </div>
+        ) : !hasObservedJoints ? (
           <div className="pointer-events-none absolute inset-0 grid place-items-center p-2 text-center">
             <p className="text-xs font-semibold">손 프레임 대기</p>
           </div>
+        ) : null}
+        {modelLoadFailed && unavailable === null ? (
+          <p className="absolute inset-x-3 bottom-3 rounded-[var(--design-radius-control)] bg-layer-raised p-2 text-xs text-muted" role="status">
+            손 모델을 불러오지 못했습니다. 페이지를 새로고침해 주세요.
+          </p>
         ) : null}
         {webGlUnavailable && unavailable === null ? (
           <p className="absolute inset-x-3 bottom-3 rounded-[var(--design-radius-control)] bg-layer-raised p-2 text-xs text-muted" role="status">
@@ -290,5 +250,6 @@ export function QuestHandPoseViewer({
         ) : null}
       </div>
     </MediaPanel>
+    </FittedMedia>
   );
 }
