@@ -50,13 +50,14 @@
     "mapbox-gl": "^3.27.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-progressive-blur": "1.0.6",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "three": "^0.183.2",
-    "zustand": "^5.0.15",
-    "ws": "8.21.3"
+    "ws": "8.21.3",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

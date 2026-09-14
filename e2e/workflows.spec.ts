@@ -190,7 +190,7 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
     await expect(playback).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Episode 재생 위치' })).toBeEnabled();
     await openCollectionDetails(page, '장치');
-    await expect(page.getByRole('region', { name: '장치 스트림 상태' }).getByRole('img', { name: /최근 10초 수신 기록/u }).first()).toBeVisible();
+    await expect(page.getByRole('region', { name: '장치 스트림 상태' }).getByRole('region', { name: /최근 10초 수신 기록/u }).first()).toBeVisible();
     await expect(controls.getByRole('button', { name: '녹화본 저장' })).toBeInViewport();
     await openCollectionDetails(page, '세션 정보');
     await controls.getByRole('button', { name: '녹화본 저장' }).click();
@@ -1173,4 +1173,32 @@ test('수집 콘솔은 실제 손 추적과 상세를 유지하며 녹화·검�
   } finally {
     await collector.close();
   }
+});
+
+test('관제에서 모델을 전환하고 같은 3D 장면으로 확대한다', async ({ page }, testInfo) => {
+  const issues = observeBrowserIssues(page);
+  await page.goto('/control/monitoring');
+  await expectApplicationReady(page);
+  const selection = page.getByRole('region', { name: '로봇 선택' });
+  let sceneId: string | null = null;
+  for (const name of ['휴머노이드 로봇', '사륜 로봇', '양팔형 로봇']) {
+    await selection.getByRole('button', { name: new RegExp(name, 'u') }).click();
+    const model = page.getByRole('region', { name: `${name} 3D 모델`, exact: true });
+    await expect(model).toBeVisible();
+    await expect(model).toHaveAttribute('aria-busy', 'false');
+    const canvas = model.locator('canvas');
+    await expect(canvas).toHaveCount(1);
+    const currentId = await canvas.getAttribute('data-robot-scene-instance');
+    expect(currentId).toBeTruthy();
+    if (sceneId !== null) expect(currentId).toBe(sceneId);
+    sceneId = currentId;
+    await testInfo.attach(name, { body: await page.screenshot(), contentType: 'image/png' });
+  }
+  await page.getByRole('link', { name: '양팔형 로봇 크게 보기' }).click();
+  await expect(page).toHaveURL(/\/control\/monitoring\/carousel/u);
+  await expect(page.getByRole('region', { name: '로봇 캐러셀', exact: true })).toBeVisible();
+  await expect(page.locator('canvas[data-robot-scene-instance]')).toHaveAttribute('data-robot-scene-instance', sceneId!);
+  await page.getByRole('link', { name: '지도로 돌아가기' }).click();
+  await expect(page.getByRole('region', { name: '양팔형 로봇 3D 모델', exact: true })).toBeVisible();
+  issues.assertNone();
 });

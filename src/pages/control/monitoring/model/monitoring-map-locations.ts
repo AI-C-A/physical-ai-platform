@@ -3,6 +3,7 @@ import { isValidRobotGeolocation, type RobotGeolocationObservation } from '@/ent
 
 export interface RobotMapLocation {
   readonly label: string;
+  readonly company?: RobotDescriptor['company'];
   readonly latitude: number;
   readonly longitude: number;
 }
@@ -25,6 +26,7 @@ export function getRobotMapLocation(
 
   return {
     label: robot.displayName,
+    company: robot.company,
     latitude: geolocation.latitudeDegrees,
     longitude: geolocation.longitudeDegrees,
   };

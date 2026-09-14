@@ -1,0 +1,63 @@
+.robot-map-label {
+  --robot-label-open: 0;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--design-radius-round);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.robot-map-label::before { content: ''; position: absolute; bottom: 100%; right: 0; width: 44px; height: 16px; }
+.robot-map-label:is(:hover, :focus-visible, [aria-pressed='true']) { --robot-label-open: 1; z-index: 2; }
+.robot-map-label[aria-pressed='true'] { z-index: 3; }
+.robot-map-bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(50% + 8px);
+  display: flex;
+  align-items: center;
+  width: max-content;
+  padding: calc(6px + var(--robot-label-open) * 4px);
+  gap: calc(var(--robot-label-open) * 10px);
+  border-radius: calc(18px - var(--robot-label-open) * 2px);
+  background: var(--surface);
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--foreground) 12%, transparent);
+  transition: padding 220ms ease, gap 220ms ease, border-radius 220ms ease;
+  text-align: left;
+}
+.robot-map-bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 4px);
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 0 0 2px 0;
+  background: var(--surface);
+  opacity: var(--robot-label-open);
+  transform: rotate(45deg) scale(var(--robot-label-open));
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+.robot-map-bubble > span:first-child { width: 24px; height: 24px; background: transparent; }
+.robot-map-bubble img { width: 22px; height: 22px; }
+.robot-map-caption-copy {
+  display: grid;
+  gap: 3px;
+  max-width: calc(var(--robot-label-open) * 170px);
+  max-height: calc(var(--robot-label-open) * 40px);
+  overflow: hidden;
+  opacity: var(--robot-label-open);
+  transition: max-width 220ms ease, max-height 220ms ease, opacity 160ms ease;
+  white-space: nowrap;
+}
+.robot-map-caption-copy strong { font-size: 13px; line-height: 1.4; font-weight: 600; letter-spacing: -.02em; }
+.robot-map-caption-copy > span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.robot-map-label:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .robot-map-bubble, .robot-map-bubble::after, .robot-map-caption-copy { transition: none; }
+}

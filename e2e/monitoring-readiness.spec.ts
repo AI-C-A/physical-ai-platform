@@ -86,9 +86,10 @@ for (const viewport of viewports) {
         await page.keyboard.press('Enter');
         await expect(marker).toHaveAttribute('aria-pressed', 'true');
         await expect(panel).toBeVisible();
-        await expect.poll(() => panel.locator('model-viewer').evaluate(
-          (element) => Reflect.get(element, 'loaded') === true,
-        )).toBe(true);
+        const model = page.getByRole('region', { name: '사족보행 로봇 3D 모델', exact: true });
+        await expect(model).toBeVisible();
+        await expect(model).toHaveAttribute('aria-busy', 'false');
+        await expect(model.locator('canvas')).toHaveCount(1);
         if (mobile) {
           await expect(panel.getByRole('progressbar', { name: '배터리 잔량', exact: true }))
             .toBeInViewport({ ratio: 1 });

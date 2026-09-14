@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-import type { RobotDescriptor } from '@/entities/robot';
+import { RobotCompanyAvatar, type RobotDescriptor } from '@/entities/robot';
 import { IndoorSiteMap, type OutdoorSiteDescriptor, type SiteDescriptor } from '@/entities/site';
 import type { RobotGeolocationLoadState } from '@/entities/robot-telemetry';
 import { useMapStylePreference } from '@/shared/config';
@@ -14,6 +14,32 @@ import { getOverlaySurfaceClassName } from '@/shared/ui/surface';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './control-monitoring.css';
 import { getRobotMapLocation, type FleetMapLocation, type RobotMapLocation } from '../model/monitoring-map-locations';
+
+const fleetBirdView = { bearing: 0, pitch: 30 };
+
+function frameFleet(
+  map: mapboxgl.Map,
+  locations: readonly FleetMapLocation[],
+  width: number,
+  height: number,
+  selectedRobotId: string | undefined,
+  duration: number,
+) {
+  if (locations.length === 0) return;
+  const longitude = locations.map((robot) => robot.longitude);
+  const latitude = locations.map((robot) => robot.latitude);
+  map.fitBounds([
+    [Math.min(...longitude), Math.min(...latitude)],
+    [Math.max(...longitude), Math.max(...latitude)],
+  ], {
+    ...fleetBirdView,
+    duration,
+    maxZoom: 20,
+    padding: width >= 768
+      ? { top: 120, bottom: 100, left: 320, right: selectedRobotId === undefined ? 100 : 380 }
+      : { top: 180, bottom: selectedRobotId === undefined ? 100 : height * 0.45 + 24, left: 64, right: 64 },
+  });
+}
 
 const mapOverlaySurfaceClassName = getOverlaySurfaceClassName();
 
@@ -34,6 +60,8 @@ function MonitoringMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialLocationRef = useRef(location);
+  const initialFleetFrameRef = useRef('');
+  const cameraInteractedRef = useRef(false);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const fleetMarkersRef = useRef(new Map<string, { readonly marker: mapboxgl.Marker; readonly button: HTMLButtonElement }>());
@@ -56,12 +84,11 @@ function MonitoringMap({
       longitude: mapCenterLongitude,
     };
     const cameraOptions = {
-      bearing: 347.2,
+      ...fleetBirdView,
       center: [
         initialMapCenter.longitude,
         initialMapCenter.latitude,
       ] as [number, number],
-      pitch: 55,
       zoom: 15.5,
     };
     let disposed = false;
@@ -82,14 +109,23 @@ function MonitoringMap({
       return () => { disposed = true; };
     }
     mapRef.current = map;
+    initialFleetFrameRef.current = '';
+    cameraInteractedRef.current = false;
     const fleetMarkers = fleetMarkersRef.current;
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
     const onMapError = () => { if (!map.isStyleLoaded()) setMapError(true); };
     const onMapReady = () => setMapError(false);
-    const onMapDrag = () => setFollowRobot(false);
+    const onMapDrag = () => {
+      cameraInteractedRef.current = true;
+      setFollowRobot(false);
+    };
+    const onMapZoom = (event: { type: string; originalEvent?: unknown }) => {
+      if (event.originalEvent) onMapDrag();
+    };
     map.on('error', onMapError);
     map.on('load', onMapReady);
     map.on('dragstart', onMapDrag);
+    map.on('zoomstart', onMapZoom);
     const resizeObserver = new ResizeObserver(() => map.resize());
     resizeObserver.observe(container);
     const loadDeadline = window.setTimeout(() => {
@@ -103,6 +139,7 @@ function MonitoringMap({
       map.off('error', onMapError);
       map.off('load', onMapReady);
       map.off('dragstart', onMapDrag);
+      map.off('zoomstart', onMapZoom);
       markerRef.current?.remove();
       fleetMarkers.forEach(({ marker }) => marker.remove());
       fleetMarkers.clear();
@@ -159,7 +196,8 @@ function MonitoringMap({
       if (entry === undefined) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'monitoring-map-marker';
+        button.className = 'monitoring-map-marker robot-map-label';
+        button.dataset.colorScheme = 'light';
         const marker = new mapboxgl.Marker({ element: button, anchor: 'center' });
         marker.setLngLat([robot.longitude, robot.latitude]);
         marker.addTo(map);
@@ -170,8 +208,35 @@ function MonitoringMap({
       const isSelected = robot.robotId === selectedRobotId;
       button.dataset.attention = String(robot.needsAttention);
       button.dataset.selected = String(isSelected);
-      button.textContent = robot.label.match(/\d+$/u)?.[0] ?? String(index + 1);
-      button.title = robot.label;
+      const identity = JSON.stringify([robot.label, robot.company, index]);
+      if (button.dataset.identity !== identity) {
+        button.dataset.identity = identity;
+        const avatar = document.createElement('span');
+        avatar.className = 'monitoring-map-marker-avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = robot.label.match(/\d+$/u)?.[0] ?? String(index + 1);
+        if (robot.company?.logoUrl) {
+          const logo = document.createElement('img');
+          logo.src = robot.company.logoUrl;
+          logo.alt = '';
+          logo.onerror = () => { avatar.textContent = String(index + 1); };
+          avatar.replaceChildren(logo);
+        }
+        const label = document.createElement('span');
+        label.className = 'robot-map-caption-copy';
+        const name = document.createElement('strong');
+        name.textContent = robot.label;
+        label.append(name);
+        if (robot.company?.name) {
+          const company = document.createElement('span');
+          company.textContent = robot.company.name;
+          label.append(company);
+        }
+        const bubble = document.createElement('span');
+        bubble.className = 'robot-map-bubble';
+        bubble.append(avatar, label);
+        button.replaceChildren(bubble);
+      }
       // Mapbox가 사용자 지정 마커에도 role="img"를 부여하므로 조작 의미를 복원한다.
       button.setAttribute('role', 'button');
       button.setAttribute('aria-label', `${robot.label} 위치 선택`);
@@ -182,31 +247,33 @@ function MonitoringMap({
   }, [accessToken, fleetLocations, mapAttempt, onSelectRobot, selectedRobotId, styleUrl]);
 
   const resetMap = () => {
+    cameraInteractedRef.current = true;
     setFollowRobot(false);
     mapRef.current?.easeTo({
-      bearing: 347.2,
+      ...fleetBirdView,
       center: [mapCenterLongitude, mapCenterLatitude],
       duration: 600,
-      pitch: 55,
       zoom: 15.5,
     });
   };
 
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    const fleetKey = fleetLocations.map((robot) => robot.robotId).sort().join(',');
+    if (!map || !container || !fleetKey || selectedRobotId !== undefined
+      || cameraInteractedRef.current || initialFleetFrameRef.current === fleetKey) return;
+    initialFleetFrameRef.current = fleetKey;
+    frameFleet(map, fleetLocations, container.clientWidth, container.clientHeight, undefined, 0);
+  }, [fleetLocations, selectedRobotId, mapAttempt, styleUrl]);
+
   const showFleet = () => {
-    if (fleetLocations.length === 0) return;
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+    cameraInteractedRef.current = true;
     setFollowRobot(false);
-    const longitude = fleetLocations.map((robot) => robot.longitude);
-    const latitude = fleetLocations.map((robot) => robot.latitude);
-    const wide = (containerRef.current?.clientWidth ?? 0) >= 768;
-    mapRef.current?.fitBounds([
-      [Math.min(...longitude), Math.min(...latitude)],
-      [Math.max(...longitude), Math.max(...latitude)],
-    ], {
-      duration: 600,
-      maxZoom: 18,
-      padding: wide ? { top: 120, bottom: 100, left: 320, right: selectedRobotId === undefined ? 80 : 380 }
-        : { top: 180, bottom: selectedRobotId === undefined ? 80 : window.innerHeight * 0.45 + 24, left: 48, right: 48 },
-    });
+    frameFleet(map, fleetLocations, container.clientWidth, container.clientHeight, selectedRobotId, 600);
   };
 
   return (
@@ -317,12 +384,14 @@ function RobotLocationMap({
 }
 
 export function SiteMap({
+  robots,
   fleetLocations,
   geolocation,
   robot,
   onSelectRobot,
   site,
 }: {
+  readonly robots: readonly RobotDescriptor[];
   readonly fleetLocations: readonly FleetMapLocation[];
   readonly geolocation: RobotGeolocationLoadState | null;
   readonly robot: RobotDescriptor | undefined;
@@ -330,7 +399,31 @@ export function SiteMap({
   readonly site: SiteDescriptor;
 }) {
   if (site.environment === 'indoor') {
-    return <IndoorSiteMap site={site} />;
+    return <IndoorSiteMap site={site} selectedHotspot={robot?.modelId ? `hotspot-${robot.modelId}` : undefined}>
+      {site.robotPlacements?.map((placement) => {
+        const placedRobot = robots.find((candidate) => candidate.modelId === placement.modelId);
+        if (!placedRobot) return null;
+        return <Button
+          variant="ghost"
+          key={placement.modelId}
+          slot={`hotspot-${placement.modelId}`}
+          data-position={placement.position.map((value) => `${value}m`).join(' ')}
+          data-normal="0m 1m 0m"
+          className="robot-map-label"
+          data-color-scheme="light"
+          type="button"
+          aria-label={`${placedRobot.company?.name ?? ''} ${placedRobot.displayName} 선택`.trim()}
+          aria-pressed={robot?.id === placedRobot.id}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => { event.stopPropagation(); onSelectRobot(placedRobot.id); }}
+        >
+          <span className="robot-map-bubble">
+            <RobotCompanyAvatar robot={placedRobot} showTitle={false} />
+            <span className="robot-map-caption-copy"><strong>{placedRobot.displayName}</strong><span>{placedRobot.company?.name}</span></span>
+          </span>
+        </Button>;
+      })}
+    </IndoorSiteMap>;
   }
 
   return (

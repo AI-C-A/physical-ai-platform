@@ -1,10 +1,12 @@
-import { lazy, type PropsWithChildren } from 'react';
+import { lazy, useMemo, useState, type PropsWithChildren } from 'react';
 import {
   Navigate,
   useLocation,
   useViewTransitionState,
   type RouteObject,
 } from 'react-router-dom';
+
+import { RobotSceneContext } from '@/entities/robot';
 
 import { PageHeader } from '@/shared/ui/page-header';
 import {
@@ -16,6 +18,8 @@ import { PlatformShell } from '@/widgets/platform-shell';
 import { MINI_APP_REGISTRY } from '../config';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { ROUTE_PATHS } from './route-paths';
+
+const RobotCarouselPage = lazy(async () => ({ default: (await import('@/pages/control/robot-carousel')).RobotCarouselPage }));
 
 const FlywheelPages = () => import('@/pages/mlops/flywheel');
 const CameraCollectorPage = lazy(async () => ({ default: (await import('@/pages/collect/camera')).CameraCollectorPage }));
@@ -109,6 +113,21 @@ function LegacyMLOpsRedirect({
   );
 }
 
+function MonitoringExperience() {
+  const location = useLocation();
+  const immersive = location.pathname.endsWith('/carousel');
+  const [preview, setPreview] = useState<HTMLDivElement | null>(null);
+  const context = useMemo(() => ({ setPreview }), []);
+  return <RobotSceneContext.Provider value={context}>
+    <div className="relative">
+      <div inert={immersive} aria-hidden={immersive} className="monitoring-map-layer" data-immersive={immersive}>
+        <ControlMonitoringPage />
+      </div>
+      <RobotCarouselPage immersive={immersive} preview={preview} />
+    </div>
+  </RobotSceneContext.Provider>;
+}
+
 function MonitoringMorphRoute({ children }: PropsWithChildren) {
   const targetProps = useRouteMorphTarget();
 
@@ -152,7 +171,9 @@ export const APP_ROUTES: RouteObject[] = [
       },
       {
         path: ROUTE_PATHS.controlMonitoring,
-        element: <ControlMonitoringPage />,
+        element: <MonitoringExperience />,
+        // 부모가 같은 3D 장면을 유지하고 경로에 따라 배치만 전환한다.
+        children: [{ index: true, element: <></> }, { path: 'carousel', element: <></> }],
       },
       {
         path: ROUTE_PATHS.controlMultiRobotMonitoring,

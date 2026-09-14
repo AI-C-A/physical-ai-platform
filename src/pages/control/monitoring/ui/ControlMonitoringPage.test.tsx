@@ -31,6 +31,7 @@ import {
   type RobotGeolocationQueryPort,
 } from '@/entities/robot-telemetry';
 import {
+  BrandingContext,
   MapStylePreferenceProvider,
   useMapStylePreference,
   type MapStyleId,
@@ -176,22 +177,24 @@ function renderPage(
   mapStyleId: MapStyleId = 'primary',
 ) {
   return render(
-    <MapStylePreferenceProvider>
-      <MapStyleSelectionGate styleId={mapStyleId}>
-        <RobotCatalogContext.Provider value={catalog}>
-          <RobotOperationalStatusContext.Provider value={status}>
-            <RobotGeolocationContext.Provider value={location}>
-              <MemoryRouter initialEntries={[initialEntry]}>
-                <RouteMorphProvider>
-                  <ControlMonitoringPage />
-                  <CurrentLocation />
-                </RouteMorphProvider>
-              </MemoryRouter>
-            </RobotGeolocationContext.Provider>
-          </RobotOperationalStatusContext.Provider>
-        </RobotCatalogContext.Provider>
-      </MapStyleSelectionGate>
-    </MapStylePreferenceProvider>,
+    <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'TIGER+', logo: null }}>
+      <MapStylePreferenceProvider>
+        <MapStyleSelectionGate styleId={mapStyleId}>
+          <RobotCatalogContext.Provider value={catalog}>
+            <RobotOperationalStatusContext.Provider value={status}>
+              <RobotGeolocationContext.Provider value={location}>
+                <MemoryRouter initialEntries={[initialEntry]}>
+                  <RouteMorphProvider>
+                    <ControlMonitoringPage />
+                    <CurrentLocation />
+                  </RouteMorphProvider>
+                </MemoryRouter>
+              </RobotGeolocationContext.Provider>
+            </RobotOperationalStatusContext.Provider>
+          </RobotCatalogContext.Provider>
+        </MapStyleSelectionGate>
+      </MapStylePreferenceProvider>
+    </BrandingContext.Provider>,
   );
 }
 
@@ -318,7 +321,7 @@ describe('ControlMonitoringPage', () => {
     await user.keyboard('{ArrowDown}{Enter}');
 
     const indoorMap = await screen.findByRole('region', { name: '판교 육군 AX 거점 실내 지도' });
-    expect(indoorMap.querySelector('model-viewer')).toHaveAttribute('src', '/assets/sites/pangyo-v1.glb');
+    expect(indoorMap.querySelector('model-viewer')).toHaveAttribute('src', '/assets/sites/pangyo-exhibit.glb');
     expect(screen.getByText('로봇 목록을 불러오지 못했습니다.')).toBeInTheDocument();
     expect(screen.getByTestId('current-location')).toHaveTextContent('siteId=pangyo-army-ax-hub');
   });
@@ -412,7 +415,7 @@ describe('ControlMonitoringPage', () => {
     await user.type(screen.getByRole('searchbox', { name: '로봇 검색' }), '사족보행');
     expect(createMarker.mock.calls.filter(([options]) => options.element !== undefined)).toHaveLength(markers.length);
     await user.click(screen.getByRole('button', { name: '전체 위치' }));
-    expect(mapInstance.fitBounds).toHaveBeenCalledWith([[127.11, 37.39], [127.11, 37.39]], expect.objectContaining({ maxZoom: 18 }));
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith([[127.11, 37.39], [127.11, 37.39]], expect.objectContaining({ maxZoom: 20 }));
   });
 
   it.each([
@@ -589,7 +592,9 @@ describe('ControlMonitoringPage', () => {
       '판교',
     );
     expect(siteSelect).not.toHaveTextContent('· 실외');
-    expect(siteSelect.closest('section')).toBeNull();
+    expect(siteSelect.closest('section')).toContainElement(
+      screen.getByRole('link', { name: 'ROBOT Army TIGER+ 모니터링으로 이동' }),
+    );
     const selectionColumn = siteSelect.parentElement?.parentElement;
     expect(selectionColumn).not.toHaveClass('overflow-hidden');
     expect(siteSelect.querySelector('.lucide-map-pin')).toBeInTheDocument();
@@ -605,7 +610,7 @@ describe('ControlMonitoringPage', () => {
     }
     expect(siteSelect).toHaveClass('min-h-[var(--layout-control-height-large)]');
     expect(robotSearch).toHaveClass('min-h-[var(--layout-control-height)]');
-    expect(siteSelect).toHaveAttribute('data-surface', 'overlay');
+    expect(siteSelect).toHaveAttribute('data-surface', 'default');
     expect(robotSearch).toHaveAttribute('data-surface', 'default');
     expect(screen.queryByRole('button', { name: '로봇 정보 패널 닫기' }))
       .not.toBeInTheDocument();
@@ -879,8 +884,8 @@ describe('ControlMonitoringPage', () => {
       '/control/monitoring/robot-002?siteId=pangyo-army-ax-hub',
     );
     const indoorModelViewer = indoorMap.querySelector('model-viewer');
-    expect(indoorModelViewer).toHaveAttribute('src', '/assets/sites/pangyo-v1.glb');
-    expect(indoorModelViewer).toHaveAttribute('camera-orbit', '-15deg 50deg 145%');
+    expect(indoorModelViewer).toHaveAttribute('src', '/assets/sites/pangyo-exhibit.glb');
+    expect(indoorModelViewer).toHaveAttribute('camera-orbit', '25deg 30deg 40%');
     expect(indoorModelViewer).toHaveAttribute('disable-tap');
     expect(indoorModelViewer).toHaveAttribute('field-of-view', '40deg');
     expect(indoorModelViewer).toHaveAttribute('environment-image', 'legacy');

@@ -1,36 +1,4 @@
-.monitoring-map-marker {
-  display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-  border: 2px solid var(--foreground);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--foreground);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.monitoring-map-marker[data-attention='true'] {
-  border-color: var(--warning);
-  color: var(--warning);
-}
-
-.monitoring-map-marker[data-selected='true'] {
-  border-color: var(--action-on-fill);
-  background: var(--action-primary);
-  color: var(--action-on-fill);
-  z-index: 1;
-}
-
-.monitoring-map-marker:hover,
-.monitoring-map-marker:focus-visible {
-  background: var(--action-primary);
-  color: var(--action-on-fill);
-  outline: 3px solid var(--focus);
-  outline-offset: 3px;
-}
+.monitoring-map-marker { position: absolute; font-family: inherit; }
+.monitoring-map-marker-avatar { display: grid; place-items: center; flex-shrink: 0; font-size: 12px; }
+.monitoring-map-marker-avatar img { object-fit: contain; }
+.monitoring-map-marker[data-attention='true'] .robot-map-bubble { outline: 2px solid var(--warning); outline-offset: 1px; }

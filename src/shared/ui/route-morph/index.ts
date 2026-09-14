@@ -11,3 +11,5 @@ export type {
   RouteMorphNavigationOptions,
   RouteMorphTriggerProps,
 } from './route-morph-types';
+
+export { defaultRouteMorphConfig } from './route-morph-config';

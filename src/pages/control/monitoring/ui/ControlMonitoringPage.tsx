@@ -9,7 +9,7 @@ import { Link, useSearchParams, type To } from 'react-router-dom';
 
 import {
   RobotInfoOverview,
-  RobotModelViewer,
+  RobotScenePreview,
   useRobotCatalog,
   useRobotOperationalStatuses,
   type RobotDescriptor,
@@ -140,6 +140,7 @@ function MonitoringLayout({
     <>
       <div className={mobileListOpen && hasRobots ? 'max-md:invisible' : undefined}>
         <SelectedRobotSiteMap
+          robots={robotCatalogQuery.status === 'ready' ? robotCatalogQuery.robots : []}
           fleetLocations={fleetLocations}
           onSelectRobot={onSelectRobot}
           robot={selectedRobot}
@@ -148,12 +149,12 @@ function MonitoringLayout({
       </div>
       <div
         className={[
-          'pointer-events-none relative z-10 grid h-full min-h-0 gap-4 overflow-hidden p-4 transition-[grid-template-columns,grid-template-rows] duration-200 motion-reduce:transition-none md:grid-rows-[minmax(0,1fr)]',
+          'pointer-events-none relative z-10 grid h-full min-h-0 grid-cols-[minmax(0,1fr)] gap-4 overflow-hidden p-4 transition-[grid-template-columns,grid-template-rows] duration-200 motion-reduce:transition-none md:grid-rows-[minmax(0,1fr)]',
           mobileListOpen ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[auto_minmax(0,1fr)]',
           desktopGridColumnsClassName,
         ].join(' ')}
       >
-        <div className="pointer-events-none flex max-h-full min-h-0 flex-col gap-3 self-start">
+        <div className="pointer-events-none flex max-h-full min-h-0 min-w-0 flex-col gap-3 self-start">
           <Select
             className="pointer-events-auto min-w-0 shrink-0"
             controlSize="large"
@@ -314,14 +315,24 @@ function MonitoringLayout({
             contentClassName="flex min-h-0 flex-1 flex-col"
             layer="translucent"
           >
-            <Button
-              aria-label="로봇 정보 패널 닫기"
-              className="absolute top-3 right-3 z-10 size-10 min-h-10 border-0 bg-transparent p-0 text-muted shadow-none hover:bg-foreground/[0.06] hover:text-foreground active:bg-foreground/[0.1]"
-              onClick={onCloseRobotInfo}
-              variant="ghost"
-            >
-              <Icon name="close" />
-            </Button>
+            <div className="relative z-30 flex shrink-0 justify-end gap-1">
+              <Link
+                aria-label={`${selectedRobot.displayName} 크게 보기`}
+                title="크게 보기"
+                className={getButtonClassName('ghost', 'size-10 min-h-10 p-0 text-muted shadow-none')}
+                to={{ pathname: '/control/monitoring/carousel', search: new URLSearchParams({ siteId: selectedSite.id, robotId: selectedRobot.id }).toString() }}
+              >
+                <Icon name="maximize" />
+              </Link>
+              <Button
+                aria-label="로봇 정보 패널 닫기"
+                className="size-10 min-h-10 p-0 text-muted shadow-none"
+                onClick={onCloseRobotInfo}
+                variant="ghost"
+              >
+                <Icon name="close" />
+              </Button>
+            </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-4">
                 <SelectedRobotInfo robot={selectedRobot} statusQuery={operationalStatusQuery} />
@@ -370,18 +381,20 @@ function SelectedRobotInfo({ robot, statusQuery }: {
 
   return (
     <>
-      <RobotModelViewer nickname={robotNickname ?? robot.displayName} robotType={robot.robotType} />
+      <RobotScenePreview robot={robot} nickname={robotNickname ?? robot.displayName} />
       <RobotInfoOverview operationalStatus={operationalStatus} robot={robot} />
     </>
   );
 }
 
 function SelectedRobotSiteMap({
+  robots,
   fleetLocations,
   onSelectRobot,
   robot,
   site,
 }: {
+  readonly robots: readonly RobotDescriptor[];
   readonly fleetLocations: readonly FleetMapLocation[];
   readonly onSelectRobot: (robotId: string) => void;
   readonly robot: RobotDescriptor | undefined;
@@ -390,12 +403,17 @@ function SelectedRobotSiteMap({
   const geolocation = useRobotGeolocation(
     robot === undefined || site.environment === 'indoor' ? null : robot.id,
   );
-  return <SiteMap fleetLocations={fleetLocations} geolocation={geolocation} onSelectRobot={onSelectRobot} robot={robot} site={site} />;
+  return <SiteMap robots={robots} fleetLocations={fleetLocations} geolocation={geolocation} onSelectRobot={onSelectRobot} robot={robot} site={site} />;
 }
 
 export function ControlMonitoringPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null);
+  const selectedRobotId = searchParams.get('robotId');
+  const setSelectedRobotId = (id: string | null) => setSearchParams((current) => {
+    const next = new URLSearchParams(current);
+    if (id) next.set('robotId', id); else next.delete('robotId');
+    return next;
+  }, { replace: true });
   const [search, setSearch] = useState('');
   const robots = useRobotCatalog();
   const multiSelectMode = isMultiMonitoringSelectionMode(searchParams);

@@ -6,7 +6,7 @@ import { Icon } from '@/shared/ui/icon';
 import { getMonitoringRobotHealth } from '../model/monitoring-robot-health';
 
 export const robotMonitoringListClassName =
-  'grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-3 [scrollbar-width:thin]';
+  'grid min-h-0 flex-1 grid-cols-1 content-start gap-1 overflow-y-auto pb-3 [scrollbar-width:thin]';
 
 interface RobotMonitoringListRowProps {
   readonly disabled?: boolean;

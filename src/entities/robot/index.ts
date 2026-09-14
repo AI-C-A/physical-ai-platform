@@ -1,3 +1,5 @@
+import './ui/robot-map-label.css';
+
 export {
   createInMemoryRobotCatalogWithData,
   createInMemoryRobotOperationalStatusWithData,
@@ -49,3 +51,6 @@ export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';
 export { RobotCompanyAvatar } from './ui/RobotCompanyAvatar';
 
 export { defaultModels, robotModels } from './model/robot-models';
+export { createCarouselScene } from './ui/robot-carousel-scene';
+export { RobotSceneContext } from './ui/robot-scene-context';
+export { RobotScenePreview } from './ui/RobotScenePreview';
