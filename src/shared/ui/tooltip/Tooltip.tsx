@@ -10,10 +10,11 @@ export function TooltipProvider({ children }: PropsWithChildren) {
 interface TooltipProps {
   readonly content: ReactNode;
   readonly disabled?: boolean;
+  readonly side?: 'top' | 'right' | 'bottom' | 'left';
   readonly trigger: ReactNode;
 }
 
-export function Tooltip({ content, disabled = false, trigger }: TooltipProps) {
+export function Tooltip({ content, disabled = false, side = 'top', trigger }: TooltipProps) {
   const [open, setOpen] = useState(false);
   if (disabled && open) setOpen(false);
 
@@ -25,8 +26,9 @@ export function Tooltip({ content, disabled = false, trigger }: TooltipProps) {
       <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
-          className={`${getFloatingSurfaceClassName()} design-motion-tooltip z-50 max-w-64 rounded-[var(--design-radius-control)] px-2 py-1 text-xs text-foreground`}
+          className={`${getFloatingSurfaceClassName()} design-motion-tooltip z-50 max-w-64 rounded-[var(--design-radius-control)] px-2.5 py-1.5 text-[13px] text-foreground`}
           sideOffset={6}
+          side={side}
         >
           {content}
           <TooltipPrimitive.Arrow className="fill-layer-floating" />
