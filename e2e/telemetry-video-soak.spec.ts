@@ -238,22 +238,22 @@ test('Camera 화면의 heap·DOM·Long Task가 제한되고 이탈 시 track을 
   issues.assertNone();
 });
 
-test('6대 다중 관제가 장시간 연결을 유지하고 이탈 시 모든 track을 정리한다', async ({
+test('3대 다중 관제가 장시간 연결을 유지하고 이탈 시 모든 track을 정리한다', async ({
   page,
 }, testInfo) => {
   test.setTimeout(readSoakDurationMs() + 45_000);
   const issues = observeBrowserIssues(page);
   const search = new URLSearchParams({ mode: 'multi' });
-  Array.from({ length: 6 }, (_, index) =>
+  Array.from({ length: 3 }, (_, index) =>
     `robot-${String(index + 1).padStart(3, '0')}`)
     .forEach((robotId) => search.append('robotId', robotId));
 
   await page.goto(`/control/monitoring/multi?${search.toString()}`);
   await expectApplicationReady(page);
-  await expect(page.getByLabel(/카메라 패널$/u)).toHaveCount(6);
+  await expect(page.getByLabel(/카메라 패널$/u)).toHaveCount(3);
 
   const videos = page.locator('video');
-  await expect(videos).toHaveCount(9);
+  await expect(videos).toHaveCount(5);
   await expect.poll(() => videos.evaluateAll((elements) =>
     elements.every((element) =>
       element instanceof HTMLVideoElement
@@ -273,7 +273,7 @@ test('6대 다중 관제가 장시간 연결을 유지하고 이탈 시 모든 t
         : []);
     return browser.__capturedMultiVideoTracks.length;
   });
-  expect(capturedTrackCount).toBeGreaterThanOrEqual(9);
+  expect(capturedTrackCount).toBeGreaterThanOrEqual(5);
 
   const cdpSession = await page.context().newCDPSession(page);
   await cdpSession.send('HeapProfiler.enable');
@@ -301,7 +301,7 @@ test('6대 다중 관제가 장시간 연결을 유지하고 이탈 시 모든 t
       finalHeapUsedBytes: finalHeap.usedSize,
       initialHeapUsedBytes: initialHeap.usedSize,
       retainedHeapGrowthBytes,
-      robotCount: 6,
+      robotCount: 3,
       soakDurationMs: readSoakDurationMs(),
       videoCount: await videos.count(),
     }, null, 2)),

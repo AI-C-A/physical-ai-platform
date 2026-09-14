@@ -103,10 +103,10 @@ test('Robot 목록에서 영상 관제로 이동한다', async ({
   await page.goto('/control/robots');
   await expectApplicationReady(page);
 
-  await page.getByRole('link', { name: '정찰 로봇 01' }).click();
+  await page.getByRole('link', { name: '사족보행 로봇' }).click();
   await expect(page).toHaveURL(/\/control\/monitoring\/robot-001$/u);
   await expect(
-    page.getByRole('heading', { level: 1, name: '정찰 로봇 01' }),
+    page.getByRole('heading', { level: 1, name: '사족보행 로봇' }),
   ).toBeVisible();
   await expect(
     page.getByRole('link', { name: '영상 관제 나가기' }),
@@ -133,18 +133,18 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
   await page.goto('/mlops/collection/new');
   await expectApplicationReady(page);
   await expect(page.getByRole('heading', { name: '새 데이터 수집' })).toBeVisible();
-  for (const name of ['작업 ID', '외골격 장치 ID', 'Quest 손 추적 장치 ID', 'RBP 헤드 카메라 ID', '외부 카메라 ID · 선택']) {
-    await expect(page.getByRole('textbox', { name, exact: true })).toHaveValue('');
-  }
+  await expect(page.getByRole('textbox', { name: '작업 ID', exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '장치 준비 상태' })).toHaveCount(0);
   await page.getByRole('textbox', { name: '세션 이름' }).fill('E2E Quest human demo');
   await fillCollectionSetup(page);
-  await expect(page.getByRole('textbox', { name: '외부 카메라 ID · 선택' })).toHaveValue('external-camera-001');
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
   await page.getByRole('button', { name: '세션 생성' }).click();
-  const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+  await openCollectionDetails(page, '장치');
+  await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+  const pairing = page.getByRole('status', { name: 'Quest 연결 코드' });
   await expect(pairing).toHaveText(/^\d{6}$/u);
-  await expect(page.getByText('를 열고 아래 코드를 입력하세요.', { exact: false })).toBeVisible();
-  await expect(page.getByText('/collect/quest', { exact: true })).toBeVisible();
+  await expect(page.getByText('브라우저에서 아래 주소를 열고 연결 코드를 입력하세요.', { exact: false })).toBeVisible();
+  await expect(page.getByText(/http:\/\/[^ ]+\/collect\/quest$/u)).toBeVisible();
   await expect(page.getByRole('link', { name: 'Collector 열기' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '장치 준비 상태', exact: true })).toHaveCount(0);
   const collector = await page.context().newPage();
@@ -152,65 +152,58 @@ test('서로 다른 탭에서 Human Demonstration과 Quest collector를 페어�
   try {
     await collector.goto('/collect/quest');
     await expectApplicationReady(collector);
-    await expect(collector.getByRole('textbox', { name: '6자리 페어링 코드' })).toHaveValue('');
-    await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-    await collector.getByRole('button', { name: '세션 연결' }).click();
-    await expect(collector.getByRole('region', { name: '연결된 세션' })).toContainText('PC 수집 세션에 연결되었습니다.');
-    await expect(page.getByRole('heading', { name: 'Quest 연결 완료' })).toBeVisible();
-    await collector.getByRole('button', { name: 'MR 모드 시작' }).click();
-    await expect(collector.getByRole('button', { name: 'MR 모드 종료' })).toBeVisible();
+    await expect(collector.getByRole('textbox', { name: '6자리 연결 코드' })).toHaveValue('');
+    await collector.getByRole('textbox', { name: '6자리 연결 코드' }).fill((await pairing.innerText()).trim());
+    await collector.getByRole('button', { name: '연결' }).click();
+    await expect(collector.getByRole('region', { name: '연결된 세션' })).toContainText('PC에 연결되었습니다.');
+    await expect(page.getByRole('region', { name: 'Quest 손 추적 장치' })).toContainText('연결됨');
+    await collector.getByRole('button', { name: '손 추적 시작' }).click();
+    await expect(collector.getByRole('button', { name: '손 추적 중지' })).toBeVisible();
     for (const side of ['왼손', '오른손']) {
       await expect(collector.getByLabel(side + ' Hand Pose 상태', { exact: true })).toContainText('추적 정상');
     }
-    await page.getByRole('button', { name: '수집 콘솔 열기' }).click();
+    await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+    await openCollectionDetails(page, '세션 정보');
     await expect(page.getByRole('heading', { name: 'E2E Quest human demo' })).toBeVisible();
     const controls = page.getByRole('region', { name: '수집 작업 컨트롤' });
     const sessionInfo = page.getByRole('region', { name: '세션 정보', exact: true });
-    await openCollectionDetails(page, '수집 상태');
+    await openCollectionDetails(page, '장치');
     const bindings = page.getByRole('region', { name: 'Collector 명령 응답' });
     await controls.getByRole('button', { name: 'Episode 녹화 시작', exact: true }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'recording');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('녹화 중');
-    {
-      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
-      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
-    }
-    await expect(bindings).toContainText('quest2-001 · 시작 · 확인 완료');
+    await expect(bindings).toContainText(/quest-[a-f0-9]{32} · 시작 · 확인 완료/u);
     await expect(page.getByRole('region', { name: 'Quest 손 포즈 3D' }).locator('canvas')).toBeVisible();
     await openCollectionDetails(page, '세션 정보');
     await expect(sessionInfo).toContainText('완전성');
-    await openCollectionDetails(page, '수집 상태');
+    await openCollectionDetails(page, '장치');
     await expect.poll(() => controls.getByLabel('녹화 경과 시간').innerText()).not.toBe('00:00');
 
     await controls.getByRole('button', { name: 'Episode 녹화 정지' }).click();
     await expect(controls).toHaveAttribute('data-collection-state', 'review');
     await expect(collector.getByRole('region', { name: 'Collector 운영 상태' })).toContainText('검토 대기');
-    {
-      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
-      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
-    }
-    await expect(bindings).toContainText('quest2-001 · 정지 · 확인 완료');
+    await expect(bindings).toContainText(/quest-[a-f0-9]{32} · 정지 · 확인 완료/u);
     const recordedCamera = page.getByRole('region', { name: '기록된 Episode 카메라' });
-    await expect(recordedCamera.locator('figure')).toHaveCount(2);
+    await expect(recordedCamera.locator('figure')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Quest 손 포즈 3D' }).locator('canvas')).toBeVisible();
     const playback = page.getByRole('group', { name: 'Episode 재생 컨트롤' });
     await expect(playback).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Episode 재생 위치' })).toBeEnabled();
-    await openCollectionDetails(page, '수집 상태');
-    await page.getByRole('region', { name: 'Sensor stream 상태' }).locator('.collection-stream > summary').first().click();
-    await expect(page.getByRole('region', { name: 'Sensor stream 상태' }).getByRole('img', { name: /최근 10초 수신 기록/u }).first()).toBeVisible();
+    await openCollectionDetails(page, '장치');
+    await expect(page.getByRole('region', { name: '장치 스트림 상태' }).getByRole('img', { name: /최근 10초 수신 기록/u }).first()).toBeVisible();
     await expect(controls.getByRole('button', { name: '녹화본 저장' })).toBeInViewport();
     await openCollectionDetails(page, '세션 정보');
     await controls.getByRole('button', { name: '녹화본 저장' }).click();
     await expect(page.locator('[data-episode-summary]')).toContainText('저장 완료 1개');
 
     await collector.reload();
-    await expect(collector.getByRole('textbox', { name: '6자리 페어링 코드' })).toBeVisible();
+    await expect(collector.getByRole('textbox', { name: '6자리 연결 코드' })).toBeVisible();
     await expect(collector.getByRole('region', { name: '연결된 세션' })).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Quest 손 포즈 3D' })).toContainText('연결 끊김');
-    await openCollectionDetails(page, '수집 상태');
+    await expect(page.getByRole('region', { name: '수집 장치 연결 안내' })).toBeVisible();
+    await openCollectionDetails(page, '장치');
     await expect(page.getByRole('region', { name: 'Quest 손 추적 장치' }).getByRole('button', { name: 'Quest 연결', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Quest 연결' }).getByRole('status', { name: 'Quest pairing code' })).toHaveText(/^\d{6}$/u);
+    await expect(page.getByRole('dialog', { name: 'Quest 연결' }).getByRole('status', { name: 'Quest 연결 코드' })).toHaveText(/^\d{6}$/u);
     collectorIssues.assertNone();
     issues.assertNone();
   } finally {
@@ -243,12 +236,12 @@ test('Monitoring은 위치 지도 위에 사이트 드롭다운과 로봇 선택
     page.getByRole('heading', { name: '선택 Robot 운영 상태' }),
   ).toHaveCount(0);
 
-  await page.getByRole('region', { name: '로봇 선택' }).getByRole('button', { name: /정찰 로봇 01/u }).click();
+  await page.getByRole('region', { name: '로봇 선택' }).getByRole('button', { name: /사족보행 로봇/u }).click();
   const selectedRobot = page.getByRole('region', {
-    name: '정찰 로봇 01 로봇 패널',
+    name: '사족보행 로봇 로봇 패널',
   });
   const robotInfoOverview = page.getByRole('region', {
-    name: '정찰 로봇 01 로봇 정보',
+    name: '사족보행 로봇 로봇 정보',
   });
   await expect(robotInfoOverview).toBeVisible();
   await expect(
@@ -317,7 +310,7 @@ test('Monitoring은 위치 지도 위에 사이트 드롭다운과 로봇 선택
   await selectedRobot.getByRole('button', { name: '로봇 정보 패널 닫기' }).click();
   await expect(selectedRobot).toHaveCount(0);
   await expect(page.getByRole('group', { name: '로봇 3D 모델' })).toHaveCount(0);
-  await expect(robotSelector.getByRole('button', { name: /정찰 로봇 01/u }))
+  await expect(robotSelector.getByRole('button', { name: /사족보행 로봇/u }))
     .toHaveAttribute('aria-pressed', 'false');
 
   await expect(robotSelector).toBeVisible();
@@ -335,9 +328,9 @@ test('Monitoring에서 여러 Robot을 선택해 다중 관제로 이동하고 �
 
   const robotSelector = page.getByRole('region', { name: '로봇 선택' });
   const regularRow = robotSelector.getByRole('button', {
-    name: /정찰 로봇 01/u,
+    name: /사족보행 로봇/u,
   });
-  const regularName = regularRow.getByText('정찰 로봇 01', { exact: true });
+  const regularName = regularRow.getByText('사족보행 로봇', { exact: true });
   const searchbox = page.getByRole('searchbox', { name: '로봇 검색' });
   const modeAction = page.getByRole('button', { name: '다중 선택' });
   const [regularRowBox, regularNameBox, regularSearchBox, regularModeActionBox] = await Promise.all([
@@ -351,10 +344,10 @@ test('Monitoring에서 여러 Robot을 선택해 다중 관제로 이동하고 �
   const selection = page.getByRole('list', { name: '다중 관제 로봇 선택' });
   const start = page.getByRole('button', { name: '다중 관제 시작' });
   const multipleCheckbox = selection.getByRole('checkbox', {
-    name: /정찰 로봇 01/u,
+    name: /사족보행 로봇/u,
   });
   const multipleRow = multipleCheckbox.locator('xpath=..');
-  const multipleName = multipleRow.getByText('정찰 로봇 01', { exact: true });
+  const multipleName = multipleRow.getByText('사족보행 로봇', { exact: true });
   const [multipleRowBox, multipleNameBox, multipleSearchBox, multipleModeActionBox] = await Promise.all([
     multipleRow.boundingBox(),
     multipleName.boundingBox(),
@@ -378,7 +371,7 @@ test('Monitoring에서 여러 Robot을 선택해 다중 관제로 이동하고 �
   await modeAction.click();
   await expect(start).toBeDisabled();
   await multipleCheckbox.click();
-  await selection.getByRole('checkbox', { name: /수송 로봇 02/u }).click();
+  await selection.getByRole('checkbox', { name: /사륜 로봇/u }).click();
   await expect(start).toBeEnabled();
   await start.click();
 
@@ -388,8 +381,8 @@ test('Monitoring에서 여러 Robot을 선택해 다중 관제로 이동하고 �
   await expect(
     page.getByRole('heading', { level: 1, name: '다중 관제' }),
   ).toBeVisible();
-  await expect(page.getByLabel('정찰 로봇 01 카메라 패널')).toBeVisible();
-  await expect(page.getByLabel('수송 로봇 02 카메라 패널')).toBeVisible();
+  await expect(page.getByLabel('사족보행 로봇 카메라 패널')).toBeVisible();
+  await expect(page.getByLabel('사륜 로봇 카메라 패널')).toBeVisible();
   await expect(page.getByRole('link', { name: '로봇 관리' })).toHaveCount(0);
 
   await page.getByRole('link', { name: '다중 영상 관제 나가기' }).click();
@@ -400,20 +393,20 @@ test('Monitoring에서 여러 Robot을 선택해 다중 관제로 이동하고 �
     name: '다중 관제 로봇 선택',
   })).toBeVisible();
   await expect(selection.getByRole('checkbox', {
-    name: /정찰 로봇 01/u,
+    name: /사족보행 로봇/u,
   })).toBeChecked();
   await expect(selection.getByRole('checkbox', {
-    name: /수송 로봇 02/u,
+    name: /사륜 로봇/u,
   })).toBeChecked();
   issues.assertNone();
 });
 
-test('다중 관제는 6대 패널을 데스크톱 한 화면에 배치하고 compact 화면에서는 내부 스크롤한다', async ({
+test('다중 관제는 3대 패널을 데스크톱 한 화면에 배치하고 compact 화면에서는 내부 스크롤한다', async ({
   page,
 }, testInfo) => {
   const issues = observeBrowserIssues(page);
   const selectedRobotIds = Array.from(
-    { length: 6 },
+    { length: 3 },
     (_, index) => `robot-${String(index + 1).padStart(3, '0')}`,
   );
   const search = new URLSearchParams({ mode: 'multi' });
@@ -430,8 +423,8 @@ test('다중 관제는 6대 패널을 데스크톱 한 화면에 배치하고 co
     '[data-panel-surface="soft-group"] > header h2',
   );
   await expect(cameraGrid).toBeVisible();
-  await expect(robotPanels).toHaveCount(6);
-  await expect(robotHeadings).toHaveCount(6);
+  await expect(robotPanels).toHaveCount(3);
+  await expect(robotHeadings).toHaveCount(3);
   await expect(page.getByText('관제 중', { exact: true })).toHaveCount(0);
 
   const monitoringHeader = page.locator('body header').first();
@@ -561,8 +554,12 @@ test('다중 관제는 6대 패널을 데스크톱 한 화면에 배치하고 co
       await expect(robotPanels.nth(index)).toBeInViewport();
     }
   } else {
-    expect(gridOverflow, 'compact 다중 관제 내부 세로 스크롤')
-      .toBeGreaterThan(1);
+    await page.setViewportSize({ width: viewportWidth, height: 600 });
+    await expect.poll(() => cameraGrid.evaluate((element) => element.scrollHeight - element.clientHeight),
+      { message: 'compact 다중 관제 내부 세로 스크롤' }).toBeGreaterThan(1);
+    await robotPanels.last().scrollIntoViewIfNeeded();
+    await expect(robotPanels.last()).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
   }
 
   issues.assertNone();
@@ -575,7 +572,7 @@ test('Robot 화면 Query와 JSON 내보내기가 같은 레코드 집합을 사�
   await page.goto('/control/robots');
   await expectApplicationReady(page);
 
-  await page.getByRole('searchbox', { name: '로봇 검색' }).fill('정찰');
+  await page.getByRole('searchbox', { name: '로봇 검색' }).fill('사족보행');
   await page.getByRole('combobox', { name: '정렬' }).click();
   await page.getByRole('option', { name: '이름 내림차순' }).click();
 
@@ -586,13 +583,14 @@ test('Robot 화면 Query와 JSON 내보내기가 같은 레코드 집합을 사�
       sort: params.get('sort'),
     };
   }).toEqual({
-    search: '정찰',
+    search: '사족보행',
     sort: 'name-desc',
   });
 
   const robotTable = page.getByRole('table', { name: '로봇 목록' });
   const robotLinks = robotTable.getByRole('link');
-  await expect(robotLinks).toHaveCount(3);
+  await expect(robotLinks).toHaveCount(1);
+  await expect(robotLinks.first()).toHaveAttribute('href', /\/robot-001(?:\?|$)/u);
   const visibleIds = await robotLinks.evaluateAll((links) =>
     links.map((link) => {
       const pathSegments = new URL((link as HTMLAnchorElement).href).pathname
@@ -709,13 +707,10 @@ test('MLOps 목록과 JSON 내보내기가 페이지를 포함한 같은 레코�
     if (suffix === 'beta') await page.getByRole('link', { name: '새 수집' }).click();
     await fillCollectionSetup(page);
     await page.getByRole('textbox', { name: '세션 이름' }).fill('내보내기 ' + suffix);
-    await page.getByRole('textbox', { name: '외골격 장치 ID', exact: true }).fill('exoskeleton-' + suffix);
-    await page.getByRole('textbox', { name: 'Quest 손 추적 장치 ID', exact: true }).fill('quest-' + suffix);
-    await page.getByRole('textbox', { name: 'RBP 헤드 카메라 ID', exact: true }).fill('head-camera-' + suffix);
-    await page.getByRole('textbox', { name: '외부 카메라 ID · 선택', exact: true }).fill('external-camera-' + suffix);
     await page.getByRole('button', { name: '세션 생성' }).click();
-    await expect(page.getByRole('status', { name: 'Quest pairing code' })).toHaveText(/^\d{6}$/u);
-    await page.getByRole('button', { name: '목록으로' }).click();
+    await expect(page.getByRole('heading', { name: '내보내기 ' + suffix, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
+    await page.getByRole('button', { name: '나중에 계속', exact: true }).click();
   }
   const collectionTable = page.getByRole('table', { name: '운영 중인 휴머노이드 수집 세션' });
   await expect(collectionTable.locator('tbody tr')).toHaveCount(2);
@@ -799,7 +794,7 @@ test('수집 계획의 DOM·시각 순서가 viewport별 키보드 읽기 순서
   await page.goto('/mlops/capture/humanoid');
   await expectApplicationReady(page);
   await expect(page).toHaveURL(/\/mlops\/collection\/new$/u);
-  const fieldNames = ['세션 이름', '작업 ID', '작업 지시', '외골격 장치 ID', 'Quest 손 추적 장치 ID', 'RBP 헤드 카메라 ID', '외부 카메라 ID · 선택'];
+  const fieldNames = ['세션 이름', '작업 지시'];
   const firstInput = page.getByRole('textbox', { name: fieldNames[0], exact: true });
   await firstInput.focus();
   for (const name of fieldNames.slice(1)) {
@@ -811,7 +806,7 @@ test('수집 계획의 DOM·시각 순서가 viewport별 키보드 읽기 순서
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: '세션 생성', exact: true })).toBeFocused();
   const plan = page.getByRole('textbox', { name: '작업 지시', exact: true });
-  const devices = page.getByRole('group', { name: '수집 장치', exact: true });
+  const devices = page.getByRole('button', { name: '세션 생성', exact: true });
   const planBox = await plan.boundingBox();
   const deviceBox = await devices.boundingBox();
   if (planBox === null || deviceBox === null) throw new Error('수집 작업과 장치 입력의 배치를 측정하지 못했습니다.');
@@ -831,17 +826,20 @@ test('수집부터 에피소드와 초안 데이터셋까지 앱 범위 업무�
   await page.getByRole('textbox', { name: '세션 이름' }).fill(captureName);
   await fillCollectionSetup(page);
   await page.getByRole('button', { name: '세션 생성' }).click();
-  const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+  await openCollectionDetails(page, '장치');
+  await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+  const pairing = page.getByRole('status', { name: 'Quest 연결 코드' });
   await expect(pairing).toHaveText(/^\d{6}$/u);
   const collector = await page.context().newPage();
   const collectorIssues = observeBrowserIssues(collector);
   try {
     await collector.goto('/collect/quest');
     await expectApplicationReady(collector);
-    await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-    await collector.getByRole('button', { name: '세션 연결' }).click();
-    await collector.getByRole('button', { name: 'MR 모드 시작' }).click();
-    await page.getByRole('button', { name: '수집 콘솔 열기' }).click();
+    await collector.getByRole('textbox', { name: '6자리 연결 코드' }).fill((await pairing.innerText()).trim());
+    await collector.getByRole('button', { name: '연결' }).click();
+    await collector.getByRole('button', { name: '손 추적 시작' }).click();
+    await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+    await openCollectionDetails(page, '세션 정보');
     await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/mlops\/collection\/capture-hd-[^/]+$/u);
     const collectionId = new URL(page.url()).pathname.split('/').at(-1);
     expect(collectionId).toMatch(/^capture-hd-/u);
@@ -898,16 +896,19 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
   await fillCollectionSetup(page);
   await page.getByRole('textbox', { name: '세션 이름' }).fill(`인라인 수집 정보 ${testInfo.project.name}`);
   await page.getByRole('button', { name: '세션 생성' }).click();
-  const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+  await openCollectionDetails(page, '장치');
+  await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+  const pairing = page.getByRole('status', { name: 'Quest 연결 코드' });
   await expect(pairing).toHaveText(/^\d{6}$/u);
   const collector = await page.context().newPage();
   try {
     await collector.goto('/collect/quest');
     await expectApplicationReady(collector);
-    await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-    await collector.getByRole('button', { name: '세션 연결' }).click();
-    await collector.getByRole('button', { name: 'MR 모드 시작' }).click();
-    await page.getByRole('button', { name: '수집 콘솔 열기' }).click();
+    await collector.getByRole('textbox', { name: '6자리 연결 코드' }).fill((await pairing.innerText()).trim());
+    await collector.getByRole('button', { name: '연결' }).click();
+    await collector.getByRole('button', { name: '손 추적 시작' }).click();
+    await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+    await openCollectionDetails(page, '세션 정보');
     const controls = page.getByRole('region', { name: '수집 작업 컨트롤' });
     const inspector = page.getByRole('complementary', { name: '수집 상세' });
     const sessionInfo = page.getByRole('region', { name: '세션 정보' });
@@ -928,7 +929,7 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       await expect(sessionInfo.getByText('데이터 품질', { exact: true })).toHaveCount(1);
       await expect(sessionInfo).toContainText(/완전성/u);
       await expect(page.getByRole('button', { name: '상세 진단', exact: true })).toHaveCount(0);
-      const connection = page.getByRole('tab', { name: '수집 상태', exact: true });
+      const connection = page.getByRole('tab', { name: '장치', exact: true });
       const sessionTab = page.getByRole('tab', { name: '세션 정보', exact: true });
       await sessionTab.focus();
       await page.keyboard.press('Shift+Tab');
@@ -940,30 +941,18 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       const connectionBox = await connection.boundingBox();
       expect(connectionBox?.height).toBeGreaterThanOrEqual(40);
       await connection.press('Enter');
-      const commandSummary = page.locator('summary').filter({ hasText: '녹화 명령 응답' });
-      if (!await commandSummary.locator('..').evaluate((element) => element.hasAttribute('open'))) await commandSummary.click();
       await expect(page.getByRole('region', { name: 'Collector 명령 응답' })).toBeVisible();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       const connectionScreenshot = testInfo.outputPath(`inline-connection-${String(viewport.width)}.png`);
       await page.screenshot({ path: connectionScreenshot });
       await testInfo.attach(`inline-connection-${String(viewport.width)}`, { path: connectionScreenshot, contentType: 'image/png' });
-      const sources = page.getByRole('region', { name: 'Sensor stream 상태' });
-      const headSource = sources.locator('summary').filter({ hasText: 'Head RGB · RBP Camera' });
-      await headSource.focus();
-      await headSource.press('Enter');
-      await expect(headSource.locator('..')).toHaveAttribute('open', '');
-      await expect(headSource.locator('..').getByText('rbp-headcam-001', { exact: true })).toBeVisible();
-      await headSource.press('Enter');
-      await expect(headSource.locator('..')).not.toHaveAttribute('open');
-      await expect(sources.getByText('Head RGB · RBP Camera', { exact: true })).toHaveCount(1);
-      await expect(sources.getByRole('button', { name: /전체 소스 상세/u })).toHaveCount(0);
-      for (const label of ['선택 소스', '파생 데이터']) {
-        const disclosure = sources.locator('summary').filter({ hasText: label });
-        await expect(disclosure).toBeVisible();
-        if (!await disclosure.locator('..').evaluate((element) => element.hasAttribute('open'))) await disclosure.click();
-      }
-      await expect(sources.getByText('External RGB · Full body', { exact: true })).toBeVisible();
-      await expect(sources.getByText('Head Semantic', { exact: true })).toBeVisible();
+      const sources = page.getByRole('region', { name: '장치 스트림 상태' });
+      const handSource = sources.getByRole('article', { name: '왼손 추적 상태' });
+      await expect(handSource.getByText(/^quest-[a-f0-9]{32}$/u)).toBeVisible();
+      await expect(sources.locator('details, summary')).toHaveCount(0);
+      await expect(sources.getByRole('article', { name: '오른손 추적 상태' })).toBeVisible();
+      await expect(sources.getByText('Head RGB · RBP Camera', { exact: true })).toHaveCount(0);
+      await expect(sources.getByRole('button', { name: '카메라 연결', exact: true })).toBeEnabled();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(controls.getByRole('button', { name: 'Episode 녹화 정지', exact: true })).toBeInViewport();
       const overflow = await inspector.evaluate((element) => ({
@@ -975,7 +964,7 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
       expect(overflow.documentX).toBeLessThanOrEqual(1);
       expect(overflow.documentY).toBeLessThanOrEqual(1);
       if (viewport.width >= 896) {
-        await expect(page.getByRole('region', { name: '실시간 수집 카메라', exact: true })).toBeInViewport();
+        await expect(page.getByRole('region', { name: '실시간 수집 모니터', exact: true })).toBeInViewport();
       }
       const sourcesScreenshot = testInfo.outputPath(`inline-sources-${String(viewport.width)}.png`);
       await page.screenshot({ path: sourcesScreenshot });
@@ -991,7 +980,7 @@ test('수집 정보는 다이얼로그 없이 펼치고 녹화 조작을 유지�
   }
 });
 
-test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재수집한다', async ({ page }, testInfo) => {
+test('수집 콘솔은 실제 손 추적과 상세를 유지하며 녹화·검토·재수집한다', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const issues = observeBrowserIssues(page);
   const assertNoWorkspaceScroll = async () => {
@@ -1025,24 +1014,27 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
   await fillCollectionSetup(page);
   await assertNoWorkspaceScroll();
   await page.getByRole('button', { name: '세션 생성' }).click();
-  const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+  await openCollectionDetails(page, '장치');
+  await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+  const pairing = page.getByRole('status', { name: 'Quest 연결 코드' });
   await expect(pairing).toHaveText(/^\d{6}$/u);
   const collector = await page.context().newPage();
   try {
     await collector.goto('/collect/quest');
     await expectApplicationReady(collector);
-    await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-    await collector.getByRole('button', { name: '세션 연결' }).click();
-    await collector.getByRole('button', { name: 'MR 모드 시작' }).click();
+    await collector.getByRole('textbox', { name: '6자리 연결 코드' }).fill((await pairing.innerText()).trim());
+    await collector.getByRole('button', { name: '연결' }).click();
+    await collector.getByRole('button', { name: '손 추적 시작' }).click();
     await assertNoWorkspaceScroll();
-    await page.getByRole('button', { name: '수집 콘솔 열기' }).click();
+    await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+    await openCollectionDetails(page, '세션 정보');
     await expect(page.getByRole('heading', { name: sessionName })).toBeVisible();
 
     const controls = page.getByRole('region', { name: '수집 작업 컨트롤' });
     const summary = page.getByRole('tab', { name: '세션 정보' });
     const sessionTab = page.getByRole('tab', { name: '세션 정보' });
     const sessionInfo = page.getByRole('region', { name: '세션 정보' });
-    const camera = page.getByRole('region', { name: '실시간 수집 카메라' });
+    const camera = page.getByRole('region', { name: '실시간 수집 모니터' });
     await expect(sessionInfo).toBeVisible();
     const inspector = page.getByRole('complementary', { name: '수집 상세' });
     const captureProductState = async (state: 'ready' | 'recording') => {
@@ -1050,7 +1042,7 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
       for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(viewport);
         await expect(controls).toHaveAttribute('data-collection-state', state === 'ready' ? 'episode-ready' : 'recording');
-        await camera.locator('figure').first().scrollIntoViewIfNeeded();
+        await page.getByRole('region', { name: 'Quest 손 포즈 3D' }).scrollIntoViewIfNeeded();
         await expect(controls).toBeInViewport();
         const name = `collection-${state}-${String(viewport.width)}x${String(viewport.height)}`;
         const path = testInfo.outputPath(`${name}.png`);
@@ -1061,13 +1053,13 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
     };
     await expect(inspector.getByRole('button', { name: '수집 상세 닫기' })).toHaveCount(0);
     await expect(inspector.getByRole('heading', { name: '세션 정보', exact: true })).toHaveCount(0);
-    await expect(sessionInfo.getByText('quest2-001', { exact: true })).toBeVisible();
-    await expect(sessionInfo.getByText('rbp-headcam-001', { exact: true })).toBeVisible();
+    await expect(sessionInfo.getByText(/^quest-[a-f0-9]{32}$/u)).toHaveCount(0);
+    await expect(sessionInfo.getByText(/^head-camera-[a-f0-9]{32}$/u)).toHaveCount(0);
     await expect(sessionInfo.getByText('생성 시각', { exact: true })).toBeVisible();
     if (testInfo.project.name === 'chrome-1440') {
       for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(viewport);
-        for (const name of ['세션 정보', '수집 상태']) {
+        for (const name of ['세션 정보', '장치']) {
           await openCollectionDetails(page, name);
           await inspector.scrollIntoViewIfNeeded();
           const path = testInfo.outputPath(`inspector-${name}-${String(viewport.width)}.png`);
@@ -1084,13 +1076,9 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
     await expect(page.locator('[data-collection-header]')).not.toContainText('수집 상세');
     await expect(page.getByRole('tablist', { name: '수집 상세 메뉴' })).toHaveAttribute('aria-orientation', 'vertical');
     await expect(page.locator('[data-preview-workspace] [data-episode-summary]')).toHaveCount(0);
-    const bodyModel = page.getByRole('region', { name: '전신 휴머노이드 3D' }).locator('model-viewer');
-    if ((page.viewportSize()?.width ?? 0) < 896) await bodyModel.scrollIntoViewIfNeeded();
-    await expect(bodyModel).toHaveJSProperty('src', '/assets/unitree-g1.glb');
-    await expect.poll(() => bodyModel.evaluate((element) => Reflect.get(element, 'loaded') === true)).toBe(true);
-    await expect(bodyModel).not.toHaveAttribute('autoplay');
+    await expect(page.getByRole('region', { name: '전신 휴머노이드 3D' })).toHaveCount(0);
     const mediaPanels = page.locator('[data-media-panel]');
-    await expect(mediaPanels).toHaveCount(3);
+    await expect(mediaPanels).toHaveCount(1);
     for (const panel of await mediaPanels.all()) {
       await expect(panel).toHaveCSS('border-radius', '12px');
       await expect(panel).toHaveCSS('overflow', 'hidden');
@@ -1098,24 +1086,14 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
       await expect(panel).toHaveCSS('box-shadow', 'none');
       await expect(panel.locator('[data-media-panel-header]')).toHaveCSS('min-height', '40px');
     }
-    for (const figure of await camera.locator('figure').all()) {
-      await expect(figure).toHaveCSS('border-radius', '12px');
-      await expect(figure).toHaveCSS('border-top-width', '0px');
-      await expect(figure).toHaveCSS('outline-style', 'none');
-      await expect(figure).toHaveCSS('box-shadow', 'none');
-    }
     const assertMonitorVisible = async () => {
-      for (const name of ['실시간 수집 카메라', 'Head RGB Depth와 세그멘테이션', '전신 휴머노이드 3D', 'Quest 손 포즈 3D']) {
+      for (const name of ['실시간 수집 모니터', 'Quest 손 포즈 3D']) {
         const region = page.getByRole('region', { name, exact: true });
         if ((page.viewportSize()?.width ?? 0) < 896) await region.scrollIntoViewIfNeeded();
         await expect(region).toBeInViewport();
       }
-      await expect(camera.locator('figure')).toHaveCount(2);
-      for (const figure of await camera.locator('figure').all()) {
-        if ((page.viewportSize()?.width ?? 0) < 896) await figure.scrollIntoViewIfNeeded();
-        await expect(figure).toBeInViewport();
-      }
-      await expect(controls).toBeInViewport();
+      await expect(camera.locator('figure')).toHaveCount(0);
+        await expect(controls).toBeInViewport();
     };
     await assertMonitorVisible();
     await captureProductState('ready');
@@ -1131,7 +1109,7 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
     await page.keyboard.press('Enter');
     await expect(sessionInfo).toBeVisible();
     await assertNoWorkspaceScroll();
-    for (const name of ['수집 상태', '문제', '세션 정보']) {
+    for (const name of ['장치', '문제', '세션 정보']) {
       await openCollectionDetails(page, name === '문제' ? /^문제(?: · \d+)?$/u : name);
       await assertMonitorVisible();
       await assertNoWorkspaceScroll();
@@ -1176,35 +1154,11 @@ test('수집 콘솔은 상세와 다섯 뷰를 유지하며 녹화·검토·재�
       await assertNoWorkspaceScroll();
       const controlsBox = await controls.boundingBox();
       if (controlsBox === null) throw new Error('수집 화면 크기를 측정하지 못했습니다.');
-      await expect(camera.locator('figure')).toHaveCount(2);
-      for (const cameraCard of await camera.locator('figure').all()) {
-        if (viewport.width < 896) await cameraCard.scrollIntoViewIfNeeded();
-        const cameraBox = await cameraCard.locator('[data-camera-viewport]').boundingBox();
-        const captionBox = await cameraCard.locator('figcaption').boundingBox();
-        const cardBox = await cameraCard.boundingBox();
-        if (cameraBox === null || captionBox === null || cardBox === null) throw new Error('카메라 크기를 측정하지 못했습니다.');
-        expect(cameraBox.height).toBeGreaterThan(0);
-        expect(Math.abs(cameraBox.width / cameraBox.height - 16 / 9)).toBeLessThan(0.02);
-        expect(Math.abs(cameraBox.x - cardBox.x)).toBeLessThan(1);
-        expect(Math.abs(cameraBox.width - cardBox.width)).toBeLessThan(1);
-        expect(Math.abs(cameraBox.y - captionBox.y - captionBox.height)).toBeLessThan(1);
-        expect(Math.abs(cameraBox.y + cameraBox.height - cardBox.y - cardBox.height)).toBeLessThan(1);
-        await expect(cameraCard.locator('img, video').first()).toHaveCSS('object-fit', 'contain');
-        expect(captionBox.y + captionBox.height).toBeLessThanOrEqual(cameraBox.y + 1);
-        expect(cameraBox.y + cameraBox.height).toBeLessThanOrEqual(viewport.height);
-        await expect(cameraCard.locator('figcaption')).toBeInViewport();
-      }
-      const perceptionViewport = page.locator('[data-perception-viewport]');
-      if (viewport.width < 896) await perceptionViewport.scrollIntoViewIfNeeded();
-      const perceptionBox = await perceptionViewport.boundingBox();
-      if (perceptionBox === null) throw new Error('인지 영상 크기를 측정하지 못했습니다.');
-      expect(perceptionBox.height).toBeGreaterThan(0);
-      expect(Math.abs(perceptionBox.width / perceptionBox.height - 16 / 9)).toBeLessThan(0.02);
-      for (const image of await perceptionViewport.locator('img').all()) {
-        await expect(image).toHaveCSS('object-fit', 'contain');
-        const imageBox = await image.boundingBox();
-        expect(imageBox).toEqual(perceptionBox);
-      }
+      await expect(camera.locator('figure')).toHaveCount(0);
+      await expect(page.locator('[data-perception-viewport]')).toHaveCount(0);
+      const handCanvas = page.getByRole('region', { name: 'Quest 손 포즈 3D' }).locator('canvas');
+      if (viewport.width < 896) await handCanvas.scrollIntoViewIfNeeded();
+      await expect(handCanvas).toBeVisible();
       expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewport.height);
       expect(controlsBox.x + controlsBox.width).toBeLessThanOrEqual(viewport.width);
       await expect(controls.getByRole('button', { name: '다음 Episode 녹화 시작' })).toBeInViewport();

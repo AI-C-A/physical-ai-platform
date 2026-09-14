@@ -64,8 +64,8 @@ for (const viewport of viewports) {
     await expectApplicationReady(page);
 
     const map = page.getByRole('region', { name: '로봇 위치 지도', exact: true });
-    const marker = page.getByRole('button', { name: '정찰 로봇 01 위치 선택', exact: true, includeHidden: true });
-    const panel = page.getByRole('region', { name: '정찰 로봇 01 로봇 패널', exact: true, includeHidden: true });
+    const marker = page.getByRole('button', { name: '사족보행 로봇 위치 선택', exact: true, includeHidden: true });
+    const panel = page.getByRole('region', { name: '사족보행 로봇 로봇 패널', exact: true, includeHidden: true });
     const list = page.getByRole('region', { name: '로봇 선택', exact: true, includeHidden: true });
     const toggle = page.locator('button[aria-controls="monitoring-robot-list"]');
     const controls = page.getByRole('group', { name: '지도 보기 제어', exact: true });
@@ -119,9 +119,9 @@ for (const viewport of viewports) {
           await captureMonitoring(page, testInfo, 'list-expanded');
         }
         const search = list.getByRole('searchbox', { name: '로봇 검색', exact: true });
-        await search.fill('수송 로봇 02');
-        await expect(list.getByRole('button', { name: /수송 로봇 02/u })).toBeVisible();
-        await expect(list.getByRole('button', { name: /정찰 로봇 01/u })).toHaveCount(0);
+        await search.fill('사륜 로봇');
+        await expect(list.getByRole('button', { name: /사륜 로봇/u })).toBeVisible();
+        await expect(list.getByRole('button', { name: /사족보행 로봇/u })).toHaveCount(0);
         await expect(marker).toHaveAttribute('aria-pressed', 'true');
         if (mobile) {
           await toggle.focus();
@@ -136,20 +136,20 @@ for (const viewport of viewports) {
 
         if (mobile) {
           await toggle.click();
-          await expect(search).toHaveValue('수송 로봇 02');
-          await list.getByRole('button', { name: /수송 로봇 02/u }).click();
+          await expect(search).toHaveValue('사륜 로봇');
+          await list.getByRole('button', { name: /사륜 로봇/u }).click();
           await expect(toggle).toHaveAttribute('aria-expanded', 'false');
           await expect(toggle).toBeFocused();
           await expect(list).toBeHidden();
-          await expect(page.getByRole('region', { name: '수송 로봇 02 로봇 패널', exact: true })).toBeVisible();
-          await expect(page.getByRole('button', { name: '수송 로봇 02 위치 선택', exact: true })).toHaveAttribute('aria-pressed', 'true');
+          await expect(page.getByRole('region', { name: '사륜 로봇 로봇 패널', exact: true })).toBeVisible();
+          await expect(page.getByRole('button', { name: '사륜 로봇 위치 선택', exact: true })).toHaveAttribute('aria-pressed', 'true');
           await expect(marker).toHaveAttribute('aria-pressed', 'false');
           await captureMonitoring(page, testInfo, 'list-selected');
         } else {
           await list.getByRole('button', { name: '로봇 검색어 모두 지우기', exact: true }).click();
           await expect(search).toHaveValue('');
           await expect(search).toBeFocused();
-          await expect(list.getByRole('button', { name: /정찰 로봇 01/u })).toHaveAttribute('aria-pressed', 'true');
+          await expect(list.getByRole('button', { name: /사족보행 로봇/u })).toHaveAttribute('aria-pressed', 'true');
         }
       });
 

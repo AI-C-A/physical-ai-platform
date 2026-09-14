@@ -56,6 +56,7 @@ test('데스크톱 Shell을 키보드로 전환하고 접힘 상태를 복구한
     )
     .toBe('true');
 
+  await expect(page.locator('.platform-shell-sidebar')).toHaveCSS('width', '56px');
   const captureLink = page.getByRole('link', { name: '수집', exact: true });
   await expect(captureLink).toHaveAttribute('aria-current', 'page');
   await captureLink.hover();
