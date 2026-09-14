@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --configLoader runner",
-    "dev:mock": "npm run dev",
+    "dev": "vite --configLoader runner --mode mock",
+    "dev:mock": "vite --configLoader runner --mode mock",
+    "dev:collection": "vite --configLoader runner --mode collection",
     "dev:real": "vite --configLoader runner --mode patrol --host --port 5173 --strictPort",
     "dev:funnel": "tailscale funnel 5173",
     "build": "npm run build:mock",
@@ -30,7 +31,8 @@
     "verify": "npm run typecheck && npm run lint && npm run check:design-system && npm run check:repository-safety && npm run test:unit && npm run test:tools && npm run test:gateway && npm run test:segmentation",
     "verify:browser": "npm run test:e2e",
     "verify:cameras": "node scripts/verify-browser-cameras.mjs",
-    "preview": "vite preview --configLoader runner"
+    "preview": "vite preview --configLoader runner",
+    "build:collection": "npm run typecheck && vite build --configLoader runner --mode collection"
   },
   "dependencies": {
     "@aws-sdk/client-kinesis-video-signaling": "3.1116.0",

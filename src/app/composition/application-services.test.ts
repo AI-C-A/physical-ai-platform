@@ -297,3 +297,13 @@ describe('application services composition', () => {
     services.dispose();
   });
 });
+
+it('관제 Mock 설정과 별개로 수집은 HTTP 서버를 사용하도록 구성한다', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json([]));
+  const services = createApplicationServices({ ...runtimeConfig, collection: { implementation: 'external' } });
+  try {
+    expect(await services.flywheel.listSessions()).toEqual([]);
+    expect(fetcher).toHaveBeenCalledWith('/api/quest/collections', expect.objectContaining({ method: 'GET' }));
+    expect(services.flywheel.collectionMode).toBe('quest-hands');
+  } finally { services.dispose(); fetcher.mockRestore(); }
+});

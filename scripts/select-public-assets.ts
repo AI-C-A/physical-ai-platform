@@ -21,6 +21,13 @@ function outputPath(directory: string, path: string): string {
 async function finalizePublicAssets(mode: string, directory: string): Promise<void> {
   const runtimeConfig = outputPath(directory, 'runtime-config.json');
   const patrolRuntimeConfig = outputPath(directory, 'runtime-config.patrol.json');
+  const collectionRuntimeConfig = outputPath(directory, 'runtime-config.collection.json');
+  if (mode === 'collection') {
+    await rm(runtimeConfig, { force: true });
+    await rename(collectionRuntimeConfig, runtimeConfig);
+  } else {
+    await rm(collectionRuntimeConfig, { force: true });
+  }
   if (mode !== 'patrol') {
     await rm(patrolRuntimeConfig, { force: true });
     return;
@@ -48,9 +55,9 @@ export function selectPublicAssets(mode: string): Plugin {
       config = resolved;
     },
     configureServer: (server) => {
-      if (mode !== 'patrol') return;
+      if (!['patrol', 'collection'].includes(mode)) return;
       server.middlewares.use('/runtime-config.json', (_request, response) => {
-        const source = resolve(server.config.publicDir, 'runtime-config.patrol.json');
+        const source = resolve(server.config.publicDir, mode === 'patrol' ? 'runtime-config.patrol.json' : 'runtime-config.collection.json');
         void readFile(source)
           .then((content) => {
             response.statusCode = 200;

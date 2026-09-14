@@ -2,8 +2,10 @@ import type { AnalyticsPort } from '@/entities/analytics';
 import type { CaptureOperationsPort } from '@/entities/capture-session';
 import type { DatasetRepositoryPort } from '@/entities/dataset';
 import type { EpisodeRepositoryPort } from '@/entities/episode';
-import type { FlywheelPort } from '@/entities/flywheel';
+import { createHttpQuestFlywheel, type FlywheelPort } from '@/entities/flywheel';
 import {
+  BrowserWebXrRuntime,
+  HttpQuestCollectorBackend,
   QuestCollectorAdapter,
   SimulatedWebXrRuntime,
   type QuestCollectorPort,
@@ -274,15 +276,19 @@ export function createApplicationServices(
       captureOperations,
       robotEventRepository,
       episodeRepository,
-      flywheel: inMemoryAdapters.factories.flywheel(),
+      flywheel: runtimeConfig.collection?.implementation === 'external'
+        ? createHttpQuestFlywheel() : inMemoryAdapters.factories.flywheel(),
       interventionQueue,
       datasetRepository,
     };
-    const questCollectorBackend = new InMemoryQuestCollectorBackend(core.flywheel, clock);
+    const realCollection = runtimeConfig.collection?.implementation === 'external';
+    const questCollectorBackend = realCollection
+      ? new HttpQuestCollectorBackend() : new InMemoryQuestCollectorBackend(core.flywheel, clock);
     const questCollector = new QuestCollectorAdapter({
       backend: questCollectorBackend,
       nowMs: () => clock.nowMs(),
-      runtime: new SimulatedWebXrRuntime(),
+      runtime: realCollection ? new BrowserWebXrRuntime() : new SimulatedWebXrRuntime(),
+      ...(questCollectorBackend instanceof HttpQuestCollectorBackend ? { livePreview: questCollectorBackend } : {}),
     });
     const analytics = new InMemoryAnalyticsAdapter({
       capture: core.captureOperations,
@@ -307,7 +313,8 @@ export function createApplicationServices(
         disposed = true;
         completedSessionSynchronization.dispose();
         questCollector.dispose();
-        questCollectorBackend.dispose();
+        if (questCollectorBackend instanceof InMemoryQuestCollectorBackend) questCollectorBackend.dispose();
+        if (realCollection) core.flywheel.dispose();
         inMemoryAdapters.dispose();
         flywheelSyncTransport?.dispose();
       },

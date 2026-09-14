@@ -1,8 +1,19 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mockCameraRequest } from './mock-camera-request';
+import { cameraCollectorOrigin } from './camera-request';
 import type { CameraBinding, CameraSender, CameraSignal } from '../model/camera';
 beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); vi.setSystemTime(1_800_000_000_000); });
-afterEach(() => { localStorage.clear(); vi.useRealTimers(); });
+afterEach(() => { localStorage.clear(); vi.useRealTimers(); vi.unstubAllEnvs(); });
+it.each(['mock', 'development'])('%s 모드의 연결 코드는 원격 Quest 주소 대신 같은 브라우저 origin을 사용한다', (mode) => {
+  vi.stubEnv('MODE', mode);
+  vi.stubEnv('VITE_COLLECTOR_ORIGIN', 'https://quest.example.com');
+  expect(cameraCollectorOrigin()).toBe(window.location.origin);
+});
+it.each(['patrol', 'collection'])('%s 모드에서는 실제 장치용 원격 주소를 유지한다', (mode) => {
+  vi.stubEnv('MODE', mode);
+  vi.stubEnv('VITE_COLLECTOR_ORIGIN', 'https://quest.example.com');
+  expect(cameraCollectorOrigin()).toBe('https://quest.example.com');
+});
 const create = () => mockCameraRequest('', 'mock-owner-session', 'POST', { collectionId: 'session', role: 'head', label: '헤드캠 1' }) as Promise<CameraBinding>;
 it('발급부터 5분 뒤 만료되고 명시적 재발급만 시간을 초기화한다', async () => {
   const camera = await create();

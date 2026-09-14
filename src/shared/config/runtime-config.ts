@@ -25,6 +25,7 @@ export interface RuntimeConfig {
   readonly branding: BrandingConfig;
   readonly adapters: AdapterComposition;
   readonly connections: RuntimeConnections;
+  readonly collection?: { readonly implementation: AdapterImplementation };
 }
 
 type RuntimeConfigFetcher = (
@@ -130,11 +131,12 @@ export function parseRuntimeConfig(
   defaultBranding: BrandingConfig,
 ): RuntimeConfig {
   const record = parseRecord(value, 'runtimeConfig');
-  assertAllowedKeys(record, ['branding', 'adapters', 'connections'], 'runtimeConfig');
+  assertAllowedKeys(record, ['branding', 'adapters', 'connections', 'collection'], 'runtimeConfig');
   return {
     branding: parseBranding(record.branding, defaultBranding),
     adapters: parseAdapters(record.adapters),
     connections: parseConnections(record.connections),
+    ...(record.collection === undefined ? {} : { collection: parseCollection(record.collection) }),
   };
 }
 
@@ -213,4 +215,10 @@ function isAbortError(error: unknown): boolean {
     && error !== null
     && 'name' in error
     && error.name === 'AbortError';
+}
+
+function parseCollection(value: unknown): { readonly implementation: AdapterImplementation } {
+  const record = parseRecord(value, 'collection');
+  assertAllowedKeys(record, ['implementation'], 'collection');
+  return { implementation: parseImplementation(record.implementation, 'collection.implementation') };
 }

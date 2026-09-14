@@ -7,6 +7,13 @@ const connections = { patrol: { endpoint: null }, telemetry: { endpoint: null, i
 const validConfig = { branding: { productName: '사용자 제품명', shortName: '사용자명', logo: '/assets/logo.svg' }, adapters: { mode: 'bundle', implementation: 'in-memory' }, connections } as const;
 
 describe('parseRuntimeConfig', () => {
+  it('수집 구현을 검증하고 알 수 없는 설정을 거부한다', () => {
+    expect(parseRuntimeConfig({ ...validConfig, collection: { implementation: 'external' } }, defaultBranding).collection)
+      .toEqual({ implementation: 'external' });
+    expect(() => parseRuntimeConfig({ ...validConfig, collection: { implementation: 'invalid' } }, defaultBranding)).toThrow();
+    expect(() => parseRuntimeConfig({ ...validConfig, collection: { implementation: 'external', token: 'unexpected' } }, defaultBranding)).toThrow();
+  });
+
   it('완전한 in-memory bundle을 파싱한다', () => {
     expect(parseRuntimeConfig(validConfig, defaultBranding)).toEqual(validConfig);
   });

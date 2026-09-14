@@ -21,6 +21,7 @@ const productionFiles = [
   'assets/openarm-bimanual.LICENSE.txt',
   'assets/openarm-bimanual.NOTICE.txt',
   'assets/sites/pangyo-v1.glb',
+  'assets/sites/pangyo-cinematic.glb',
   'assets/app-current.js',
 ];
 const simulationFiles = [
@@ -71,6 +72,12 @@ afterEach(async () => {
 });
 
 describe('실행 환경별 공개 빌드 자산', () => {
+  it.each(['mock', 'development'])('%s 개발 서버는 기본 Mock 설정을 실제 수집 설정으로 덮어쓰지 않는다', async (mode) => {
+    const use = vi.fn();
+    await runHook(selectPublicAssets(mode).configureServer, [{ middlewares: { use } }]);
+    expect(use).not.toHaveBeenCalled();
+  });
+
   it('Real 빌드의 실제 outDir에서 데모만 제외하고 모델·지도·라이선스를 보존한다', async () => {
     const fixture = await createFixture();
     const plugin = selectPublicAssets('patrol');
