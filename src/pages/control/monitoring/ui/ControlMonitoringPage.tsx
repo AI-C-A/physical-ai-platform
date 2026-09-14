@@ -24,6 +24,7 @@ import {
 } from '@/entities/robot-telemetry';
 import { appendPathSegment } from '@/shared/lib/navigation';
 import { Button, getButtonClassName } from '@/shared/ui/button';
+import { Brand } from '@/shared/ui/brand';
 import { Icon } from '@/shared/ui/icon';
 import { SearchField } from '@/shared/ui/search-field';
 import { Panel } from '@/shared/ui/panel';
@@ -155,17 +156,21 @@ function MonitoringLayout({
         ].join(' ')}
       >
         <div className="pointer-events-none flex max-h-full min-h-0 min-w-0 flex-col gap-3 self-start">
-          <Select
-            className="pointer-events-auto min-w-0 shrink-0"
-            controlSize="large"
-            surface="overlay"
-            label="사이트"
-            leadingIcon="location"
-            onValueChange={onSelectSite}
-            options={siteOptions}
-            showLabel={false}
-            value={selectedSite.id}
-          />
+          <Panel className="monitoring-context-panel pointer-events-auto shrink-0" contentClassName="grid" layer="translucent">
+            <div className="monitoring-context-brand">
+              <Brand compact={false} stacked />
+            </div>
+            <Select
+              className="pointer-events-auto min-w-0 shrink-0"
+              controlSize="large"
+              label="사이트"
+              leadingIcon="location"
+              onValueChange={onSelectSite}
+              options={siteOptions}
+              showLabel={false}
+              value={selectedSite.id}
+            />
+          </Panel>
 
           <Button
             aria-controls="monitoring-robot-list"

@@ -107,7 +107,7 @@ test('MLOps 상세 화면은 통합된 상위 메뉴를 활성화한다', async 
 });
 
 for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings']) {
-  test(`${path} 사이드바 전환의 모든 프레임에서 메뉴 좌표와 DOM을 유지한다`, async ({ page }) => {
+  test(`${path} 사이드바 전환 중 가로 정렬과 DOM을 유지하고 접힌 메뉴의 세로 여백을 줄인다`, async ({ page }) => {
     const issues = observeBrowserIssues(page);
     await page.goto(path);
     await expectApplicationReady(page);
@@ -122,19 +122,20 @@ for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings
         if (!toggle || !main || icons.some((icon) => !icon)) throw new Error('Shell elements missing');
         const baseline = icons.map((icon) => icon!.getBoundingClientRect());
         const toggleTop = toggle.getBoundingClientRect().top;
-        const frames: { width: number; mainLeft: number; iconDrift: number; toggleDrift: number; stableNodes: boolean }[] = [];
+        const frames: { width: number; mainLeft: number; iconHorizontalDrift: number; navigationTop: number; toggleDrift: number; stableNodes: boolean }[] = [];
         const sample = () => {
           const bounds = sidebar.getBoundingClientRect();
           const button = toggle.getBoundingClientRect();
           frames.push({
             width: bounds.width,
             mainLeft: main.getBoundingClientRect().left,
-            iconDrift: Math.max(...icons.map((icon, index) => {
+            navigationTop: icons[0]!.getBoundingClientRect().top,
+            iconHorizontalDrift: Math.max(...icons.map((icon, index) => {
               const rect = icon!.getBoundingClientRect();
               const initial = baseline[index]!;
-              return Math.max(Math.abs(rect.x - initial.x), Math.abs(rect.y - initial.y));
+              return Math.abs(rect.x - initial.x);
             })),
-            toggleDrift: Math.max(Math.abs(button.top - toggleTop), Math.abs(bounds.right - button.right - 8)),
+            toggleDrift: Math.max(Math.abs(button.top - toggleTop), Math.abs(button.left - bounds.left - 8)),
             stableNodes: links.every((link, index) => link === sidebar.querySelectorAll('a.ui-navigation-item')[index]),
           });
         };
@@ -161,11 +162,16 @@ for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings
       expect(frames.some((frame) => frame.width > 57 && frame.width < 239)).toBe(true);
       for (const frame of frames) {
         expect(frame.stableNodes).toBe(true);
-        expect(frame.iconDrift).toBeLessThan(0.1);
+        expect(frame.iconHorizontalDrift).toBeLessThan(0.1);
         expect(frame.toggleDrift).toBeLessThan(0.1);
         expect(Math.abs(frame.width - frame.mainLeft)).toBeLessThan(0.1);
       }
       expect(frames.at(-1)?.width).toBe(mode === 'collapse' ? 56 : 240);
+      const firstTop = frames[0]!.navigationTop;
+      const lastTop = frames.at(-1)!.navigationTop;
+      if (mode === 'collapse') expect(lastTop).toBeLessThan(firstTop);
+      else if (mode === 'expand') expect(lastTop).toBeGreaterThan(firstTop);
+      else expect(lastTop).toBeCloseTo(firstTop, 1);
       if (mode !== 'reverse') {
         for (let index = 1; index < frames.length; index++) {
           const delta = frames[index]!.width - frames[index - 1]!.width;

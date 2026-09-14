@@ -3,11 +3,56 @@
 }
 
 .platform-shell-content {
+  --shell-context-brand-height: 0rem;
+  --shell-context-brand-opacity: 0;
+  --shell-context-brand-visibility: hidden;
+  --shell-context-padding: 0rem;
   transition: padding-left var(--design-motion-release) var(--design-ease-standard);
 }
 
+.platform-shell-brand[data-collapsed="true"] {
+  margin-left: var(--layout-page-gutter);
+}
+
+.platform-shell-brand {
+  transition: opacity var(--design-motion-fast) var(--design-ease-standard), margin-left var(--design-motion-release) var(--design-ease-standard);
+}
+
+.platform-shell-brand[data-hidden="true"] { opacity: 0; pointer-events: none; }
+
+.platform-shell-group,
+.platform-shell-navigation {
+  transition: margin-top var(--design-motion-release) var(--design-ease-standard);
+}
+
+.platform-shell-launcher-row { height: 3.25rem; padding-top: 0.25rem; }
+.platform-shell-launcher-row[data-hidden="true"] { height: 0; padding-top: 0; }
+
+.platform-shell-group-title { height: 1.5rem; padding-block: 0.25rem; margin-bottom: 0.5rem; }
+.platform-shell-group-title[data-hidden="true"] { height: 0; padding-block: 0; margin-bottom: 0; }
+
+.platform-shell-launcher-row,
+.platform-shell-group-title,
+.platform-shell-content > [data-page-shell="standard"] {
+  transition: height var(--design-motion-release) var(--design-ease-standard), padding var(--design-motion-release) var(--design-ease-standard), margin var(--design-motion-release) var(--design-ease-standard), opacity var(--design-motion-fast) var(--design-ease-standard), visibility var(--design-motion-release);
+}
+
+@media (min-width: 64rem) {
+  .platform-shell-content[data-sidebar-collapsed="true"] {
+    --shell-brand-clearance: 3.5rem;
+    --shell-context-brand-height: 3.5rem;
+    --shell-context-brand-opacity: 1;
+    --shell-context-brand-visibility: visible;
+    --shell-context-padding: 0.75rem;
+  }
+
+  .platform-shell-content[data-sidebar-collapsed="true"] > [data-page-shell="standard"] {
+    padding-top: calc(var(--layout-page-gutter) + var(--shell-brand-clearance));
+  }
+}
+
 .platform-shell-launcher,
-.platform-shell-label {
+.platform-shell-label:not(.platform-shell-group-title) {
   transition: opacity var(--design-motion-fast) var(--design-ease-standard);
 }
 
@@ -24,6 +69,12 @@
 @media (prefers-reduced-motion: reduce) {
   .platform-shell-sidebar,
   .platform-shell-content,
+  .platform-shell-brand,
+  .platform-shell-group,
+  .platform-shell-navigation,
+  .platform-shell-launcher-row,
+  .platform-shell-group-title,
+  .platform-shell-content > [data-page-shell="standard"],
   .platform-shell-launcher,
   .platform-shell-label {
     transition: none;

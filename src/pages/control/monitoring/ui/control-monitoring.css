@@ -2,3 +2,23 @@
 .monitoring-map-marker-avatar { display: grid; place-items: center; flex-shrink: 0; font-size: 12px; }
 .monitoring-map-marker-avatar img { object-fit: contain; }
 .monitoring-map-marker[data-attention='true'] .robot-map-bubble { outline: 2px solid var(--warning); outline-offset: 1px; }
+
+.monitoring-context-panel {
+  padding: var(--shell-context-padding, 0rem);
+  transition: padding var(--design-motion-release) var(--design-ease-standard);
+}
+
+.monitoring-context-brand {
+  height: var(--shell-context-brand-height, 0rem);
+  overflow: hidden;
+  opacity: var(--shell-context-brand-opacity, 0);
+  visibility: var(--shell-context-brand-visibility, hidden);
+  transition: height var(--design-motion-release) var(--design-ease-standard), opacity var(--design-motion-fast) var(--design-ease-standard), visibility var(--design-motion-release);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monitoring-context-panel,
+  .monitoring-context-brand {
+    transition: none;
+  }
+}

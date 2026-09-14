@@ -226,10 +226,10 @@ function NavigationGroup({
   readonly onNavigate?: (to: To) => void;
 }) {
   return (
-    <section aria-label={group.label} className="mt-6 min-w-0 first:mt-0">
+    <section aria-label={group.label} className={cn('platform-shell-group min-w-0', !collapsed && 'mt-6 first:mt-0')}>
       <h2
         aria-hidden={collapsed}
-        className="platform-shell-label mb-2 overflow-hidden whitespace-nowrap px-3 py-1 text-xs font-medium text-navigation-label"
+        className="platform-shell-group-title platform-shell-label overflow-hidden whitespace-nowrap px-3 text-xs font-medium text-navigation-label"
         data-hidden={collapsed}
       >
         {group.label}
@@ -287,7 +287,7 @@ function NavigationLink({
       </span>
     </Link>
   );
-  return <Tooltip content={item.label} disabled={!collapsed} trigger={link} />;
+  return <Tooltip content={item.label} disabled={!collapsed} side="right" trigger={link} />;
 }
 
 function SettingsNavigation({
@@ -320,7 +320,7 @@ function SettingsNavigation({
     </NavLink>
   );
 
-  return <Tooltip content="설정" disabled={!collapsed} trigger={link} />;
+  return <Tooltip content="설정" disabled={!collapsed} side="right" trigger={link} />;
 }
 
 export function PlatformShell({ miniApps, navigationTransition = false }: PlatformShellProps) {
@@ -488,10 +488,30 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
 
         {isImmersiveRoute ? null : (
           <aside
-            className={`platform-shell-sidebar fixed inset-y-0 left-0 z-30 hidden overflow-x-hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
+            className={`platform-shell-sidebar fixed inset-y-0 left-0 z-30 hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
-            <Brand animateCollapse compact={sidebarCollapsed} stacked />
-            <div className="flex min-h-13 min-w-0 items-center pt-1">
+            <div className="-mx-2 -mt-2 flex min-h-16 w-60 shrink-0 items-center gap-2 p-2">
+              <Button
+                aria-expanded={!sidebarCollapsed}
+                aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+                className="platform-shell-toggle size-10 shrink-0 p-0 text-muted"
+                onClick={() => setSidebarCollapsed((current) => !current)}
+                title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+                variant="ghost"
+              >
+                <Icon name="menu" />
+              </Button>
+              <div
+                className="platform-shell-brand relative shrink-0 text-foreground"
+                data-collapsed={sidebarCollapsed}
+                data-hidden={sidebarCollapsed && isMonitoringRoute}
+                aria-hidden={sidebarCollapsed && isMonitoringRoute}
+                inert={sidebarCollapsed && isMonitoringRoute}
+              >
+                <Brand compact={false} stacked className="relative whitespace-nowrap" />
+              </div>
+            </div>
+            <div className="platform-shell-launcher-row flex min-w-0 shrink-0 items-center overflow-hidden" data-hidden={sidebarCollapsed}>
               <div
                 aria-hidden={sidebarCollapsed}
                 className="platform-shell-launcher min-w-0 flex-1 overflow-hidden"
@@ -505,23 +525,8 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
                   />
                 </div>
               </div>
-              <Button
-                aria-expanded={!sidebarCollapsed}
-                aria-label={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-                className="platform-shell-toggle relative size-10 shrink-0 p-0 text-muted"
-                onClick={() => setSidebarCollapsed((current) => !current)}
-                title={sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-                variant="ghost"
-              >
-                <span aria-hidden="true" className="platform-shell-label absolute" data-hidden={!sidebarCollapsed}>
-                  <Icon name="panel-open" />
-                </span>
-                <span aria-hidden="true" className="platform-shell-label absolute" data-hidden={sidebarCollapsed}>
-                  <Icon name="panel-close" />
-                </span>
-              </Button>
             </div>
-            <div className="mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+            <div className={cn('platform-shell-navigation min-h-0 flex-1 overflow-x-hidden overflow-y-auto', sidebarCollapsed ? 'mt-2' : 'mt-4')}>
               <InnerNavigation
                 collapsed={sidebarCollapsed}
                 items={currentMiniApp.items}
@@ -537,6 +542,7 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
         )}
 
         <div
+          data-sidebar-collapsed={isImmersiveRoute ? undefined : sidebarCollapsed}
           className={isImmersiveRoute
             ? undefined
             : cn('platform-shell-content', sidebarCollapsed ? 'lg:pl-14' : 'lg:pl-60')}
