@@ -262,7 +262,7 @@ describe('PlatformShell', () => {
     expect(launcher).toHaveFocus();
   });
 
-  it('MLOps 업무 메뉴 8개를 접힘 그룹 없이 한 목록으로 표시한다', () => {
+  it('MLOps 업무 메뉴 9개를 접힘 그룹 없이 한 목록으로 표시한다', () => {
     renderShell('/mlops/collection');
 
     const navigation = screen.getByRole('navigation', {
@@ -273,6 +273,7 @@ describe('PlatformShell', () => {
       within(navigation).getAllByRole('link').map((link) => link.getAttribute('aria-label')),
     ).toEqual([
       '수집',
+      '수집 에피소드',
       '데이터 카탈로그',
       '데이터 검수',
       '데이터셋',

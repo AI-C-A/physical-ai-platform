@@ -84,11 +84,11 @@ export const MINI_APP_REGISTRY = [
             activePaths: [ROUTE_PATHS.mlopsCapture, ROUTE_PATHS.mlopsSessions],
             icon: 'radio',
           },
+          { label: '수집 에피소드', path: ROUTE_PATHS.mlopsEpisodes, icon: 'database' },
           {
             label: '데이터 카탈로그',
             path: ROUTE_PATHS.mlopsCatalog,
             activePaths: [
-              ROUTE_PATHS.mlopsEpisodes,
               ROUTE_PATHS.mlopsDrives,
               ROUTE_PATHS.mlopsInterventions,
             ],

@@ -60,6 +60,7 @@ const CollectionDetailPage = lazy(async () => ({ default: (await FlywheelPages()
 const ReviewPage = lazy(async () => ({ default: (await FlywheelPages()).ReviewWorkspacePage }));
 const OperationsPage = lazy(async () => ({ default: (await FlywheelPages()).OperationsWorkspacePage }));
 const LegacySessionRedirectPage = lazy(async () => ({ default: (await FlywheelPages()).LegacyHumanoidSessionRedirectPage }));
+const CollectedEpisodesPage = lazy(async () => ({ default: (await FlywheelPages()).CollectedEpisodesPage }));
 const EpisodeDetailPage = lazy(async () => ({ default: (await FlywheelPages()).FlywheelEpisodeDetailPage }));
 const DriveDetailPage = lazy(async () => ({ default: (await FlywheelPages()).DriveDetailPage }));
 const InterventionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).InterventionDetailPage }));
@@ -215,12 +216,7 @@ export const APP_ROUTES: RouteObject[] = [
       },
       {
         path: ROUTE_PATHS.mlopsEpisodes,
-        element: (
-          <LegacyMLOpsRedirect
-            query={{ type: 'episode' }}
-            to={ROUTE_PATHS.mlopsCatalog}
-          />
-        ),
+        element: <CollectedEpisodesPage />,
       },
       {
         path: ROUTE_PATHS.mlopsEpisodeDetail,
