@@ -1,19 +1,20 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { cameraRequest, cameraRoleLabel, startCameraPeer, type CameraBinding, type CameraPeerState, type CameraRole } from '@/entities/collection-camera';
+import { cameraRequest, startCameraPeer, getCameraOwnerToken, type CameraBinding, type CameraPeerState, type CameraRole } from '@/entities/collection-camera';
 import { Button } from '@/shared/ui/button';
 import { FittedMedia, MediaPanel } from '@/shared/ui/media-panel';
-import { Input } from '@/shared/ui/input';
-import { Select } from '@/shared/ui/select';
 import { StatusIndicator } from '@/shared/ui/status-indicator';
+import { DeviceConnectionCode } from './DeviceConnectionCode';
 import { CameraAnalysisCard } from './CameraAnalysisCard';
 
-function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tileStyle, analysisStyle, visible }: {
+function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, connectedTarget, onConnected, tileStyle, analysisStyle, visible }: {
   readonly analysisStyle: CSSProperties;
   readonly visible: boolean;
   readonly tileStyle: CSSProperties;
   readonly camera: CameraBinding;
   readonly managementTarget: HTMLDivElement | null;
+  readonly connectedTarget?: HTMLDivElement | null | undefined;
+  readonly onConnected?: (() => void) | undefined;
   readonly onReplace: (value: CameraBinding) => void;
   readonly onRemove: (id: string) => void;
 }) {
@@ -35,11 +36,18 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tile
   const [now, setNow] = useState(Date.now);
   const videoRef = useRef<HTMLVideoElement>(null);
   const busy = useRef(false);
+  const reportPaired = useEffectEvent((value: boolean) => {
+    setPaired(value);
+    if (value !== camera.paired) {
+      onReplace({ ...camera, paired: value });
+      if (value) onConnected?.();
+    }
+  });
   useEffect(() => {
     if (paused) return;
     let alive = true;
     const video = videoRef.current;
-    const peer = startCameraPeer({ id: camera.id, token: camera.viewerToken, role: 'viewer', onRotation: setRotation, onPaired: (value) => { if (alive) setPaired(value); },
+    const peer = startCameraPeer({ id: camera.id, token: camera.viewerToken, role: 'viewer', onRotation: setRotation, onPaired: (value) => { if (alive) reportPaired(value); },
       onStream: (stream) => {
         if (!alive) return;
         setPlaying(false);
@@ -54,103 +62,101 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, tile
     window.addEventListener('pagehide', leave);
     return () => { alive = false; peer.close(); if (video) video.srcObject = null; window.removeEventListener('pagehide', leave); };
   }, [camera.id, camera.viewerToken, camera.pairingCode, paused, attempt]);
-  const retryAfter = useRef(0);
-  const mutate = async (action: 'renew' | 'remove', automatic = false, signal?: AbortSignal) => {
+  const mutate = async (action: 'renew' | 'remove') => {
     if (busy.current) return;
     busy.current = true; setPending(true); setError(null);
     try {
       if (action === 'remove') { await cameraRequest(`/${camera.id}`, camera.viewerToken, 'DELETE'); onRemove(camera.id); }
       else {
-        const updated = await cameraRequest<CameraBinding>(`/${camera.id}/${automatic ? 'refresh-code' : 'renew'}`, camera.viewerToken, 'POST', {}, signal);
-        if (signal?.aborted) return;
+        const updated = await cameraRequest<CameraBinding>(`/${camera.id}/refresh-code`, camera.viewerToken, 'POST', { restart: true });
         setPaired(updated.paired);
-        if (!automatic || (!updated.paired && updated.pairingCode !== camera.pairingCode)) { setPaused(false); setPlaying(false); }
+        if (updated.paired && !camera.paired) onConnected?.();
         onReplace(updated);
+        setNow(Date.now());
       }
-    } catch (cause) { if (signal?.aborted) return; retryAfter.current = Date.now() + 10_000; setError(cause instanceof Error ? cause.message : '카메라 설정을 변경하지 못했습니다.'); }
-    finally { busy.current = false; if (!signal?.aborted) setPending(false); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '카메라 연결을 변경하지 못했습니다.'); }
+    finally { busy.current = false; setPending(false); }
   };
-  const refreshCode = useEffectEvent((signal: AbortSignal) => {
-    const time = Date.now();
-    setNow(time);
-    if (!paired && camera.pairingExpiresAtMs <= time && time >= retryAfter.current) void mutate('renew', true, signal);
-  });
   useEffect(() => {
-    const controller = new AbortController();
-    const resume = () => refreshCode(controller.signal);
-    const timer = setInterval(resume, 1_000);
-    window.addEventListener('focus', resume);
-    document.addEventListener('visibilitychange', resume);
-    return () => { controller.abort(); clearInterval(timer); window.removeEventListener('focus', resume); document.removeEventListener('visibilitychange', resume); };
+    const tick = () => setNow(Date.now());
+    const timer = window.setInterval(tick, 1_000);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', tick); };
   }, []);
-  const expired = camera.pairingExpiresAtMs <= now;
-  const codeUrl = `${location.origin}/collect/camera?code=${camera.pairingCode ?? ''}`;
+  const controlsTarget = paired && connectedTarget !== undefined ? connectedTarget : managementTarget;
+  const reconnect = () => { setPaused(false); setPlaying(false); setError(null); setAttempt((value) => value + 1); };
   return <>
-    <div className="collection-camera-tile" style={tileStyle}><FittedMedia aspectRatio={aspectRatio} className="items-center"><MediaPanel className="isolate h-auto" aria-label={`${camera.label} 카메라`} title={camera.label} status={<StatusIndicator label={playing ? '영상 수신 중' : state === 'error' ? '연결 오류' : '수신 대기'} tone={state === 'error' ? 'warning' : 'neutral'} />}><div data-aspect-media-viewport className="relative min-h-0 min-w-0 overflow-hidden" style={{ aspectRatio, clipPath: 'inset(0)', containerType: 'size' }}>
+    <div className="collection-camera-tile" data-portrait={paired && aspectRatio < 1} style={paired ? tileStyle : { display: 'none' }}><FittedMedia aspectRatio={aspectRatio} className="items-center"><MediaPanel className="collection-camera-panel isolate h-auto" aria-label={`${camera.label} 카메라`} title={camera.label} status={<StatusIndicator label={playing ? '영상 수신 중' : state === 'error' ? '연결 오류' : '수신 대기'} tone={state === 'error' ? 'warning' : 'neutral'} />}><div data-aspect-media-viewport className="relative min-h-0 min-w-0 overflow-hidden" style={{ aspectRatio, clipPath: 'inset(0)', containerType: 'size' }}>
       <video ref={videoRef} aria-label={`${camera.label} 실시간 영상`} autoPlay muted playsInline
         className="absolute top-1/2 left-1/2 object-contain" style={{ width: rotation % 180 === 0 ? '100%' : '100cqh', height: rotation % 180 === 0 ? '100%' : '100cqw', transform: `translate(-50%, -50%) rotate(${rotation}deg)` }}
         onLoadedMetadata={(event) => updateAspectRatio(event.currentTarget)} onResize={(event) => updateAspectRatio(event.currentTarget)}
         onPlaying={() => { if (!paused) { setPlaying(true); setError(null); } }} onWaiting={() => setPlaying(false)} onPause={() => setPlaying(false)} />
-    </div></MediaPanel></FittedMedia></div>
-    <div className="collection-camera-tile" style={analysisStyle}><CameraAnalysisCard key={`${camera.viewerToken}:${attempt}`} label={camera.label} role={camera.role} videoRef={videoRef} playing={visible && playing && !paused && state === 'connected'} rotation={rotation} /></div>
-    {managementTarget ? createPortal(<section aria-label={`${camera.label} 설정`} className="grid gap-3 rounded-[var(--design-radius-control)] bg-layer-raised p-3">
-      <header className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{camera.label}</h3><span className="text-xs text-muted">{cameraRoleLabel(camera.role)}</span></header>
-      {paired ? <StatusIndicator label={paused ? '미리보기 정지' : playing ? '영상 수신 중' : state === 'error' ? '연결 오류' : '영상 수신 대기'} tone={state === 'error' ? 'warning' : 'neutral'} /> : null}
-      {!paired ? <div className="grid gap-2 text-xs">
-        {expired ? <p role="status" className="text-warning">새 연결 코드를 받는 중…</p> : <>
-          <output aria-label={`${camera.label} 연결 코드`} className="text-center font-mono text-2xl font-bold tracking-widest">{camera.pairingCode}</output>
-          <a href={codeUrl} target="_blank" rel="noreferrer" className="text-center underline underline-offset-4">카메라에서 열기</a>
-        </>}
+      {error && !managementTarget ? <div className="absolute inset-0 grid place-content-center gap-3 bg-layer p-4 text-center">
+        <p role="alert" className="text-sm text-negative">{error}</p>
+        <Button variant="secondary" onClick={reconnect}>다시 연결</Button>
       </div> : null}
-      <details><summary className="cursor-pointer text-xs text-muted">관리</summary>
-      <div className="flex flex-wrap gap-2 pt-2">
-        {error && !paused && state !== 'error' ? <Button variant="secondary" onClick={() => void videoRef.current?.play().catch(() => setError('영상 재생을 시작하지 못했습니다. 다시 연결하세요.'))}>영상 재생</Button> : null}
-        {paired && (paused || state === 'error') ? <Button variant="secondary" onClick={() => { setPaused(false); setPlaying(false); setAttempt((value) => value + 1); }}>다시 연결</Button>
-          : paired ? <Button variant="ghost" onClick={() => { setPaused(true); setPlaying(false); }}>미리보기 정지</Button> : null}
-        <Button variant="ghost" disabled={pending} onClick={() => void mutate('renew')}>새 코드 받기</Button>
-        <Button variant="ghost" disabled={pending} onClick={() => void mutate('remove')}>카메라 제거</Button>
-      </div>
-      </details>
-      {error ? <p role="alert" className="text-xs leading-5 text-negative">{error}</p> : null}
-    </section>, managementTarget) : null}
+    </div></MediaPanel></FittedMedia></div>
+    <div className="collection-camera-tile" style={paired && playing ? analysisStyle : { display: 'none' }}>{paired && playing ? <CameraAnalysisCard key={`${camera.viewerToken}:${attempt}`} label={camera.label} role={camera.role} videoRef={videoRef} playing={visible && playing && !paused && state === 'connected'} rotation={rotation} sourceAspectRatio={aspectRatio} /> : null}</div>
+    {controlsTarget ? createPortal(paired ? <section aria-label={`${camera.label} 설정`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-border py-4">
+      <h3 className="text-sm font-semibold">{camera.label}</h3>
+      <Button variant="ghost" className="text-xs text-negative" aria-label={`${camera.label} 삭제`} disabled={pending} onClick={() => void mutate('remove')}>삭제</Button>
+      <StatusIndicator label={paused ? '영상 수신 중지' : playing ? '영상 수신 중' : state === 'error' ? '연결 오류' : '영상 수신 대기'} tone={state === 'error' ? 'warning' : 'neutral'} />
+      {paused || state === 'error' ? <Button variant="secondary" onClick={reconnect}>다시 연결</Button> : null}
+      {error ? <p role="alert" className="col-span-full text-xs text-negative">{error}</p> : null}
+    </section> : <DeviceConnectionCode showLabel label={camera.label} device="카메라 기기" path="/collect/camera"
+      code={camera.pairingCode} expiresAtMs={camera.pairingExpiresAtMs} now={now} pending={pending} error={error}
+      onRenew={() => void mutate('renew')} />,
+    controlsTarget) : null}
   </>;
 }
 
-export function BrowserCameraPanel({ sessionId, preview, settingsTarget }: { readonly sessionId: string; readonly preview?: ReactNode; readonly settingsTarget?: HTMLDivElement | null }) {
+function nextCameraLabel(role: CameraRole, cameras: readonly CameraBinding[]): string {
+  const base = role === 'head' ? '헤드캠' : '전신 카메라';
+  let number = 1;
+  while (cameras.some((camera) => camera.label === `${base} ${number}`)) number += 1;
+  return `${base} ${number}`;
+}
+
+export function BrowserCameraPanel({ sessionId, preview, settingsTarget, connectedTarget, onConnected, emptyState }: { readonly sessionId: string; readonly preview?: ReactNode; readonly settingsTarget?: HTMLDivElement | null; readonly connectedTarget?: HTMLDivElement | null | undefined; readonly onConnected?: (() => void) | undefined; readonly emptyState?: ReactNode }) {
   const [managementTarget, setManagementTarget] = useState<HTMLDivElement | null>(null);
   const [cameras, setCameras] = useState<CameraBinding[]>([]);
   const [token, setToken] = useState<string | null>(null);
-  const [role, setRole] = useState<CameraRole>('head');
-  const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [reload, setReload] = useState(0);
+  const [selection, setSelection] = useState<{ target: HTMLDivElement | null | undefined; id: string } | null>(null);
+  const selectedId = selection?.target === settingsTarget ? selection?.id : null;
   const busy = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
-      const response = await fetch(`/api/quest/collections/${encodeURIComponent(sessionId)}`, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) });
-      if (!response.ok) throw new Error('수집 세션의 카메라 연결 정보를 불러오지 못했습니다.');
-      const record: unknown = await response.json();
-      if (typeof record !== 'object' || record === null || !('viewerToken' in record)
-        || typeof record.viewerToken !== 'string' || !record.viewerToken) throw new Error('카메라 페어링을 지원하는 수집 서버가 필요합니다.');
-      const list = await cameraRequest<CameraBinding[]>(`?collectionId=${encodeURIComponent(sessionId)}`, record.viewerToken, 'GET', undefined, controller.signal);
+      const ownerToken = await getCameraOwnerToken(sessionId, controller.signal);
+      const list = await cameraRequest<CameraBinding[]>(`?collectionId=${encodeURIComponent(sessionId)}`, ownerToken, 'GET', undefined, controller.signal);
       if (controller.signal.aborted) return;
-      setToken(record.viewerToken); setCameras(list); setError(null);
+      setToken(ownerToken); setCameras(list); setError(null);
     })().catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '카메라 목록을 불러오지 못했습니다.'); });
     return () => controller.abort();
   }, [sessionId, reload]);
-  const add = async () => {
+  const retry = () => { setError(null); setReload((value) => value + 1); };
+  const add = async (role: CameraRole) => {
     if (busy.current || token === null) return;
     busy.current = true; setPending(true); setError(null);
     try {
-      const camera = await cameraRequest<CameraBinding>('', token, 'POST', { collectionId: sessionId, role,
-        label: label.trim() || `${role === 'head' ? 'Head' : 'Full body'} ${String(cameras.filter((item) => item.role === role).length + 1)}` });
-      setCameras((current) => [...current, camera]); setLabel('');
+      const existing = cameras.find((camera) => camera.role === role && !camera.paired);
+      const camera = existing
+        ? await cameraRequest<CameraBinding>(`/${existing.id}/refresh-code`, existing.viewerToken, 'POST', { restart: true })
+        : await cameraRequest<CameraBinding>('', token, 'POST', { collectionId: sessionId, role, label: nextCameraLabel(role, cameras) });
+      setCameras((current) => existing ? current.map((item) => item.id === camera.id ? camera : item) : [...current, camera]);
+      setSelection({ target: settingsTarget, id: camera.id });
+      if (camera.paired) onConnected?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : '카메라를 추가하지 못했습니다.'); }
     finally { busy.current = false; setPending(false); }
   };
-  const count = cameras.length * 2 + 1;
+  const previewCount = preview === undefined || preview === null ? 0 : 1;
+  const workspace = preview !== undefined;
+  const connectedCameras = cameras.filter((camera) => camera.paired);
+  const hasTiles = connectedCameras.length > 0 || previewCount > 0;
+  const count = Math.max(1, connectedCameras.length * 2 + previewCount);
   const columns = Math.min(4, Math.ceil(Math.sqrt(count)));
   const compactColumns = count <= 2 ? 1 : 2;
   const tileStyle = (index: number): CSSProperties => {
@@ -158,25 +164,32 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget }: { rea
     return { '--tile-span': 12 / remaining(columns), '--tile-span-compact': 12 / remaining(compactColumns) } as CSSProperties;
   };
   const gridStyle = { '--grid-rows': Math.ceil(count / columns), '--grid-rows-compact': Math.ceil(count / compactColumns) } as CSSProperties;
-  const settings = <div className="grid gap-4">
-      <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void add(); }}>
-        <Select label="카메라 용도" value={role} onValueChange={(value) => { if (value === 'head' || value === 'full-body') setRole(value); }}
-          options={[{ label: cameraRoleLabel('head'), value: 'head' }, { label: cameraRoleLabel('full-body'), value: 'full-body' }]} disabled={pending} />
-        <Input label="카메라 이름 · 선택" maxLength={80} value={label} disabled={pending} placeholder="예: Head 정면, Full body 측면" onChange={(event) => setLabel(event.target.value)} />
-        <Button type="submit" isLoading={pending} disabled={token === null || cameras.length >= 16}>카메라 추가</Button>
-      </form>
-
-      {error ? <div className="grid gap-2"><p role="alert" className="text-xs text-negative">{error}</p><Button variant="ghost" onClick={() => setReload((value) => value + 1)}>목록 다시 불러오기</Button></div> : null}
+  const feedback = error ? (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--design-radius-control)] bg-status-negative-background p-4">
+      <p role="alert" className="text-sm text-status-negative-foreground">{error}</p>
+      <Button variant="secondary" onClick={retry}>연결 정보 새로고침</Button>
+    </div>
+  ) : null;
+  const addButtons = <div className="flex flex-wrap gap-2">
+    <Button variant="secondary" isLoading={pending} disabled={token === null || cameras.length >= 16} onClick={() => void add('head')}>헤드캠 연결</Button>
+    <Button variant="secondary" isLoading={pending} disabled={token === null || cameras.length >= 16} onClick={() => void add('full-body')}>전신 카메라 연결</Button>
+  </div>;
+  const settings = <div className="grid gap-3">
+      {feedback}
       {token === null && error === null ? <p role="status" className="text-xs text-muted">연결된 카메라를 불러오는 중입니다.</p> : null}
-      <div ref={setManagementTarget} className="grid gap-4" />
-      <p className="text-xs text-muted">카메라 영상은 미리보기용이며 Episode에 저장되지 않습니다.</p>
+      <div ref={setManagementTarget} className="grid" />
+      {selectedId && cameras.some((camera) => camera.id === selectedId && !camera.paired) ? null : addButtons}
     </div>;
   return (
-    <section aria-label="브라우저 카메라 연동" className={preview === undefined ? 'grid gap-4' : 'h-full min-h-0 overflow-hidden'}>
-      {preview === undefined ? settings : settingsTarget ? createPortal(settings, settingsTarget) : null}
-      <div className={preview === undefined ? 'hidden' : 'collection-camera-grid'} style={gridStyle} aria-label="수집 영상 그리드">
-      {preview === undefined ? null : <div className="collection-camera-tile" style={tileStyle(0)} aria-label="손 추적 미리보기">{preview}</div>}
-      {cameras.map((camera, index) => <BrowserCameraCard tileStyle={tileStyle(index * 2 + 1)} analysisStyle={tileStyle(index * 2 + 2)} visible={preview !== undefined} key={camera.id} camera={camera} managementTarget={managementTarget}
+    <section aria-label="카메라 연결" className={workspace ? 'flex h-full min-h-0 flex-col gap-2 overflow-hidden' : 'grid gap-4'}>
+      {!workspace ? settings : settingsTarget ? createPortal(settings, settingsTarget) : null}
+      {workspace && !settingsTarget && feedback ? <div className={!hasTiles && token === null ? 'm-auto w-full max-w-lg p-4' : 'shrink-0'}>{feedback}</div> : null}
+      {workspace && !hasTiles && (token !== null || error === null) ? <div className="min-h-0 flex-1">
+        {token === null ? <div role="status" className="grid h-full place-items-center text-sm text-muted">연결 정보를 불러오는 중입니다.</div> : emptyState}
+      </div> : null}
+      <div className={!workspace || !hasTiles ? 'hidden' : 'collection-camera-grid min-h-0 flex-1'} style={gridStyle} data-tile-count={count} aria-label="수집 영상 그리드">
+      {previewCount === 0 ? null : <div className="collection-camera-tile" style={tileStyle(0)} aria-label="손 추적 미리보기">{preview}</div>}
+      {cameras.map((camera) => <BrowserCameraCard tileStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount)} analysisStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount + 1)} visible={preview !== undefined} key={camera.id} camera={camera} managementTarget={camera.paired || camera.id === selectedId ? managementTarget : null} connectedTarget={connectedTarget} onConnected={onConnected}
         onRemove={(id) => setCameras((current) => current.filter((item) => item.id !== id))}
         onReplace={(updated) => setCameras((current) => current.map((item) => item.id === updated.id ? updated : item))} />)}
       </div>
@@ -184,6 +197,6 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget }: { rea
   );
 }
 
-export function BrowserCameraWorkspace({ sessionId, children, settingsTarget }: { readonly sessionId?: string; readonly children: ReactNode; readonly settingsTarget: HTMLDivElement | null }) {
-  return sessionId === undefined ? children : <BrowserCameraPanel key={sessionId} sessionId={sessionId} preview={children} settingsTarget={settingsTarget} />;
+export function BrowserCameraWorkspace({ sessionId, children, settingsTarget, connectedTarget, onConnected, emptyState }: { readonly sessionId?: string; readonly children: ReactNode; readonly settingsTarget: HTMLDivElement | null; readonly connectedTarget?: HTMLDivElement | null | undefined; readonly onConnected?: (() => void) | undefined; readonly emptyState: ReactNode }) {
+  return sessionId === undefined ? children ?? emptyState : <BrowserCameraPanel key={sessionId} sessionId={sessionId} preview={children} settingsTarget={settingsTarget} connectedTarget={connectedTarget} onConnected={onConnected} emptyState={emptyState} />;
 }

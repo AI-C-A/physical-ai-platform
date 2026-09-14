@@ -89,15 +89,15 @@ export function CollectionCameraPanel({ sessionId }: { readonly sessionId?: stri
   return (
     <section aria-label="시연 카메라" className="grid gap-3">
       {sessionId ? <BrowserCameraPanel key={sessionId} sessionId={sessionId} /> : null}
-      <details open={sessionId === undefined}>
-      <summary className="cursor-pointer py-2 text-xs text-muted">외부 WebRTC 주소로 연결</summary>
+      <section aria-label="외부 WebRTC 연결" className="grid gap-3">
+      <h3 className="text-base font-semibold">외부 WebRTC 주소로 연결</h3>
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold">시연 카메라</h2>
         <p className="text-xs leading-5 text-muted">라즈베리파이 등에서 보내는 WebRTC 영상을 연결하세요. 실시간 확인용이며 Episode에는 영상이 저장되지 않습니다.</p>
       </div>
       <CameraSource label="헤드캠" role="head" />
       <CameraSource label="전신 카메라" role="full-body" />
-      </details>
+      </section>
     </section>
   );
 }
