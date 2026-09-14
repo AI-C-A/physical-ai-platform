@@ -19,8 +19,8 @@ describe('InMemoryRobotOperationalStatusQuery', () => {
       data: {
         serialNumber: robot.serialNumber,
         name: robot.displayName,
-        latitude: 37.39472,
-        longitude: 127.11153,
+        latitude: 37.40462,
+        longitude: 127.10581,
       },
     });
   });

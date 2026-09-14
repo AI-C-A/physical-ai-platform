@@ -29,7 +29,7 @@ describe('SitesPage', () => {
     expect(within(table).getByText('37.39472, 127.11153')).toBeInTheDocument();
     expect(within(table).getByText('pangyo-army-ax-hub')).toBeInTheDocument();
     expect(within(table).getByText('실내').tagName).toBe('TD');
-    expect(within(table).getByText('/assets/sites/pangyo-v1.glb')).toBeInTheDocument();
+    expect(within(table).getByText('/assets/sites/pangyo-exhibit.glb')).toBeInTheDocument();
   });
 
   it('각 사이트 ID가 반영된 모니터링 링크를 제공한다', () => {

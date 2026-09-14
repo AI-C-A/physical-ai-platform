@@ -125,7 +125,8 @@ describe('RobotsPage', () => {
       await screen.findByRole('status', { name: '실시간 상태: 확인 미지원' }),
     ).toHaveAttribute('aria-atomic', 'true');
     expect(screen.queryByRole('button', { name: '상태 새로고침' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('로봇 온라인')).toHaveLength(3);
+    expect(screen.getAllByText('로봇 온라인')).toHaveLength(5);
+    expect(screen.getByRole('link', { name: '휴머노이드 로봇' })).toBeInTheDocument();
     expect(screen.getAllByText('N0000001').length).toBeGreaterThan(0);
     expect(screen.queryByText('사족 보행형')).not.toBeInTheDocument();
     expect(screen.queryByText('위치 텔레메트리')).not.toBeInTheDocument();

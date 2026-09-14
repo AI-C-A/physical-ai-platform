@@ -4,14 +4,8 @@ import { Button } from '@/shared/ui/button';
 import { ModelViewer, type ModelViewerElement } from '@/shared/ui/model-viewer';
 import { Spinner } from '@/shared/ui/spinner';
 
-import type { RobotType } from '../model/robot';
-
-const robotModels: Record<RobotType, { file: string; label: string; orbit: string; orientation?: string }> = {
-  humanoid: { file: 'openarm-bimanual-five-finger.glb', label: '양팔형 로봇 (오픈암 스타일)', orbit: '-45deg 72deg 115%' },
-  // RBQ-10의 Z-up 좌표를 뷰어의 Y-up 좌표로 변환한다.
-  quadruped: { file: 'rbq10_walk.glb', label: '사족보행 로봇', orbit: '45deg 65deg 105%', orientation: '0deg -90deg 0deg' },
-  mobile: { file: 'four-wheel-rover.glb', label: '사륜 로봇', orbit: '-135deg 65deg 105%' },
-};
+import type { RobotModelId, RobotType } from '../model/robot';
+import { defaultModels, robotModels } from '../model/robot-models';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -28,10 +22,11 @@ function shouldAnimateModel() {
 interface RobotModelViewerProps {
   readonly nickname?: string | null;
   readonly robotType?: RobotType | undefined;
+  readonly modelId?: RobotModelId | undefined;
 }
 
-export function RobotModelViewer({ nickname = null, robotType }: RobotModelViewerProps) {
-  const model = robotModels[robotType ?? 'quadruped'];
+export function RobotModelViewer({ nickname = null, robotType, modelId }: RobotModelViewerProps) {
+  const model = robotModels[modelId ?? defaultModels[robotType ?? 'quadruped']];
   const modelRef = useRef<ModelViewerElement>(null);
   const animate = useSyncExternalStore(subscribeMotionPreference, shouldAnimateModel, () => false);
 
@@ -42,7 +37,7 @@ export function RobotModelViewer({ nickname = null, robotType }: RobotModelViewe
   return (
     <figure
       aria-label="로봇 3D 모델"
-      className="flex flex-col"
+      className="flex min-w-0 flex-col"
       role="group"
     >
       <div className="relative h-28 shrink-0 md:h-52">

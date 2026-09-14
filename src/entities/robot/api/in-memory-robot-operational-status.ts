@@ -48,11 +48,11 @@ implements RobotOperationalStatusQueryPort {
         serialNumber: robot.serialNumber,
         name: robot.name,
         nickname: null,
-        battery: Math.max(0, 96 - numericId * 4),
+        battery: robot.modelId === 'openarm' ? 100 : Math.max(0, 96 - numericId * 4),
         isConnecting: true,
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
-        isCharging: numericId % 4 === 0,
+        isCharging: robot.modelId === 'openarm' || numericId % 4 === 0,
       },
     });
   }

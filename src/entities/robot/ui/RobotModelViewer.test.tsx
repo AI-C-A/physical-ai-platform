@@ -9,6 +9,9 @@ describe('RobotModelViewer', () => {
     const model = () => screen.getByRole('group', { name: '로봇 3D 모델' }).querySelector('model-viewer');
     expect(model()).toHaveAttribute('src', '/assets/openarm-bimanual-five-finger.glb');
     expect(model()).toHaveAttribute('alt', '양팔형 로봇 (오픈암 스타일) 3D 모델');
+    view.rerender(<RobotModelViewer modelId="alice5" robotType="humanoid" />);
+    expect(model()).toHaveAttribute('src', '/assets/alice5.glb');
+    expect(model()).toHaveAttribute('alt', '휴머노이드 로봇 3D 모델');
     view.rerender(<RobotModelViewer robotType="mobile" />);
     expect(model()).toHaveAttribute('src', '/assets/four-wheel-rover.glb');
     expect(model()).toHaveAttribute('alt', '사륜 로봇 3D 모델');

@@ -53,7 +53,9 @@ function BatteryIndicator({
   battery,
   batteryLabel,
   isCharging,
+  surfaceClassName,
 }: {
+  readonly surfaceClassName: string;
   readonly battery: number;
   readonly batteryLabel: string;
   readonly isCharging: boolean;
@@ -65,7 +67,7 @@ function BatteryIndicator({
   return (
     <section
       aria-label={'배터리 ' + batteryLabel + (isCharging ? ', 충전 중' : '')}
-      className={cn(cardSurfaceClassName, 'text-foreground')}
+      className={cn(surfaceClassName, 'text-foreground')}
       data-card-surface
       role="group"
     >
@@ -113,7 +115,9 @@ function BatteryIndicator({
 function RobotSnapshotOverview({
   isStale,
   status,
+  surfaceClassName,
 }: {
+  readonly surfaceClassName: string;
   readonly isStale: boolean;
   readonly status: PatrolRobotSnapshot;
 }) {
@@ -129,7 +133,7 @@ function RobotSnapshotOverview({
       {status.isConnecting ? null : (
         <section
           aria-label="연결 상태"
-          className={cardSurfaceClassName}
+          className={surfaceClassName}
           data-card-surface
           role="group"
         >
@@ -144,6 +148,7 @@ function RobotSnapshotOverview({
       )}
 
       <BatteryIndicator
+        surfaceClassName={surfaceClassName}
         battery={status.battery}
         batteryLabel={formatBatteryPercentage(status.battery)}
         isCharging={status.isCharging}
@@ -151,7 +156,7 @@ function RobotSnapshotOverview({
 
       <section
         aria-label="현재 위치"
-        className={cardSurfaceClassName}
+        className={surfaceClassName}
         data-card-surface
       >
         <h3 className="text-xs font-medium text-muted">현재 위치</h3>
@@ -175,7 +180,7 @@ function RobotSnapshotOverview({
 
       <section
         aria-label="기체 식별 정보"
-        className={cardSurfaceClassName}
+        className={surfaceClassName}
         data-card-surface
       >
         <dl className="grid gap-2.5 text-xs">
@@ -198,6 +203,7 @@ function RobotSnapshotOverview({
 }
 
 interface RobotInfoOverviewProps {
+  readonly appearance?: 'cards' | 'plain';
   readonly operationalStatus: AsyncQueryState<RobotOperationalStatus | null> & {
     readonly streamIssue?: RobotOperationalStatusStreamIssue | null;
   };
@@ -205,6 +211,7 @@ interface RobotInfoOverviewProps {
 }
 
 export function RobotInfoOverview({
+  appearance = 'cards',
   operationalStatus,
   robot,
 }: RobotInfoOverviewProps) {
@@ -250,7 +257,7 @@ export function RobotInfoOverview({
         />
       )}
       {snapshot === null ? null : (
-        <RobotSnapshotOverview isStale={streamIssue !== null} status={snapshot} />
+        <RobotSnapshotOverview isStale={streamIssue !== null} status={snapshot} surfaceClassName={appearance === 'plain' ? 'py-3' : cardSurfaceClassName} />
       )}
     </section>
   );

@@ -42,8 +42,10 @@ export type {
   RobotOperationalStatusQueryPort,
   RobotOperationalStatusSubscriptionEvent,
 } from './model/robot-operational-status';
-export type { RobotDescriptor, RobotType } from './model/robot';
+export type { RobotDescriptor, RobotModelId, RobotType } from './model/robot';
 export { RobotInfoOverview } from './ui/RobotInfoOverview';
 export { RobotModelViewer } from './ui/RobotModelViewer';
 export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';
 export { RobotCompanyAvatar } from './ui/RobotCompanyAvatar';
+
+export { defaultModels, robotModels } from './model/robot-models';
