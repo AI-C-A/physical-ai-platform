@@ -59,3 +59,43 @@ it('rejects wrong-role output and retries a failed server', async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
   expect(result.current.status).toBe('ready');
 });
+
+it.each([
+  [404, '분석 경로를 찾을 수 없습니다'],
+  [429, '다른 요청을 처리 중'],
+  [500, '서버 또는 프록시'],
+  [502, '정상 응답을 받지 못했습니다'],
+  [503, '모델·GPU 상태'],
+  [504, '시간을 초과'],
+])('explains HTTP %s failures', async (status, message) => {
+  vi.mocked(fetch).mockResolvedValue(new Response('failure', { status }));
+  const { result } = renderHook(() => useCameraAnalysis({ videoRef, imageRef, role: 'head', rotation: 0, enabled: true }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(result.current.error).toContain(`HTTP ${status}`);
+  expect(result.current.error).toContain(message);
+});
+
+it.each([
+  [new DOMException('timeout', 'TimeoutError'), '25초 안에 응답하지 않았습니다'],
+  [new TypeError('Failed to fetch'), '네트워크와 분석 서버 연결'],
+  [new DOMException('tainted canvas', 'SecurityError'), 'CORS 설정'],
+])('explains request failures: %s', async (error, message) => {
+  vi.mocked(fetch).mockRejectedValueOnce(error);
+  const { result } = renderHook(() => useCameraAnalysis({ videoRef, imageRef, role: 'head', rotation: 0, enabled: true }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(result.current.error).toContain(message);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+  expect(result.current).toMatchObject({ status: 'ready', error: null });
+});
+
+it('keeps the cause visible while retrying and clears it when stopped', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(new Response('failure', { status: 503 }));
+  const { result, rerender } = renderHook(({ enabled }) => useCameraAnalysis({ videoRef, imageRef, role: 'head', rotation: 0, enabled }), { initialProps: { enabled: true } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  vi.mocked(fetch).mockImplementation(() => new Promise(() => undefined));
+  await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+  expect(result.current.status).toBe('error');
+  expect(result.current.error).toContain('HTTP 503');
+  rerender({ enabled: false });
+  expect(result.current).toMatchObject({ status: 'waiting', error: null });
+});

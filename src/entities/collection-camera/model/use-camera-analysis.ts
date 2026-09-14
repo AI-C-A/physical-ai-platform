@@ -5,8 +5,34 @@ interface AnalysisState {
   readonly status: 'waiting' | 'loading' | 'ready' | 'error';
   readonly count: number | null;
   readonly latencyMs: number | null;
+  readonly error: string | null;
 }
-const waiting: AnalysisState = { status: 'waiting', count: null, latencyMs: null };
+const waiting: AnalysisState = { status: 'waiting', count: null, latencyMs: null, error: null };
+
+function responseError(status: number): string {
+  const reason: Record<number, string> = {
+    404: '분석 경로를 찾을 수 없습니다. 분석 서버 주소와 프록시 설정을 확인해 주세요.',
+    413: '영상 프레임이 허용 크기를 초과했습니다.',
+    415: '분석 서버가 JPEG 프레임을 지원하지 않습니다.',
+    422: '프레임 처리 또는 연동 서비스 호출에 실패했습니다. 분석 서버 로그를 확인해 주세요.',
+    429: '분석 서버가 다른 요청을 처리 중입니다.',
+    500: '서버 또는 프록시에서 오류가 발생했습니다. 분석 서버 실행 상태와 로그를 확인해 주세요.',
+    502: '프록시가 분석 서버에서 정상 응답을 받지 못했습니다. 서버 실행 상태와 연결 설정을 확인해 주세요.',
+    503: '분석 서비스를 사용할 수 없습니다. 분석 서버의 모델·GPU 상태와 로그를 확인해 주세요.',
+    504: '프록시가 분석 서버의 응답을 기다리다 시간을 초과했습니다.',
+  };
+  return `HTTP ${status} · ${reason[status] ?? '분석 요청에 실패했습니다. 분석 서버 로그를 확인해 주세요.'}`;
+}
+
+function analysisError(error: unknown): string {
+  if (error instanceof Error || error instanceof DOMException) {
+    if (error.name === 'TimeoutError') return '분석 서버가 25초 안에 응답하지 않았습니다. 서버 연결과 처리 상태를 확인해 주세요.';
+    if (error.name === 'SecurityError') return '영상의 접근 권한 때문에 프레임을 캡처할 수 없습니다. 영상 제공 서버의 CORS 설정을 확인해 주세요.';
+    if (error instanceof TypeError) return '분석 요청을 전송하지 못했습니다. 네트워크와 분석 서버 연결을 확인해 주세요.';
+    return error.message;
+  }
+  return '분석 중 알 수 없는 오류가 발생했습니다.';
+}
 
 /** 원본 연결을 재사용하고, 회전된 최신 프레임 하나만 서버로 보낸다. */
 export function useCameraAnalysis({ videoRef, imageRef, role, enabled, rotation }: {
@@ -54,14 +80,15 @@ export function useCameraAnalysis({ videoRef, imageRef, role, enabled, rotation 
         const jpeg = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
         if (!active) return;
         if (!jpeg) throw new Error('프레임을 캡처하지 못했습니다.');
-        if (!currentUrl) setState({ ...waiting, status: 'loading' });
+        if (!currentUrl && failures === 0) setState({ ...waiting, status: 'loading' });
         controller = new AbortController();
         const response = await fetch(`/api/perception/${role}/infer`, {
           method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, cache: 'no-store',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]),
         });
-        if (!response.ok || response.headers.get('content-type')?.split(';')[0] !== 'image/png'
-          || response.headers.get('x-perception-mode') !== role) throw new Error('분석 서버 응답 오류');
+        if (!response.ok) throw new Error(responseError(response.status));
+        if (response.headers.get('content-type')?.split(';')[0] !== 'image/png') throw new Error('분석 서버가 PNG 영상 대신 다른 형식으로 응답했습니다. 분석 경로와 프록시 설정을 확인해 주세요.');
+        if (response.headers.get('x-perception-mode') !== role) throw new Error('카메라 역할과 분석 서버의 응답 모드가 다릅니다. 역할별 서버 연결 설정을 확인해 주세요.');
         const countHeader = response.headers.get('x-detection-count');
         const count = countHeader === null ? NaN : Number(countHeader);
         if (!Number.isInteger(count) || count < 0 || count > (role === 'head' ? 2 : 4)) throw new Error('잘못된 검출 정보');
@@ -75,16 +102,16 @@ export function useCameraAnalysis({ videoRef, imageRef, role, enabled, rotation 
         clearImage();
         currentUrl = url;
         image.src = url;
-        setState({ status: 'ready', count, latencyMs: Math.round(performance.now() - started) });
+        setState({ status: 'ready', count, latencyMs: Math.round(performance.now() - started), error: null });
         failures = 0;
         clearTimeout(staleTimer);
         staleTimer = setTimeout(() => { clearImage(); if (active) setState({ ...waiting, status: 'loading' }); }, 3_000);
         schedule(Math.max(0, 200 - (performance.now() - started)));
-      } catch {
+      } catch (error) {
         if (!active) return;
         clearTimeout(staleTimer);
         clearImage();
-        setState({ ...waiting, status: 'error' });
+        setState({ ...waiting, status: 'error', error: analysisError(error) });
         failures += 1;
         schedule(Math.min(5_000, 500 * 2 ** failures));
       }
