@@ -1,8 +1,9 @@
+import { questCollectionProfile as profile } from '../model/quest-collection-profile';
 import { QuestStream } from '@/shared/lib/quest-stream';
 import type {
   CatalogCollection, CollectionHandPoseFrame, CollectionHandPoseTelemetry, CollectionStreamTelemetry,
   CollectionTelemetrySnapshot, FlywheelEpisode, FlywheelPort, HumanDemonstrationBinding,
-  HumanDemonstrationProfile, HumanDemonstrationSourceState, HumanoidCaptureSession,
+  HumanDemonstrationSourceState, HumanoidCaptureSession,
 } from '../model/flywheel';
 import { createUnavailableFlywheel } from './unavailable-flywheel';
 
@@ -46,16 +47,6 @@ interface CollectionRecord {
   readonly frame: CollectionHandPoseTelemetry | null;
 }
 
-const profile: HumanDemonstrationProfile = {
-  id: 'quest-hand-collection-v1', schemaVersion: 1,
-  handTracking: { requiredHands: 'both', targetRateHz: 60, queueCapacityFrames: 600,
-    maximumBatchFrames: 64, flushIntervalMs: 50, partialAfterMs: 250, lostAfterMs: 1_500 },
-  streams: (['left', 'right'] as const).map((side) => ({
-    streamId: `quest-hand-${side}`, displayName: side === 'left' ? '왼손 추적' : '오른손 추적',
-    modality: 'hand-pose', origin: 'sensor', sourceRole: 'xr-hand-tracking', required: true,
-    targetRateHz: 60, coordinateFrame: 'quest-local-floor', maximumDriftMs: null, minimumCompletenessPercent: null,
-  })),
-};
 
 function binding(record: CollectionRecord): HumanDemonstrationBinding {
   return {
@@ -125,7 +116,7 @@ function telemetryFrom(record: CollectionRecord): CollectionTelemetrySnapshot {
     return {
       streamId: stream.streamId, displayName: stream.displayName, modality: 'hand-pose', required: true,
       health: live && hand?.poseObserved ? 'healthy' : 'disconnected', connectionState,
-      expectedRateHz: 60, observedRateHz: null, latencyMs: null, driftMs: null,
+      expectedRateHz: stream.targetRateHz, observedRateHz: null, latencyMs: null, driftMs: null,
       sampleCount, droppedFrameCount: 0, missingSampleCount: 0, bytesWritten: bytesWritten / 2,
       lastSampleAtMs: record.frame?.receivedTimestampMs ?? null, origin: 'sensor',
       sourceDeviceId: record.questDeviceId, coordinateFrame: 'quest-local-floor',
@@ -197,6 +188,7 @@ export function createHttpQuestFlywheel(): FlywheelPort {
   return {
     ...createUnavailableFlywheel(),
     collectionMode: 'quest-hands',
+    supportsBrowserCameras: true,
     listSessions: async () => (await readAll()).map(sessionFrom),
     listOperationalSessions: async () => (await readAll()).filter((item) => !['completed', 'abandoned'].includes(item.status)).map(sessionFrom),
     getSession: async (id) => { const record = (await readAll()).find((item) => item.id === id); return record === undefined ? null : sessionFrom(record); },

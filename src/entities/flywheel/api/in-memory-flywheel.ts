@@ -1,3 +1,4 @@
+import { questCollectionProfile } from '../model/quest-collection-profile';
 /* eslint-disable @typescript-eslint/require-await -- In-memory commands intentionally preserve the asynchronous Port contract. */
 import type { ClockPort } from '@/shared/lib/clock';
 import { createCollectionVisuals } from './in-memory-collection-visuals';
@@ -461,6 +462,7 @@ function clone<T>(value: T): T {
 }
 
 export class InMemoryFlywheel implements FlywheelPort {
+  readonly supportsBrowserCameras = true;
   readonly #clock: ClockPort;
   readonly #listeners = new Set<() => void>();
   readonly #timers = new Set<ReturnType<typeof setTimeout>>();
@@ -912,12 +914,13 @@ export class InMemoryFlywheel implements FlywheelPort {
     input: CreateHumanDemonstrationSessionInput,
   ): Promise<HumanoidCaptureSession> {
     this.#assertActive();
-    if (input.profileId !== undefined && input.profileId !== humanDemonstrationProfile.id) {
+    const profile = input.profileId === questCollectionProfile.id ? questCollectionProfile : humanDemonstrationProfile;
+    if (input.profileId !== undefined && input.profileId !== profile.id) {
       throw new Error('지원하지 않는 Human Demonstration profile입니다.');
     }
     const id = this.#nextId('capture-hd');
     const participantId = `participant-${id}`;
-    const sourceBindings: HumanDemonstrationBinding['sourceBindings'] = [
+    const candidates: HumanDemonstrationBinding['sourceBindings'] = [
       {
         sourceDeviceId: input.questDeviceId,
         role: 'xr-hand-tracking',
@@ -959,16 +962,18 @@ export class InMemoryFlywheel implements FlywheelPort {
         activeEpisodeId: null,
       }]),
     ];
+    const sourceBindings = candidates.filter((source) => source.sourceDeviceId.trim() !== ''
+      && profile.streams.some((stream) => stream.sourceRole === source.role));
     const humanDemonstration: HumanDemonstrationBinding = {
       participantId,
       participantIdScope: 'session',
       exoskeletonDeviceId: input.exoskeletonDeviceId,
-      profile: humanDemonstrationProfile,
+      profile,
       sourceBindings,
       collectorAcknowledgements: [],
       pairing: {
         code: String(100_000 + this.#sequence % 900_000),
-        expiresAtMs: this.#clock.nowMs() + 30 * 60_000,
+        expiresAtMs: this.#clock.nowMs() + 5 * 60_000,
       },
     };
     const session: HumanoidCaptureSession = {
@@ -991,7 +996,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       preflight: [],
       taskId: input.taskId,
       instruction: input.instruction,
-      sensorPresetId: humanDemonstrationProfile.id,
+      sensorPresetId: profile.id,
       episodeIds: [],
       activeEpisodeId: null,
       processingStage: null,
@@ -1022,7 +1027,7 @@ export class InMemoryFlywheel implements FlywheelPort {
       updatedAtMs: this.#clock.nowMs(),
       humanDemonstration: {
         ...session.humanDemonstration,
-        pairing: { code, expiresAtMs: this.#clock.nowMs() + 30 * 60_000 },
+        pairing: { code, expiresAtMs: this.#clock.nowMs() + 5 * 60_000 },
       },
     };
     this.#replaceSession(updated);
@@ -1220,7 +1225,7 @@ export class InMemoryFlywheel implements FlywheelPort {
         ? {
           ...stream,
           status: 'active' as const,
-          observedRateHz: humanDemonstrationProfile.handTracking.targetRateHz,
+          observedRateHz: session.humanDemonstration.profile.handTracking.targetRateHz,
           bytesWritten: stream.bytesWritten + Math.floor(input.byteLength / 2),
         }
         : stream
@@ -1232,7 +1237,7 @@ export class InMemoryFlywheel implements FlywheelPort {
           ? {
             ...stream,
             status: 'active' as const,
-            observedRateHz: humanDemonstrationProfile.handTracking.targetRateHz,
+            observedRateHz: session.humanDemonstration.profile.handTracking.targetRateHz,
             bytesWritten: stream.bytesWritten + Math.floor(input.byteLength / 2),
           }
           : stream),
@@ -1315,7 +1320,7 @@ export class InMemoryFlywheel implements FlywheelPort {
     const conflict = this.#sessions.find((item) => {
       if (item.id === session.id || (item.status !== 'active' && item.status !== 'recording')) return false;
       if (session.kind === 'humanoid' && session.humanDemonstration !== null) {
-        return item.kind === 'humanoid'
+        return session.humanDemonstration.exoskeletonDeviceId !== '' && item.kind === 'humanoid'
           && item.humanDemonstration?.exoskeletonDeviceId === session.humanDemonstration.exoskeletonDeviceId;
       }
       return session.robotId !== null && item.robotId === session.robotId;

@@ -881,6 +881,7 @@ export interface CreateDeploymentInput {
 
 export interface FlywheelPort {
   readonly collectionMode?: 'quest-hands';
+  readonly supportsBrowserCameras?: boolean;
   listProjects(): Promise<readonly ProjectDescriptor[]>;
   listTemplates(): Promise<readonly CollectionTemplate[]>;
   listSessions(): Promise<readonly FlywheelCaptureSession[]>;

@@ -50,7 +50,7 @@ describe('InMemoryFlywheel', () => {
       await expect(quest.pairHumanDemonstrationSource(input)).rejects.toThrow('새 코드 받기');
       const updated = await pc.renewHumanDemonstrationPairing(session.id);
       expect(updated.humanDemonstration!.pairing.code).not.toBe(oldCode);
-      expect(updated.humanDemonstration!.pairing.expiresAtMs).toBe(now + 30 * 60_000);
+      expect(updated.humanDemonstration!.pairing.expiresAtMs).toBe(now + 5 * 60_000);
       expect({ ...updated, updatedAtMs: session.updatedAtMs, humanDemonstration: { ...updated.humanDemonstration, pairing: session.humanDemonstration!.pairing } }).toEqual(session);
       expect(await quest.getSession(session.id)).toMatchObject({ humanDemonstration: { pairing: updated.humanDemonstration!.pairing } });
       await expect(quest.pairHumanDemonstrationSource(input)).rejects.toThrow();
@@ -172,6 +172,33 @@ describe('InMemoryFlywheel', () => {
     } finally {
       pc.dispose();
       quest.dispose();
+    }
+  });
+
+  it('실제 수집 profile로 만든 mock은 Quest 연결을 기다리며 빈 외골격 ID로 세션 충돌을 만들지 않는다', async () => {
+    const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
+    try {
+      for (const device of ['quest-a', 'quest-b']) {
+        const session = await port.createHumanDemonstrationSession({
+          projectId: 'project-tiger', siteId: 'site-lab', name: device, taskId: device, instruction: '분류',
+          profileId: 'quest-hand-collection-v1', questDeviceId: device,
+          exoskeletonDeviceId: '', headCameraDeviceId: '', externalCameraDeviceId: '',
+        });
+        expect(session.humanDemonstration?.sourceBindings).toEqual([
+          expect.objectContaining({ sourceDeviceId: device, role: 'xr-hand-tracking', state: 'pending' }),
+        ]);
+        await expect(port.validateSession(session.id)).rejects.toThrow('필수 장치 연결 대기 중');
+        await port.pairHumanDemonstrationSource({
+          pairingCode: session.humanDemonstration!.pairing.code, sourceDeviceId: device,
+          integrationProfileId: 'quest-webxr-hand-pose-v1', capabilities: ['left-hand-pose', 'right-hand-pose'],
+        });
+        await expect(port.validateSession(session.id)).rejects.toThrow('필수 장치 연결 대기 중');
+        await port.updateHumanDemonstrationSource(session.id, device, 'ready');
+        await port.validateSession(session.id);
+        await expect(port.startSession(session.id)).resolves.toMatchObject({ status: 'active' });
+      }
+    } finally {
+      port.dispose();
     }
   });
 
