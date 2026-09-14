@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 
-import { useBranding } from '@/shared/config';
 import { Button } from '@/shared/ui/button';
 import { Menu } from '@/shared/ui/dropdown';
 import { Icon } from '@/shared/ui/icon';
@@ -14,7 +13,6 @@ interface AppLauncherProps {
 }
 
 export function AppLauncher({ currentMiniApp, miniApps, onSelect }: AppLauncherProps) {
-  const branding = useBranding();
   const pendingNavigation = useRef<MiniAppNavigationItem | null>(null);
 
   return (
@@ -33,7 +31,7 @@ export function AppLauncher({ currentMiniApp, miniApps, onSelect }: AppLauncherP
       <Menu.Content
         align="start"
         aria-label="앱 전환"
-        width="wide"
+        width="content"
         onCloseAutoFocus={(event) => {
           const destination = pendingNavigation.current;
           if (destination === null) return;
@@ -43,16 +41,12 @@ export function AppLauncher({ currentMiniApp, miniApps, onSelect }: AppLauncherP
         }}
         side="bottom"
       >
-        <Menu.Label>
-          {branding.productName}
-        </Menu.Label>
         {miniApps.map((miniApp) => {
           const isCurrent = miniApp.id === currentMiniApp.id;
           return (
             <Menu.Item
               selected={isCurrent}
               label={miniApp.label}
-              {...(miniApp.description ? { description: miniApp.description } : {})}
               key={miniApp.id}
               onSelect={() => {
                 if (isCurrent) return;
