@@ -1218,6 +1218,7 @@ export function HumanoidCollectionDetailPage() {
   const now = useNow();
   const port = useFlywheelPort();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const telemetryQuery = useCollectionTelemetry(sessionId);
   const loadSession = useCallback((value: ReturnType<typeof useFlywheelPort>) => value.getSession(sessionId), [sessionId]);
   const sessionQuery = useFlywheelQuery(loadSession);
@@ -1488,7 +1489,7 @@ export function HumanoidCollectionDetailPage() {
                 onAfterClose={() => {
                   if (!leaveAfterExitRef.current) return;
                   leaveAfterExitRef.current = false;
-                  void navigate('/mlops/collection', { viewTransition: true });
+                  void navigate({ pathname: '/mlops/collection', search: searchParams.toString() }, { viewTransition: true });
                 }}
                 title={closeIntent.title}
                 trigger={(
@@ -1511,7 +1512,7 @@ export function HumanoidCollectionDetailPage() {
                 )}
               </Dialog>
               <DeleteOperationalSessionButton
-                onDeleted={() => void navigate('/mlops/collection', { replace: true })}
+                onDeleted={() => void navigate({ pathname: '/mlops/collection', search: searchParams.toString() }, { replace: true })}
                 onOpenChange={setDeleteDialogOpen}
                 open={deleteDialogOpen}
                 session={session}

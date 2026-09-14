@@ -3,7 +3,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './playwright-test';
 
 import { expectApplicationReady } from './browser-assertions';
-import { fillCollectionSetup } from './collection-setup';
+import { fillCollectionSetup, openCollectionDetails } from './collection-setup';
 
 for (const width of [1440, 390]) {
   test(`사이드바 메뉴는 본문만 전환하고 재선택·모바일 닫기·히스토리를 유지한다 (${String(width)}px)`, async ({ page }, testInfo) => {
@@ -146,15 +146,24 @@ for (const width of [1440, 390]) {
     await fillCollectionSetup(page);
     await page.getByRole('textbox', { name: '세션 이름' }).fill('페이지 전환 확인');
     await page.getByRole('button', { name: '세션 생성', exact: true }).click();
-    const pairing = page.getByRole('status', { name: 'Quest pairing code' });
+    await expect(page.getByRole('heading', { name: '페이지 전환 확인', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/collection\/[^/]+$/u);
+    await openCollectionDetails(page, '장치');
+    await page.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+    const pairing = page.getByRole('status', { name: 'Quest 연결 코드' });
     await expect(pairing).toHaveText(/^\d{6}$/u);
     const collector = await page.context().newPage();
     try {
       await collector.goto('/collect/quest');
       await expectApplicationReady(collector);
-      await collector.getByRole('textbox', { name: '6자리 페어링 코드' }).fill((await pairing.innerText()).trim());
-      await collector.getByRole('button', { name: '세션 연결', exact: true }).click();
-      await collector.getByRole('button', { name: 'MR 모드 시작', exact: true }).click();
+      await collector.getByRole('textbox', { name: '6자리 연결 코드' }).fill((await pairing.innerText()).trim());
+      await collector.getByRole('button', { name: '연결', exact: true }).click();
+      await collector.getByRole('button', { name: '손 추적 시작', exact: true }).click();
+
+      await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+      await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
+      await page.getByRole('button', { name: '나중에 계속', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '데이터 수집', exact: true })).toBeVisible();
 
       await page.evaluate(() => {
         const original = document.startViewTransition.bind(document);
@@ -213,7 +222,7 @@ for (const width of [1440, 390]) {
         await expect(page.locator('html')).not.toHaveAttribute('data-collection-page-transition');
       };
 
-      await page.getByRole('button', { name: '수집 콘솔 열기', exact: true }).click();
+      await page.getByRole('link', { name: '페이지 전환 확인', exact: true }).click();
       await checkTransition('open');
       await expect(page.getByRole('heading', { name: '페이지 전환 확인', exact: true })).toBeVisible();
       await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
@@ -333,7 +342,7 @@ async function openRobotMonitoringMorph(
 ) {
   await page.goto('/control/monitoring');
   await expectApplicationReady(page);
-  await page.getByRole('button', { name: /정찰 로봇 01/u }).first().click();
+  await page.getByRole('button', { name: /사족보행 로봇/u }).first().click();
   const trigger = page.getByRole('link', { name: '영상 관제' });
   await expect(trigger).toBeVisible();
   const radius = await trigger.evaluate((element) => (
@@ -350,8 +359,8 @@ async function openMultiRobotMonitoringMorph(page: Page) {
   await expectApplicationReady(page);
   await page.getByRole('button', { name: '다중 선택' }).click();
   const selection = page.getByRole('list', { name: '다중 관제 로봇 선택' });
-  await selection.getByRole('checkbox', { name: /정찰 로봇 01/u }).click();
-  await selection.getByRole('checkbox', { name: /수송 로봇 02/u }).click();
+  await selection.getByRole('checkbox', { name: /사족보행 로봇/u }).click();
+  await selection.getByRole('checkbox', { name: /사륜 로봇/u }).click();
   const trigger = page.getByRole('button', { name: '다중 관제 시작' });
   await expect(trigger).toBeEnabled();
   const radius = await trigger.evaluate((element) => (
@@ -543,7 +552,7 @@ test('이벤트 상세는 퇴장 중 내용을 유지하고 완료 후에 제거
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('수집·Quest 다이얼로그는 퇴장 완료 후에 라우트를 이동한다', async ({ page }) => {
+test('수집 생성은 퇴장 후 이동하고 Quest 연결은 현재 콘솔에서 닫힌다', async ({ page }) => {
   await page.goto('/mlops/collection/new?q=motion');
   await expectApplicationReady(page);
   const dialog = page.locator('.design-motion-dialog').filter({ has: page.getByRole('heading', { name: '새 데이터 수집', exact: true }) });
@@ -563,16 +572,22 @@ test('수집·Quest 다이얼로그는 퇴장 완료 후에 라우트를 이동�
   await expectDialogExiting(dialog);
   await expect(page).toHaveURL(/\/collection\/new\?q=motion/u);
   await finishDialogExit(dialog);
-  await expect(page).toHaveURL(/\/collection\/[^/]+\/setup\?q=motion/u);
+  await expect(page).toHaveURL(/\/collection\/[^/]+\?q=motion/u);
+  await openCollectionDetails(page, '장치');
+  const questTrigger = page.getByRole('button', { name: 'Quest 연결', exact: true });
+  await questTrigger.click();
   await expect(page.getByRole('dialog', { name: 'Quest 연결' })).toBeVisible();
   const questDialog = page.locator('.design-motion-dialog').filter({ has: page.getByRole('heading', { name: 'Quest 연결', exact: true }) });
   await pauseDialogExit(questDialog);
   await page.keyboard.press('Escape');
   await expectDialogExiting(questDialog);
-  await expect(page).toHaveURL(/\/setup\?q=motion/u);
+  await expect(page).toHaveURL(/\/collection\/[^/]+\?q=motion/u);
   await finishDialogExit(questDialog);
+  await expect(page).toHaveURL(/\/collection\/[^/]+\?q=motion/u);
+  await expect(questTrigger).toBeFocused();
+  await page.getByRole('button', { name: '수집 콘솔 닫기', exact: true }).click();
+  await page.getByRole('button', { name: '나중에 계속', exact: true }).click();
   await expect(page).toHaveURL(/\/collection\?q=motion/u);
-  await expect(trigger).toBeFocused();
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await trigger.click();
@@ -623,7 +638,7 @@ test('영상 관제 링크는 선택한 버튼에서 실제 라우트 화면으�
   expect(await page.evaluate(() => 'startViewTransition' in document)).toBe(true);
   const radius = await openRobotMonitoringMorph(page, true);
 
-  await expect(page.getByRole('heading', { name: '정찰 로봇 01' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '사족보행 로봇' })).toBeVisible();
   const target = page.locator('[data-route-morph-active]');
   await expect(target).toHaveCount(1);
   await expect(target).toHaveAttribute(
@@ -689,16 +704,23 @@ test.describe('reduced motion', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('로봇 미리보기는 모션 설정에 따라 자동 재생을 시작하고 멈춘다', async ({ page }) => {
+  test('사족보행 애니메이션은 모션 설정에 따라 자동 재생을 시작하고 멈춘다', async ({ page }) => {
     await page.goto('/control/monitoring');
     await expectApplicationReady(page);
     await page.getByRole('region', { name: '로봇 선택', exact: true })
-      .getByRole('button', { name: /정찰 로봇 01/u }).click();
+      .getByRole('button', { name: /사족보행 로봇/u }).click();
     const model = page.getByRole('group', { name: '로봇 3D 모델' }).locator('model-viewer');
     await expect(model).toHaveJSProperty('loaded', true);
+    await expect(model).toHaveJSProperty('availableAnimations', ['Walk']);
     await expect(model).toHaveJSProperty('paused', true);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await expect(model).toHaveJSProperty('paused', false);
+    await expect.poll(() => model.evaluate((element) => (
+      element as HTMLElement & { readonly duration: number }
+    ).duration)).toBeCloseTo(0.8, 4);
+    await expect.poll(() => model.evaluate((element) => (
+      element as HTMLElement & { readonly currentTime: number }
+    ).currentTime)).toBeGreaterThan(0.1);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(model).toHaveJSProperty('paused', true);
   });
