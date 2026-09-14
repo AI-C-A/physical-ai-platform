@@ -2,6 +2,55 @@
 
 Mac은 카메라 수신과 화면 표시를 담당하고, NVIDIA 데스크탑은 추론을 담당한다.
 
+## PC별 실행 순서
+
+최초 모델 설치를 마친 뒤에는 데스크탑의 모델 서버 세 개를 먼저 실행하고, Mac에서 수집 앱을 실행한다. 아래 Python 명령은 Linux/WSL의 Bash 기준이다. 각 터미널에서 해당 모델의 Python 환경을 먼저 활성화하고 `/path/to/...`를 실제 경로로 바꾼다.
+
+| PC | 실행 항목 | 포트 |
+| --- | --- | --- |
+| Mac | `npm run dev:real` — 수집 화면과 모델 서버 프록시 | 5173 |
+| Mac | `npm run gateway:quest` — Quest 연결과 관절 녹화 | 8787 |
+| Mac | `npm run dev:funnel` — Quest용 HTTPS 접속 주소 | 5173으로 전달 |
+| NVIDIA 데스크탑 | RF-DETR 세그멘테이션 | 8790 |
+| NVIDIA 데스크탑 | 4D Humans 전신 분석 | 8791 |
+| NVIDIA 데스크탑 | MediaPipe + 세그멘테이션 헤드 분석 | 8792 |
+
+데스크탑의 서로 다른 터미널 세 개에서 실행한다.
+
+```bash
+# 터미널 1: RF-DETR 환경
+SEGMENTATION_HOST=0.0.0.0 SEGMENTATION_DEVICE=cuda:0 \
+  python /path/to/robot-army-tiger-fe/segmentation/server.py
+```
+
+```bash
+# 터미널 2: 4D Humans 환경
+cd /path/to/4D-Humans
+PERCEPTION_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+  python /path/to/robot-army-tiger-fe/perception/server.py --mode full-body --host 0.0.0.0
+```
+
+```bash
+# 터미널 3: MediaPipe 환경
+HAND_LANDMARKER_MODEL=/path/to/hand_landmarker.task \
+PERCEPTION_SEGMENTATION_URL=http://127.0.0.1:8790/infer \
+  python /path/to/robot-army-tiger-fe/perception/server.py --mode head --host 0.0.0.0
+```
+
+Mac의 `.env.local`에는 아래 [Mac에서 연결](#mac에서-연결)의 세 주소를 지정한다. 두 PC가 Tailscale에 연결되어 있고 Mac에서 데스크탑의 8790~8792 포트에 접근할 수 있어야 한다. WSL을 사용한다면 설정한 Tailscale IP에서 WSL의 서버까지 실제로 연결되는지 확인한다.
+
+Mac의 WebStorm에서는 compound 설정 `Real`에 다음 세 npm 실행 항목만 넣는다. 로컬 GPU 실행 항목은 포함하지 않는다.
+
+- `Real (Frontend)` → `dev:real`
+- `Real (Quest Gateway)` → `gateway:quest`
+- `Real (Tailscale Funnel)` → `dev:funnel`
+
+이 설정으로 `Real`을 한 번 실행하면 Mac의 세 프로세스가 시작된다. 이미 실행 중인 기존 프로세스는 먼저 중지한다. `.idea` 설정은 Git에서 제외되므로 다른 checkout에서는 다시 구성한다. Patrol 관제도 필요하면 Quest Gateway를 `gateway:dev`로 교체하고 Patrol 환경변수를 설정한다. 두 gateway는 같은 포트를 사용하므로 동시에 실행하지 않는다.
+
+Mac 터미널에서 `curl --max-time 5 http://<데스크탑-IP>:8790/health`를 실행하고 8791, 8792도 확인한다. `/health` 성공 후 수집 콘솔의 헤드·전신 분석 카드에서 실제 추론 결과까지 확인한다.
+
+## 분석 구성
+
 - 전신: 4D Humans의 HMR2 + RegNetY 검출기(CUDA) → 원본과 별도의 3D 메시 카드.
 - 헤드: 기존 RF-DETR-Seg(CUDA) + MediaPipe Hand Landmarker(CPU) → 동일 프레임 위에 마스크와 손 관절 합성.
 - 현재 전신은 프레임별 메시 복원이다. PHALP의 시간축 ID 추적, 동작 이름 분류, 브라우저 3D 회전, 녹화는 포함하지 않는다.
@@ -17,10 +66,10 @@ Mac은 카메라 수신과 화면 표시를 담당하고, NVIDIA 데스크탑은
 저장소의 [세그멘테이션 설치 안내](../segmentation/README.md)에 따라 CUDA용 PyTorch와 `segmentation/requirements.txt`를 별도 환경에 설치한다. 저장소 루트에서:
 
 ```bash
-SEGMENTATION_DEVICE=cuda:0 npm run segmentation:dev
+SEGMENTATION_HOST=0.0.0.0 SEGMENTATION_DEVICE=cuda:0 npm run segmentation:dev
 ```
 
-`SEGMENTATION_PYTHON`으로 해당 환경의 Python을 지정할 수 있다. 헤드 서버와 같은 데스크탑에서 실행하므로 8790은 localhost로 유지한다.
+`SEGMENTATION_PYTHON`으로 해당 환경의 Python을 지정할 수 있다. Mac의 관제 화면에서도 접속할 수 있도록 바인딩하고, 같은 데스크탑의 헤드 서버는 localhost로 접속한다.
 
 ### 2. 4D Humans · 포트 8791
 
