@@ -1,7 +1,8 @@
 import { Button } from '@/shared/ui/button';
-import { ErrorMessage } from '@/shared/ui/error-message';
+import { Icon } from '@/shared/ui/icon';
 import { Panel } from '@/shared/ui/panel';
 import { Spinner } from '@/shared/ui/spinner';
+import { Surface } from '@/shared/ui/surface';
 
 type QueryFeedbackProps =
   | {
@@ -19,7 +20,6 @@ type QueryFeedbackProps =
     };
 
 const titles = {
-  error: '데이터를 불러오지 못했습니다',
   empty: '표시할 데이터가 없습니다',
   'filtered-empty': '조건에 맞는 결과가 없습니다',
   'not-found': '대상을 찾을 수 없습니다',
@@ -36,11 +36,38 @@ export function QueryFeedback(props: QueryFeedbackProps) {
     );
   }
 
+  if (props.kind === 'empty' || props.kind === 'filtered-empty') {
+    return (
+      <Surface density="compact" className="flex min-w-0 items-center gap-[var(--layout-toolbar-gap)]">
+        <p className="min-w-0 flex-1 break-words text-sm leading-6 text-muted" role="status">{props.message}</p>
+        {props.onRetry === undefined ? null : (
+          <Button className="shrink-0" onClick={props.onRetry} variant="secondary">
+            다시 시도
+          </Button>
+        )}
+      </Surface>
+    );
+  }
+
+  if (props.kind === 'error') {
+    return (
+      <Surface density="compact" className="flex min-w-0 items-center gap-[var(--layout-toolbar-gap)]">
+        <span className="shrink-0 text-status-negative-foreground">
+          <Icon name="events" size="md" />
+        </span>
+        <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-6 text-foreground" role="alert">
+          {props.message}
+        </p>
+        <Button className="shrink-0" onClick={props.onRetry} variant="secondary">
+          다시 시도
+        </Button>
+      </Surface>
+    );
+  }
+
   return (
     <Panel title={titles[props.kind]}>
-      {props.kind === 'error' ? (
-        <ErrorMessage>{props.message}</ErrorMessage>
-      ) : <p role="status">{props.message}</p>}
+      <p role="status">{props.message}</p>
       {props.onRetry === undefined ? null : (
         <Button className="mt-4" onClick={props.onRetry} variant="secondary">
           다시 시도
