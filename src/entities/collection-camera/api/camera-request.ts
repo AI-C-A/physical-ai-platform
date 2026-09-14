@@ -1,3 +1,4 @@
+import { mockCameraRequest, usesMockCameras } from './mock-camera-request';
 const object = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const integer = (value: unknown): boolean => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -28,6 +29,13 @@ function validResponse(path: string, method: string, value: unknown): boolean {
 }
 
 export async function cameraRequest<T>(path: string, token?: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
+  if (usesMockCameras()) {
+    const result = await mockCameraRequest(path, token, method, body);
+    signal?.throwIfAborted();
+    if (!validResponse(path, method, result)) throw new Error('카메라 응답 형식이 올바르지 않습니다.');
+    return result as T;
+  }
   const response = await fetch(`/api/quest/cameras${path}`, {
     method, cache: 'no-store', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -39,4 +47,22 @@ export async function cameraRequest<T>(path: string, token?: string, method = 'G
     ? result.message : '카메라 연결 요청에 실패했습니다.');
   if (!validResponse(path, method, result)) throw new Error('카메라 서버의 응답 형식이 올바르지 않습니다.');
   return result as T;
+}
+
+/** 수집 세션의 카메라 관리 권한을 조회한다. */
+export async function getCameraOwnerToken(sessionId: string, signal: AbortSignal): Promise<string> {
+  signal.throwIfAborted();
+  if (usesMockCameras()) return `mock-owner-${sessionId}`;
+  const response = await fetch(`/api/quest/collections/${encodeURIComponent(sessionId)}`, {
+    cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+  });
+  if (!response.ok) throw new Error('수집 세션의 카메라 연결 정보를 불러오지 못했습니다.');
+  const record: unknown = await response.json();
+  if (!object(record) || !text(record.viewerToken)) throw new Error('카메라 연결을 지원하는 수집 서버가 필요합니다.');
+  return record.viewerToken;
+}
+
+/** 로컬 연결은 동일 origin을 사용하고 원격 연결은 지정된 수집 주소를 사용한다. */
+export function cameraCollectorOrigin(): string {
+  return (!usesMockCameras() && import.meta.env.VITE_COLLECTOR_ORIGIN?.trim()) || window.location.origin;
 }

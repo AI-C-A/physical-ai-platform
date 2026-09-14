@@ -1,3 +1,4 @@
+import { usesMockCameras, mockCameraRequest } from './mock-camera-request';
 import type { CameraSignal } from '../model/camera';
 import { cameraRequest } from './camera-request';
 
@@ -53,6 +54,7 @@ export function startCameraPeer(options: Options): { close: () => void; setRotat
     options.onStream?.(null);
   };
   const notifyLeave = () => {
+    if (usesMockCameras()) { void mockCameraRequest(`${path}/leave`, options.token, 'POST', { revision }).catch(() => undefined); return; }
     void fetch(`/api/quest/cameras${path}/leave`, { method: 'POST', keepalive: true,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${options.token}` },
       body: JSON.stringify({ revision }), signal: AbortSignal.timeout(3_000) }).catch(() => undefined);
