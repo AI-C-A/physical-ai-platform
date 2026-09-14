@@ -117,7 +117,7 @@ try {
   await expect(senders[0].page.getByRole('alert')).toContainText('만료', { timeout: 10_000 });
   assert.equal(await senders[0].page.locator('video').evaluate((video) => video.srcObject === null), true);
   for (const sender of senders.slice(1)) await expect(sender.manager.getByText('영상 수신 중', { exact: true })).toBeVisible();
-  // Pairing only exposes connection controls; deletion belongs to the sidebar.
+  // 연결 창에는 연결 조작만 표시하고 삭제는 사이드바에서 수행한다.
   await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
   await settings.getByRole('button', { name: '헤드캠 연결', exact: true }).click();
   const pendingCamera = settings.getByRole('region', { name: '헤드캠 1 연결 안내', exact: true });

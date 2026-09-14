@@ -27,8 +27,8 @@ test('RBQ-10 walk preserves the original meshes, materials and embedded textures
   for (const { target } of clip.channels) assert.equal(animated.json.nodes[target.node].matrix, undefined);
 });
 
-// Load the baked artifact with the application's Three.js animation runtime.
-// Texture bytes are checked above; omitting materials avoids a DOM image decoder in Node.
+// 앱과 같은 Three.js 애니메이션 런타임으로 생성된 결과물을 읽는다.
+// 텍스처 바이트는 위에서 검증한다. Node에서 DOM 이미지 디코더를 요구하지 않도록 재질은 제외한다.
 const geometryDocument = structuredClone(animated.json);
 delete geometryDocument.images;
 delete geometryDocument.textures;
@@ -85,7 +85,7 @@ test('RBQ-10 trot alternates diagonal pairs with grounded support between keyfra
   const calves = names.map((name) => scene.getObjectByName(`${name}_calf_visual`));
   const highest = names.map(() => 0);
   const point = new Vector3();
-  // Twice the baked frame rate exercises the runtime's quaternion interpolation.
+  // 생성 프레임률의 두 배로 검사해 런타임의 쿼터니언 보간도 검증한다.
   let firstPairLifted = false;
   let secondPairLifted = false;
   for (let sample = 0; sample <= 96; sample += 1) {

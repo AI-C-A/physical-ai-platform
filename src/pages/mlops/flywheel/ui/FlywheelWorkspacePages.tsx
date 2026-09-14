@@ -567,7 +567,7 @@ function getCollectionIssues({
   const requiredStreams = telemetry?.streams.filter((stream) => stream.required && stream.origin !== 'derived'
     && !awaitingStreamIds.includes(stream.streamId)) ?? [];
   const affectedStreams = monitoring ? requiredStreams.filter((stream) => streamHealthTone(stream) !== 'positive') : [];
-  // A single unavailable source must not turn into a device-wide outage.
+  // 소스 하나의 수신 실패를 전체 장치 연결 끊김으로 확대하지 않는다.
   const connectionProblem = refreshError !== null || (monitoring && telemetry !== null && requiredStreams.length > 0
     && (awaitingStreamIds.length === 0 || affectedStreams.length > 0)
     && effectiveConnectionState !== 'live'
@@ -576,8 +576,8 @@ function getCollectionIssues({
   const qualityIssues = (telemetry?.qualityIssues ?? []).filter((issue) => {
     if (monitoring && issue.streamId != null && awaitingStreamIds.includes(issue.streamId)
       && (issue.id.startsWith('disconnected-') || issue.id.startsWith('degraded-') || issue.id === 'no-hand-pose-data')) return false;
-    // Only live reception symptoms are covered by the connection warning.
-    // Stored-data, calibration, sync and processing issues remain actionable.
+    // 연결 경고와 중복되는 실시간 수신 증상만 합친다.
+    // 저장 데이터, 보정, 동기화와 처리 문제는 별도로 표시한다.
     return !(connectionProblem && monitoring
       && (issue.id.startsWith('disconnected-') || issue.id.startsWith('degraded-'))
       && requiredStreams.some((stream) => stream.streamId === issue.streamId));

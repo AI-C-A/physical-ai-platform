@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 
-// Rebuild with: node scripts/create-rbq10-walk.mjs
-// Authored preview motion, not a recording or a hardware control trajectory.
-// Preserve the source geometry and embedded texture bytes; append only animation data.
-// glTF animation format: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#animations
+// 재생성: node scripts/create-rbq10-walk.mjs
+// 미리보기용으로 제작한 동작이며 실제 녹화나 하드웨어 제어 궤적이 아니다.
+// 원본 형상과 내장 텍스처 바이트는 보존하고 애니메이션 데이터만 추가한다.
+// glTF 애니메이션 형식: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#animations
 const sourceUrl = new URL('../public/assets/rbq10_textured.glb', import.meta.url);
 const outputUrl = new URL('../public/assets/rbq10_walk.glb', import.meta.url);
 const source = await readFile(sourceUrl);
@@ -21,8 +21,8 @@ const originalBinary = source.subarray(28 + jsonLength, 28 + jsonLength + docume
 const duration = 0.8;
 const framesPerSecond = 60;
 const frameCount = Math.round(duration * framesPerSecond);
-// Diagonal pairs alternate with a short overlap at touchdown. A wave gait made
-// the compact preview look like slow, disconnected steps instead of locomotion.
+// 착지 구간을 짧게 겹치면서 대각선 다리를 교대로 움직인다.
+// 작은 미리보기에서도 각 다리의 동작이 이어지는 보행으로 보이도록 한다.
 const dutyFactor = 0.625;
 const stride = 0.28;
 const footLift = 0.04;
@@ -41,8 +41,8 @@ const indexOf = (name) => {
   return index;
 };
 
-// Only animated nodes need conversion from matrices to TRS. Their source matrices
-// contain translations alone; visual-node transforms remain byte-for-byte intact.
+// 애니메이션 대상 노드만 행렬을 TRS로 변환한다. 원본 행렬에는 이동만 있으며
+// 시각 노드의 변환 데이터는 그대로 보존한다.
 function animatedNode(name) {
   const index = indexOf(name);
   const node = document.nodes[index];
@@ -73,7 +73,7 @@ function footPath(cycle, swingStart) {
   const phase = (cycle + dutyFactor - swingStart + 1) % 1;
   if (phase < dutyFactor) return { x: stride * (0.5 - phase / dutyFactor), z: 0 };
   const progress = (phase - dutyFactor) / (1 - dutyFactor);
-  // Match the stance velocity at both ends of the swing to avoid a snapping foot.
+  // 발이 튀지 않도록 스윙 양 끝에서 지지 구간의 속도를 맞춘다.
   const tangent = -stride * (1 - dutyFactor) / dutyFactor;
   return {
     x: -stride / 2 + tangent * progress + (stride - tangent) * smoothstep(progress),
@@ -90,7 +90,7 @@ function solveLeg(x, y, z, side) {
     / (2 * upperLength * lowerLength);
   assert.ok(cosine >= -1 && cosine <= 1, 'Foot target is outside the leg workspace');
   const calf = -Math.acos(cosine);
-  // Knee range from the official RBQ model. Keep the mechanically valid IK branch.
+  // 공식 RBQ 모델의 무릎 가동 범위 안에서 기구적으로 유효한 IK 해를 유지한다.
   // https://github.com/RainbowRobotics/RBQ/blob/main/resources/model/rbq/rbq.xml
   assert.ok(calf >= -2.8274 && calf <= -0.4189, 'Knee exceeds the RBQ joint range');
   const thigh = Math.atan2(-x, height)
@@ -129,7 +129,7 @@ for (const leg of legs) {
 }
 
 for (let frame = 0; frame <= frameCount; frame += 1) {
-  // Use exactly the first sample at the last frame for a seamless loop.
+  // 반복 경계가 이어지도록 마지막 프레임에 첫 샘플을 그대로 사용한다.
   const cycle = (frame % frameCount) / frameCount;
   const bodyY = 0.002 * Math.sin(2 * Math.PI * cycle);
   const bodyZ = bodyHeight + 0.004 * Math.cos(4 * Math.PI * cycle);
@@ -138,7 +138,7 @@ for (let frame = 0; frame <= frameCount; frame += 1) {
     const target = footPath(cycle, leg.swingStart);
     let ankleZ = 0.03 + target.z;
     let pose;
-    // Ground the actual sole geometry, including its offset below the foot marker.
+    // 발 기준점 아래의 오프셋까지 포함해 실제 발바닥 형상을 지면에 맞춘다.
     for (let iteration = 0; iteration < 12; iteration += 1) {
       pose = solveLeg(target.x, leg.side * 0.10285 - bodyY, ankleZ - bodyZ, leg.side);
       const error = target.z - lowestCalfPoint(pose, leg.vertices, leg.side, bodyZ);

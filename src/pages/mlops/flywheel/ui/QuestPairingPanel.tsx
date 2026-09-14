@@ -53,7 +53,7 @@ export function QuestPairingPanel({ session, disabled = false, compact = false }
 
   useEffect(() => {
     if (!prepareOnOpen || disabled) return;
-    // Defer until mounted; cleanup also cancels the StrictMode probe.
+    // 마운트 이후 실행하며 정리 함수에서 StrictMode의 시험 실행도 취소한다.
     let cancelled = false;
     void Promise.resolve().then(() => { if (!cancelled) void renew(); });
     return () => { cancelled = true; };
