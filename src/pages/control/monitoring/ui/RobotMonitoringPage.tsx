@@ -1,3 +1,4 @@
+import { Brand } from '@/shared/ui/brand';
 import { useState } from 'react';
 import {
   Link,
@@ -300,9 +301,12 @@ function RobotMonitoringContent({
       scheme="dark"
     >
       <header className={monitoringViewportHeaderClassName}>
-        <h1 className="truncate text-base font-bold text-foreground sm:text-lg">
-          {robot.displayName}
-        </h1>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Brand compact linked={false} className="min-h-0" />
+          <h1 className="truncate text-base font-bold text-foreground sm:text-lg">
+            {robot.displayName}
+          </h1>
+        </div>
         <MonitoringExitLink returnPath={returnPath} />
       </header>
       <div className={monitoringViewportContentClassName}>
@@ -334,6 +338,7 @@ export function RobotMonitoringPage() {
   if (robot.status === 'loading') {
     return (
       <ColorSchemeArea className="min-h-dvh p-4 sm:p-6" layer="canvas">
+        <Brand compact linked={false} className="mb-4 min-h-0 justify-start" />
         <QueryFeedback kind="loading" />
       </ColorSchemeArea>
     );
@@ -341,6 +346,7 @@ export function RobotMonitoringPage() {
   if (robot.status === 'error') {
     return (
       <ColorSchemeArea className="min-h-dvh p-4 sm:p-6" layer="canvas">
+        <Brand compact linked={false} className="mb-4 min-h-0 justify-start" />
         <QueryFeedback kind="error" message={robot.message} onRetry={robot.retry} />
       </ColorSchemeArea>
     );
@@ -351,6 +357,7 @@ export function RobotMonitoringPage() {
         className="grid min-h-dvh content-start gap-4 p-4 sm:p-6"
         layer="canvas"
       >
+        <Brand compact linked={false} className="mb-4 min-h-0 justify-start" />
         <QueryFeedback kind="not-found" message="관제할 로봇을 찾을 수 없습니다." />
         <div className="justify-self-start">
           <MonitoringExitLink returnPath={returnPath} />

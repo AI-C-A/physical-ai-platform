@@ -1,3 +1,4 @@
+import { BrandingContext } from '@/shared/config';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -67,10 +68,10 @@ function renderPage(initialEntry: string) {
     <RobotCatalogContext.Provider value={catalog}>
       <RobotOperationalStatusContext.Provider value={operationalStatus}>
         <RobotVideoContext.Provider value={emptyVideo}>
-          <MemoryRouter initialEntries={[initialEntry]}>
+          <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[initialEntry]}>
             <MultiRobotMonitoringPage />
             <CurrentLocation />
-          </MemoryRouter>
+          </MemoryRouter></BrandingContext.Provider>
         </RobotVideoContext.Provider>
       </RobotOperationalStatusContext.Provider>
     </RobotCatalogContext.Provider>,

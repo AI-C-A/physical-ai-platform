@@ -1,0 +1,43 @@
+@font-face {
+  font-family: 'Strong Army';
+  src: url('/fonts/strong-army/StrongArmy-Bold.woff') format('woff');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+.brand-wordmark {
+  font-family: 'Strong Army', sans-serif;
+  font-weight: 700;
+  font-synthesis: none;
+}
+
+.brand-collapse {
+  justify-content: flex-start;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding-inline: 0.75rem;
+  transition: padding var(--design-motion-release) var(--design-ease-standard);
+}
+
+.brand-collapse[data-compact="true"] {
+  padding-inline: 0.25rem;
+}
+
+.brand-collapse-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: opacity var(--design-motion-fast) var(--design-ease-standard);
+}
+
+.brand-collapse[data-compact="true"] .brand-collapse-label {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-collapse,
+  .brand-collapse-label {
+    transition: none;
+  }
+}

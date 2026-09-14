@@ -1,3 +1,4 @@
+import { BrandingContext } from '@/shared/config';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -29,8 +30,8 @@ const clock: ClockPort = { nowMs: () => nowMs };
 const robot: RobotDescriptor = {
   id: 'robot-001',
   serialNumber: 'MOCK00001',
-  name: '정찰 로봇 01',
-  displayName: '정찰 로봇 01',
+  name: '사족보행 로봇',
+  displayName: '사족보행 로봇',
   integrationProfileId: 'patrol-rest-v1',
 };
 
@@ -38,8 +39,8 @@ const robot3: RobotDescriptor = {
   ...robot,
   id: 'robot-003',
   serialNumber: 'MOCK00003',
-  name: '정찰 로봇 03',
-  displayName: '정찰 로봇 03',
+  name: '양팔형 로봇',
+  displayName: '양팔형 로봇',
 };
 
 function createCatalog(descriptor: RobotDescriptor): RobotCatalogPort {
@@ -79,7 +80,7 @@ function renderRobotMonitoring(
       <RobotVideoContext.Provider value={videoPort}>
         <InterventionQueueContext.Provider value={queue}>
           <ToastProvider>
-            <MemoryRouter initialEntries={[initialEntry]}>
+            <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[initialEntry]}>
               <Routes>
                 <Route
                   element={<RobotMonitoringPage />}
@@ -90,7 +91,7 @@ function renderRobotMonitoring(
                   path="/control/interventions"
                 />
               </Routes>
-            </MemoryRouter>
+            </MemoryRouter></BrandingContext.Provider>
           </ToastProvider>
         </InterventionQueueContext.Provider>
       </RobotVideoContext.Provider>

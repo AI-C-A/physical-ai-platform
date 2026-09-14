@@ -116,7 +116,7 @@ for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings
       const frames = await page.locator('aside').evaluate(async (sidebar, mode) => {
         const toggle = sidebar.querySelector<HTMLButtonElement>('.platform-shell-toggle');
         const main = document.querySelector('main');
-        const links = Array.from(sidebar.querySelectorAll('a'));
+        const links = Array.from(sidebar.querySelectorAll('a.ui-navigation-item'));
         const icons = links.map((link) => link.querySelector('svg'));
         if (!toggle || !main || icons.some((icon) => !icon)) throw new Error('Shell elements missing');
         const baseline = icons.map((icon) => icon!.getBoundingClientRect());
@@ -134,7 +134,7 @@ for (const path of ['/control/monitoring', '/mlops/settings', '/bigdata/settings
               return Math.max(Math.abs(rect.x - initial.x), Math.abs(rect.y - initial.y));
             })),
             toggleDrift: Math.max(Math.abs(button.top - toggleTop), Math.abs(bounds.right - button.right - 8)),
-            stableNodes: links.every((link, index) => link === sidebar.querySelectorAll('a')[index]),
+            stableNodes: links.every((link, index) => link === sidebar.querySelectorAll('a.ui-navigation-item')[index]),
           });
         };
         sample();

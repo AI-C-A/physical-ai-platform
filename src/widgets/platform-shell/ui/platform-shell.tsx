@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom';
 
 import { useBranding } from '@/shared/config';
+import { Brand } from '@/shared/ui/brand';
 import { Button } from '@/shared/ui/button';
 import { cn } from '@/shared/ui/class-names';
 import { Icon, type IconName } from '@/shared/ui/icon';
@@ -146,48 +147,6 @@ function getSiteSelectionSearch(search: string): string {
   return `?${new URLSearchParams({ siteId }).toString()}`;
 }
 
-function Brand({ compact }: { readonly compact: boolean }) {
-  const branding = useBranding();
-  const location = useLocation();
-  const siteSelectionSearch = getSiteSelectionSearch(location.search);
-  return (
-    <Link
-      aria-label={`${branding.productName} 모니터링으로 이동`}
-      className={
-        compact
-          ? 'flex min-h-12 items-center justify-center'
-          : 'flex min-h-12 min-w-0 items-center gap-2'
-      }
-      to={{
-        pathname: '/control/monitoring',
-        search: siteSelectionSearch,
-      }}
-      viewTransition={location.pathname !== '/control/monitoring'}
-    >
-      {branding.logo === null ? (
-        <span
-          aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center text-xs font-bold"
-        >
-          AR
-        </span>
-      ) : (
-        <img
-          alt=""
-          className="size-7 shrink-0 object-contain"
-          src={branding.logo}
-        />
-      )}
-      {compact ? null : (
-        <span className="min-w-0">
-          <strong className="block text-xs font-semibold leading-tight">
-            {branding.productName}
-          </strong>
-        </span>
-      )}
-    </Link>
-  );
-}
 
 function MiniAppHeader({
   currentMiniApp,
@@ -291,7 +250,7 @@ function NavigationGroup({
 
 function getNavigationClassName(isActive: boolean) {
   return cn(
-    'ui-pressable ui-pressable--subtle ui-navigation-item ui-focus-inset flex min-h-11 min-w-0 items-center gap-3 overflow-hidden px-3 py-2 text-sm',
+    'ui-pressable ui-pressable--subtle ui-navigation-item ui-focus-inset flex min-h-11 min-w-0 items-center gap-3 overflow-hidden px-1 py-2 text-sm',
     isActive
       ? 'font-semibold'
       : 'font-normal',
@@ -320,7 +279,7 @@ function NavigationLink({
       to={destination}
       viewTransition={location.pathname !== item.path}
     >
-      <span className="shrink-0">
+      <span className="flex w-8 shrink-0 items-center justify-center">
         <Icon name={item.icon} />
       </span>
       <span aria-hidden="true" className="platform-shell-label shrink-0 whitespace-nowrap" data-hidden={collapsed}>
@@ -352,7 +311,7 @@ function SettingsNavigation({
       to={destination}
       viewTransition={!isActive}
     >
-      <span className="shrink-0">
+      <span className="flex w-8 shrink-0 items-center justify-center">
         <Icon name="settings" />
       </span>
       <span aria-hidden="true" className="platform-shell-label shrink-0 whitespace-nowrap" data-hidden={collapsed}>
@@ -500,6 +459,7 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
                 }
               >
                 <div className="flex h-full min-h-0 flex-col gap-5">
+                  <Brand compact={false} />
                   <MiniAppHeader
                     currentMiniApp={currentMiniApp}
                     miniApps={miniApps}
@@ -530,6 +490,7 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
           <aside
             className={`platform-shell-sidebar fixed inset-y-0 left-0 z-30 hidden overflow-x-hidden bg-navigation-background p-2 lg:flex lg:flex-col ${sidebarCollapsed ? 'w-14' : 'w-60'}`}
           >
+            <Brand animateCollapse compact={sidebarCollapsed} stacked />
             <div className="flex min-h-13 min-w-0 items-center pt-1">
               <div
                 aria-hidden={sidebarCollapsed}

@@ -1,3 +1,4 @@
+import { Brand } from '@/shared/ui/brand';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -274,9 +275,12 @@ export function MultiRobotMonitoringPage() {
       scheme="dark"
     >
       <header className={monitoringViewportHeaderClassName}>
-        <h1 className="truncate text-base font-bold text-foreground sm:text-lg">
-          다중 관제
-        </h1>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Brand compact linked={false} className="min-h-0" />
+          <h1 className="truncate text-base font-bold text-foreground sm:text-lg">
+            다중 관제
+          </h1>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {robots.status === 'ready' ? (
             <ConfigurationSheet
