@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import {
+  RobotCompanyAvatar,
   useRobotCatalogPort,
   useRobotOperationalStatuses,
   useRobotQuery,
@@ -304,15 +305,20 @@ export function RobotsPage() {
                 return (
                   <TableRow key={robot.id}>
                     <TableCell>
-                      <Link
-                        className="font-semibold underline"
-                        to={appendPathSegment('/control/monitoring', robot.id)}
-                      >
-                        {robot.displayName}
-                      </Link>
-                      <span className="block text-xs text-muted">
-                        {robot.id}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <RobotCompanyAvatar robot={robot} />
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold underline"
+                            to={appendPathSegment('/control/monitoring', robot.id)}
+                          >
+                            {robot.displayName}
+                          </Link>
+                          <span className="block text-xs text-muted">
+                            {robot.id}
+                          </span>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {robotStreamIssue === undefined ? (

@@ -56,8 +56,8 @@ describe('Select', () => {
         label="로봇"
         onValueChange={onValueChange}
         options={[
-          { label: '정찰 로봇 01', value: 'robot-001' },
-          { label: '수송 로봇 02', value: 'robot-002' },
+          { label: '사족보행 로봇', value: 'robot-001' },
+          { label: '사륜 로봇', value: 'robot-002' },
         ]}
         value="robot-001"
       />,

@@ -4,8 +4,15 @@ import { Button } from '@/shared/ui/button';
 import { ModelViewer, type ModelViewerElement } from '@/shared/ui/model-viewer';
 import { Spinner } from '@/shared/ui/spinner';
 
-const ROBOT_MODEL_URL = `${import.meta.env.BASE_URL}assets/go2_walk-monitoring.glb`;
-const DEFAULT_CAMERA_ORBIT = '-135deg 65deg 105%';
+import type { RobotType } from '../model/robot';
+
+const robotModels: Record<RobotType, { file: string; label: string; orbit: string; orientation?: string }> = {
+  humanoid: { file: 'openarm-bimanual-five-finger.glb', label: '양팔형 로봇 (오픈암 스타일)', orbit: '-45deg 72deg 115%' },
+  // RBQ-10의 Z-up 좌표를 뷰어의 Y-up 좌표로 변환한다.
+  quadruped: { file: 'rbq10_walk.glb', label: '사족보행 로봇', orbit: '45deg 65deg 105%', orientation: '0deg -90deg 0deg' },
+  mobile: { file: 'four-wheel-rover.glb', label: '사륜 로봇', orbit: '-135deg 65deg 105%' },
+};
+
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 function subscribeMotionPreference(listener: () => void) {
@@ -20,9 +27,11 @@ function shouldAnimateModel() {
 
 interface RobotModelViewerProps {
   readonly nickname?: string | null;
+  readonly robotType?: RobotType | undefined;
 }
 
-export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
+export function RobotModelViewer({ nickname = null, robotType }: RobotModelViewerProps) {
+  const model = robotModels[robotType ?? 'quadruped'];
   const modelRef = useRef<ModelViewerElement>(null);
   const animate = useSyncExternalStore(subscribeMotionPreference, shouldAnimateModel, () => false);
 
@@ -38,9 +47,10 @@ export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
     >
       <div className="relative h-28 shrink-0 md:h-52">
         <ModelViewer
-          alt="걷는 사족 보행 로봇 3D 모델"
+          key={model.file}
+          alt={`${model.label} 3D 모델`}
           autoplay={animate}
-          camera-orbit={DEFAULT_CAMERA_ORBIT}
+          camera-orbit={model.orbit}
           camera-controls
           className="block h-full w-full"
           elementRef={modelRef}
@@ -59,9 +69,10 @@ export function RobotModelViewer({ nickname = null }: RobotModelViewerProps) {
               <Spinner className="size-6 text-muted" label="3D 모델 불러오는 중" />
             </div>
           )}
+          orientation={model.orientation}
           reveal="auto"
           shadow-intensity="1"
-          src={ROBOT_MODEL_URL}
+          src={`${import.meta.env.BASE_URL}assets/${model.file}`}
           touch-action="pan-y"
         >
           <span slot="progress-bar" />

@@ -10,7 +10,7 @@ export function createInMemoryInterventionRequests(
     {
       id: 'intervention-001',
       robotId: 'robot-001',
-      robotName: '정찰 로봇 01',
+      robotName: '사족보행 로봇',
       siteId: 'pangyo-army-ax-hub',
       siteName: '판교 육군 AX 거점',
       location: '군수동 1층 보급 통로',
@@ -30,7 +30,7 @@ export function createInMemoryInterventionRequests(
     {
       id: 'intervention-002',
       robotId: 'robot-003',
-      robotName: '정찰 로봇 03',
+      robotName: '양팔형 로봇',
       siteId: 'pangyo-outdoor-zone',
       siteName: '판교 기동 시험장',
       location: '차량 정비 구역 순찰로',

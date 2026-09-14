@@ -4,12 +4,26 @@ import { describe, expect, it, vi } from 'vitest';
 import { RobotModelViewer } from './RobotModelViewer';
 
 describe('RobotModelViewer', () => {
-  it('반대쪽 전면과 측면 사이의 위쪽 시점에서 계속 걷는다', () => {
+  it('로봇 선택이 바뀌면 해당 유형의 모델과 설명으로 전환한다', () => {
+    const view = render(<RobotModelViewer robotType="humanoid" />);
+    const model = () => screen.getByRole('group', { name: '로봇 3D 모델' }).querySelector('model-viewer');
+    expect(model()).toHaveAttribute('src', '/assets/openarm-bimanual-five-finger.glb');
+    expect(model()).toHaveAttribute('alt', '양팔형 로봇 (오픈암 스타일) 3D 모델');
+    view.rerender(<RobotModelViewer robotType="mobile" />);
+    expect(model()).toHaveAttribute('src', '/assets/four-wheel-rover.glb');
+    expect(model()).toHaveAttribute('alt', '사륜 로봇 3D 모델');
+    view.rerender(<RobotModelViewer robotType="quadruped" />);
+    expect(model()).toHaveAttribute('src', '/assets/rbq10_walk.glb');
+    expect(model()).toHaveAttribute('alt', '사족보행 로봇 3D 모델');
+    expect(model()).toHaveAttribute('orientation', '0deg -90deg 0deg');
+  });
+
+  it('전면과 측면 사이의 위쪽 시점에서 모델을 표시한다', () => {
     render(<RobotModelViewer nickname="Mock Robot" />);
 
     const modelViewer = screen.getByRole('group', { name: '로봇 3D 모델' })
       .querySelector('model-viewer');
-    expect(modelViewer).toHaveAttribute('camera-orbit', '-135deg 65deg 105%');
+    expect(modelViewer).toHaveAttribute('camera-orbit', '45deg 65deg 105%');
     expect(modelViewer).toHaveAttribute('autoplay');
     expect(modelViewer).not.toHaveAttribute('auto-rotate');
     expect(screen.getByText('Mock Robot')).toHaveClass('text-xl', 'md:text-4xl', 'md:font-light');

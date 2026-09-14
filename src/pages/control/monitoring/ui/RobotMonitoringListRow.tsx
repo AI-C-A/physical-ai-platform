@@ -1,4 +1,4 @@
-import type { RobotDescriptor, RobotOperationalStatus } from '@/entities/robot';
+import { RobotCompanyAvatar, type RobotDescriptor, type RobotOperationalStatus } from '@/entities/robot';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { Icon } from '@/shared/ui/icon';
@@ -6,7 +6,7 @@ import { Icon } from '@/shared/ui/icon';
 import { getMonitoringRobotHealth } from '../model/monitoring-robot-health';
 
 export const robotMonitoringListClassName =
-  'mt-3 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1 [scrollbar-width:thin]';
+  'grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-3 [scrollbar-width:thin]';
 
 interface RobotMonitoringListRowProps {
   readonly disabled?: boolean;
@@ -43,6 +43,7 @@ export function RobotMonitoringListRow({
   ].filter(Boolean).join(' ');
   const label = (
     <span className="flex min-w-0 flex-1 items-center gap-3">
+      <RobotCompanyAvatar robot={robot} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold leading-5">{robot.displayName}</span>
         <span className="mt-0.5 block truncate text-xs font-normal leading-4 text-muted">
@@ -54,7 +55,7 @@ export function RobotMonitoringListRow({
           </span>
         )}
       </span>
-      <span className="flex shrink-0 items-center gap-1 text-xs font-medium tabular-nums text-muted">
+      <span className="flex w-12 shrink-0 items-center justify-end gap-1 self-center text-xs font-medium leading-5 tabular-nums text-muted">
         {health.isCharging ? (
           <span aria-label="충전 중" className="inline-flex" role="img" title="충전 중">
             <Icon name="charging" />

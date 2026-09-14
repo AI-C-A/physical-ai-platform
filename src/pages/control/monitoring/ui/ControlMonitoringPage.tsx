@@ -180,7 +180,7 @@ function MonitoringLayout({
 
           <Panel
             aria-label="로봇 선택"
-            className={`${mobileListOpen ? 'flex' : 'hidden md:flex'} pointer-events-auto min-h-0 flex-col overflow-hidden p-4`}
+            className={`${mobileListOpen ? 'flex' : 'hidden md:flex'} pointer-events-auto min-h-0 flex-col overflow-hidden p-0`}
             contentClassName="flex min-h-0 flex-1 flex-col"
             id="monitoring-robot-list"
             layer="translucent"
@@ -197,7 +197,7 @@ function MonitoringLayout({
           >
             {hasRobots ? (
               <>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 p-3">
               <SearchField
                 className="min-w-0 flex-1"
                 inputRef={searchInputRef}
@@ -210,7 +210,7 @@ function MonitoringLayout({
               <Button
                 aria-label={isMultiSelectMode ? '선택 취소' : '다중 선택'}
                 buttonRef={multiSelectActionRef}
-                className="min-w-10 shrink-0 border-0 px-2 text-xs font-medium text-muted hover:text-foreground"
+                className="min-w-12 shrink-0 border-0 px-3 text-xs font-medium text-muted hover:text-foreground"
                 onClick={isMultiSelectMode
                   ? onCancelMultiSelect
                   : onEnterMultiSelect}
@@ -220,7 +220,7 @@ function MonitoringLayout({
               </Button>
             </div>
             {statusesUnavailable || staleRobotIds.size > 0 ? (
-              <div className="mt-2 rounded-[var(--design-radius-control)] bg-status-warning-background p-3 text-xs text-status-warning-foreground" role="status">
+              <div className="mx-3 mb-3 rounded-[var(--design-radius-control)] bg-status-warning-background p-3 text-xs text-status-warning-foreground" role="status">
                 <p>{statusesUnavailable ? '로봇 상태를 불러오지 못했습니다.' : `${String(staleRobotIds.size)}대의 상태 수신이 지연되고 있습니다.`}</p>
                 <Button className="mt-2 min-h-10 px-2 text-xs" onClick={onRefreshStatuses} variant="secondary">상태 다시 확인</Button>
               </div>
@@ -228,7 +228,7 @@ function MonitoringLayout({
               </>
             ) : null}
             {!hasRobots ? (
-              <div className="min-h-0 overflow-y-auto text-sm leading-relaxed">
+              <div className="min-h-0 overflow-y-auto p-3 text-sm leading-relaxed">
                 {robotCatalogQuery.status === 'loading' ? (
                   <div className="flex items-center gap-2 text-muted" role="status" aria-label="불러오는 중">
                     <Spinner />
@@ -244,7 +244,7 @@ function MonitoringLayout({
                 )}
               </div>
             ) : monitoredRobots.length === 0 ? (
-              <div className="my-6 text-sm" role="status">
+              <div className="px-3 py-6 text-sm" role="status">
                 <p className="font-medium">조건에 맞는 로봇이 없습니다.</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">다른 이름이나 ID로 검색해 보세요.</p>
                 <Button className="mt-3 min-h-10 text-xs" onClick={() => { onSearchChange(''); searchInputRef.current?.focus(); }} variant="secondary">검색 지우기</Button>
@@ -282,7 +282,7 @@ function MonitoringLayout({
               </ul>
             )}
             {isMultiSelectMode && hasRobots ? (
-              <div className="mt-2 shrink-0 border-t border-border/70 pt-3">
+              <div className="mt-2 shrink-0 border-t border-border/70 p-3">
                 <Button
                   {...multiMonitoringMorph.getTriggerProps(multiMonitoringTarget)}
                   aria-label="다중 관제 시작"
@@ -370,7 +370,7 @@ function SelectedRobotInfo({ robot, statusQuery }: {
 
   return (
     <>
-      <RobotModelViewer nickname={robotNickname ?? robot.displayName} />
+      <RobotModelViewer nickname={robotNickname ?? robot.displayName} robotType={robot.robotType} />
       <RobotInfoOverview operationalStatus={operationalStatus} robot={robot} />
     </>
   );

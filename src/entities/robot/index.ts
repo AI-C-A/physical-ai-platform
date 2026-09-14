@@ -46,3 +46,4 @@ export type { RobotDescriptor, RobotType } from './model/robot';
 export { RobotInfoOverview } from './ui/RobotInfoOverview';
 export { RobotModelViewer } from './ui/RobotModelViewer';
 export { RealtimeStatusNotice } from './ui/RealtimeStatusNotice';
+export { RobotCompanyAvatar } from './ui/RobotCompanyAvatar';

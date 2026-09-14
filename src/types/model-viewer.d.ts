@@ -17,6 +17,7 @@ interface ModelViewerAttributes
   readonly loading?: 'auto' | 'eager' | 'lazy';
   readonly 'max-camera-orbit'?: string;
   readonly 'min-camera-orbit'?: string;
+  readonly orientation?: string | undefined;
   readonly reveal?: 'auto' | 'interaction' | 'manual';
   readonly 'rotation-per-second'?: string;
   readonly 'shadow-intensity'?: string;

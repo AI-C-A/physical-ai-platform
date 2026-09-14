@@ -10,4 +10,8 @@ export interface RobotDescriptor {
   readonly integrationProfileId: string;
   /** 외부 연동에서 유형을 확인할 수 없으면 임의 값을 만들지 않고 필드를 생략한다. */
   readonly robotType?: RobotType;
+  readonly company?: {
+    readonly name: string;
+    readonly logoUrl: string;
+  };
 }

@@ -127,7 +127,7 @@ describe('InterventionsPage', () => {
     expect(screen.queryByText(/P0|P1/u)).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /요청을 수락하고 관제 시작/u }))
       .toHaveLength(1);
-    expect(screen.getByRole('link', { name: '정찰 로봇 01 처리 중인 관제 열기' }))
+    expect(screen.getByRole('link', { name: '사족보행 로봇 처리 중인 관제 열기' }))
       .toHaveTextContent('처리 중인 관제 열기');
 
     expect(screen.queryByText('robot-001')).not.toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('InterventionsPage', () => {
     renderPage();
 
     expect(await screen.findByRole('link', {
-      name: '정찰 로봇 01 처리 중인 관제 열기',
+      name: '사족보행 로봇 처리 중인 관제 열기',
     })).toHaveAttribute(
       'href',
       '/control/monitoring/robot-001?siteId=pangyo-army-ax-hub&interventionId=intervention-001',
@@ -191,7 +191,7 @@ describe('InterventionsPage', () => {
     const { queue } = renderPage();
 
     await user.click(await screen.findByRole('button', {
-      name: '정찰 로봇 03 요청을 수락하고 관제 시작',
+      name: '양팔형 로봇 요청을 수락하고 관제 시작',
     }));
 
     await waitFor(async () => {
