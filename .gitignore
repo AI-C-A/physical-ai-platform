@@ -30,3 +30,7 @@ id_ecdsa
 
 # macOS 로컬 폴더 메타데이터
 .DS_Store
+
+# Blender 로컬 작업 산출물 (공유 실행 설정은 유지)
+/.run/pangyo-cinematic/
+/.run/pangyo-layout/

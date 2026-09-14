@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import { Button } from '@/shared/ui/button';
 import { ErrorMessage } from '@/shared/ui/error-message';
@@ -12,7 +12,7 @@ import { Spinner } from '@/shared/ui/spinner';
 
 import type { IndoorSiteDescriptor } from '../model/site';
 
-const INITIAL_CAMERA_RADIUS_RATIO = 1.45;
+const INITIAL_CAMERA_RADIUS_RATIO = 0.4;
 const MINIMUM_CAMERA_RADIUS_RATIO = 0.2;
 const MAXIMUM_CAMERA_RADIUS_RATIO = 1.8;
 const WHEEL_ZOOM_ANIMATION_MS = 220;
@@ -160,7 +160,7 @@ function attachMapboxStyleMouseControls(
   };
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (event.pointerType !== 'mouse') return;
+    if (event.pointerType !== 'mouse' || (event.target instanceof Element && event.target.closest('button'))) return;
 
     cancelInertia();
     activePointerId = event.pointerId;
@@ -498,10 +498,31 @@ function attachMapboxStyleWheelZoom(
 
 export function IndoorSiteMap({
   site,
+  children,
+  selectedHotspot,
 }: {
   readonly site: IndoorSiteDescriptor;
+  readonly children?: ReactNode;
+  readonly selectedHotspot?: string | undefined;
 }) {
   const modelViewerRef = useRef<ModelViewerElement>(null);
+
+  useEffect(() => {
+    const viewer = modelViewerRef.current;
+    if (!viewer || !canRenderIndoorMap()) return;
+    // model-viewer가 각 핫스폿의 깊이를 별도로 정렬하므로
+    // 슬롯 버튼과 함께 shadow DOM의 래퍼를 앞으로 올린다.
+    const style = document.createElement('style');
+    style.textContent = `.annotation-wrapper:hover { z-index: 999 !important; }`;
+    if (selectedHotspot) {
+      style.textContent += `.annotation-wrapper:has(slot[name="${CSS.escape(selectedHotspot)}"]) { z-index: 1000 !important; }`;
+    }
+    const attach = () => { viewer.shadowRoot?.append(style); };
+    attach();
+    viewer.addEventListener('load', attach);
+    return () => { viewer.removeEventListener('load', attach); style.remove(); };
+  }, [selectedHotspot]);
+
 
   useEffect(() => {
     if (!canRenderIndoorMap()) return undefined;
@@ -531,7 +552,8 @@ export function IndoorSiteMap({
       <ModelViewer
         alt={site.mapAlt}
         camera-controls
-        camera-orbit="-15deg 50deg 145%"
+        camera-orbit="25deg 30deg 40%"
+        camera-target={site.initialCameraTarget?.map((value) => `${value}m`).join(' ')}
         className="block h-full w-full"
         disable-tap
         environment-image="legacy"
@@ -561,6 +583,7 @@ export function IndoorSiteMap({
         tone-mapping="neutral"
         touch-action="none"
       >
+        {children}
         <span className="hidden" slot="pan-target" />
         <span slot="progress-bar" />
       </ModelViewer>
