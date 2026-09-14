@@ -12,6 +12,27 @@
   font-synthesis: none;
 }
 
+:root,
+[data-color-scheme="light"] {
+  --brand-light-display: block;
+  --brand-dark-display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-scheme="light"]) {
+    --brand-light-display: none;
+    --brand-dark-display: block;
+  }
+}
+
+[data-color-scheme="dark"] {
+  --brand-light-display: none;
+  --brand-dark-display: block;
+}
+
+.brand-symbol-light { display: var(--brand-light-display); }
+.brand-symbol-dark { display: var(--brand-dark-display); }
+
 .brand-collapse {
   justify-content: flex-start;
   gap: 0.75rem;

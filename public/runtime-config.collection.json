@@ -2,7 +2,8 @@
   "branding": {
     "productName": "ROBOT Army TIGER+",
     "shortName": "ROBOT Army TIGER+",
-    "logo": "/assets/army-tiger-logo.png"
+    "logo": "/assets/army-tiger-symbol-light.png",
+    "logoDark": "/assets/army-tiger-symbol-dark.png"
   },
   "adapters": {
     "mode": "bundle",

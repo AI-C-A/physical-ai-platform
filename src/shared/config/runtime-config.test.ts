@@ -7,6 +7,13 @@ const connections = { patrol: { endpoint: null }, telemetry: { endpoint: null, i
 const validConfig = { branding: { productName: '사용자 제품명', shortName: '사용자명', logo: '/assets/logo.svg' }, adapters: { mode: 'bundle', implementation: 'in-memory' }, connections } as const;
 
 describe('parseRuntimeConfig', () => {
+  it('선택적 다크 로고 경로를 검증하고 사용자 브랜드에 기본 로고를 섞지 않는다', () => {
+    const branding = { ...validConfig.branding, logoDark: '/assets/custom-dark.svg' };
+    expect(parseRuntimeConfig({ ...validConfig, branding }, defaultBranding).branding).toEqual(branding);
+    expect(parseRuntimeConfig(validConfig, { ...defaultBranding, logoDark: '/default-dark.svg' }).branding).toEqual(validConfig.branding);
+    expect(() => parseRuntimeConfig({ ...validConfig, branding: { ...branding, logoDark: 123 } }, defaultBranding)).toThrow('branding.logoDark');
+  });
+
   it('수집 구현을 검증하고 알 수 없는 설정을 거부한다', () => {
     expect(parseRuntimeConfig({ ...validConfig, collection: { implementation: 'external' } }, defaultBranding).collection)
       .toEqual({ implementation: 'external' });

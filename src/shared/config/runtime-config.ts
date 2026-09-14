@@ -4,6 +4,7 @@ export interface BrandingConfig {
   readonly productName: string;
   readonly shortName: string;
   readonly logo: string | null;
+  readonly logoDark?: string;
 }
 
 export interface AdapterComposition {
@@ -80,11 +81,12 @@ function parseImplementation(value: unknown, fieldName: string): AdapterImplemen
 function parseBranding(value: unknown, defaults: BrandingConfig): BrandingConfig {
   if (value === undefined) return defaults;
   const record = parseRecord(value, 'branding');
-  assertAllowedKeys(record, ['productName', 'shortName', 'logo'], 'branding');
+  assertAllowedKeys(record, ['productName', 'shortName', 'logo', 'logoDark'], 'branding');
   return {
     productName: parseRequiredString(record.productName, 'branding.productName'),
     shortName: parseRequiredString(record.shortName, 'branding.shortName'),
     logo: parseNullableString(record.logo, 'branding.logo'),
+    ...(record.logoDark === undefined ? {} : { logoDark: parseRequiredString(record.logoDark, 'branding.logoDark') }),
   };
 }
 

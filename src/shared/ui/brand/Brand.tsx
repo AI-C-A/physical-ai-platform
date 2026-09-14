@@ -32,6 +32,11 @@ export function Brand({ compact, linked = true, animateCollapse = false, stacked
         >
           AR
         </span>
+      ) : branding.logoDark !== undefined ? (
+        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center">
+          <img alt="" className="brand-symbol-light size-full object-contain" src={branding.logo} />
+          <img alt="" className="brand-symbol-dark size-full object-contain" src={branding.logoDark} />
+        </span>
       ) : (
         <ColorSchemeArea scheme="light" className="flex size-8 shrink-0 items-center justify-center rounded-[var(--design-radius-control)] bg-background p-0.5">
           <img
