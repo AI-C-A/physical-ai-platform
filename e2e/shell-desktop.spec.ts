@@ -91,7 +91,7 @@ test('데스크톱 Shell을 키보드로 전환하고 접힘 상태를 복구한
 test('MLOps 상세 화면은 통합된 상위 메뉴를 활성화한다', async ({ page }) => {
   const cases = [
     ['/mlops/sessions/capture-h-001', '데이터 카탈로그'],
-    ['/mlops/episodes/episode-fw-001', '데이터 카탈로그'],
+    ['/mlops/episodes/episode-fw-001', '수집 에피소드'],
     ['/mlops/quality/quality-001', '데이터 검수'],
     ['/mlops/evaluations/evaluation-001', '평가'],
     ['/mlops/inference/inference-001', '운영'],
