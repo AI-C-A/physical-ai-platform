@@ -1,7 +1,8 @@
+import { Brand } from '@/shared/ui/brand';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { cameraRequest, cameraRoleLabel, startCameraPeer, type CameraPeerState, type CameraSender } from '@/entities/collection-camera';
+import { cameraRequest, startCameraPeer, type CameraPeerState, type CameraSender } from '@/entities/collection-camera';
 import { Button } from '@/shared/ui/button';
 import { ColorSchemeArea } from '@/shared/ui/color-scheme';
 import { Input } from '@/shared/ui/input';
@@ -19,8 +20,9 @@ function cameraError(error: unknown): string {
   return '카메라 연결을 완료하지 못했습니다. 다시 시도하세요.';
 }
 
-function CameraSenderSlot({ initialCode, slotId, claimDevice, releaseDevice }: {
+function CameraSenderSlot({ initialCode, slotId, claimDevice, releaseDevice, onPaired }: {
   readonly initialCode: string;
+  readonly onPaired: () => void;
   readonly slotId: number;
   readonly claimDevice: (slot: number, device: string) => boolean;
   readonly releaseDevice: (slot: number) => void;
@@ -88,7 +90,7 @@ function CameraSenderSlot({ initialCode, slotId, claimDevice, releaseDevice }: {
     const attempt = ++generation.current;
     try {
       const result = await cameraRequest<CameraSender>('/pair', undefined, 'POST', { pairingCode: code });
-      if (generation.current === attempt) setBinding(result);
+      if (generation.current === attempt) { setBinding(result); onPaired(); }
     } catch (cause) { if (generation.current === attempt) setError(cameraError(cause)); }
     finally { if (generation.current === attempt) { busy.current = false; setPending(false); } }
   };
@@ -127,35 +129,23 @@ function CameraSenderSlot({ initialCode, slotId, claimDevice, releaseDevice }: {
   };
 
   return (
-    <section aria-label={`카메라 연결 ${String(slotId)}`} className="grid gap-4 rounded-[var(--design-radius-control)] bg-layer-raised p-4">
-      <header className="grid gap-1">
-        <h2 className="text-base font-semibold">{binding?.label ?? `카메라 ${String(slotId)}`}</h2>
-        {binding ? <p className="text-sm text-muted">{cameraRoleLabel(binding.role)}</p> : null}
-      </header>
-      {!binding ? <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); if (code.length === 6) void pair(); }}>
-        <Input label="6자리 카메라 연결 코드" inputMode="numeric" autoComplete="one-time-code" required maxLength={6}
+    <section aria-label={`카메라 연결 ${String(slotId)}`} className="grid gap-4">
+      {binding ? <h2 className="text-base font-semibold">{binding.label}</h2> : null}
+      {!binding ? <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); if (code.length === 6) void pair(); }}>
+        <Input label="6자리 연결 코드" inputMode="numeric" autoComplete="one-time-code" required maxLength={6}
           value={code} disabled={pending} onChange={(event) => setCode(event.target.value.replace(/\D/gu, '').slice(0, 6))} />
-        <Button type="submit" isLoading={pending} disabled={code.length !== 6}>세션 연결</Button>
+        <Button type="submit" isLoading={pending} disabled={code.length !== 6}>연결</Button>
       </form> : <>
-        <div className="relative aspect-video overflow-hidden rounded-[var(--design-radius-control)] bg-layer-base"><video ref={videoRef} aria-label={`${binding.label} 로컬 미리보기`} className="absolute top-1/2 left-1/2 object-contain" style={{ width: rotation % 180 === 0 ? '100%' : '56.25%', height: rotation % 180 === 0 ? '100%' : '177.7778%', transform: `translate(-50%, -50%) rotate(${rotation}deg)` }} autoPlay playsInline muted /></div>
+        {!active && devices.length > 1 ? <Select label="사용할 카메라" value={deviceId} disabled={pending}
+          options={[{ label: '기본 카메라', value: 'default' }, ...devices.map((device, index) => ({ label: device.label || `카메라 ${String(index + 1)}`, value: device.deviceId }))]}
+          onValueChange={setDeviceId} /> : null}
+        <div className={`relative aspect-video overflow-hidden rounded-[var(--design-radius-control)] bg-layer-base ${active || pending ? '' : 'hidden'}`}><video ref={videoRef} aria-label={`${binding.label} 로컬 미리보기`} className="absolute top-1/2 left-1/2 object-contain" style={{ width: rotation % 180 === 0 ? '100%' : '56.25%', height: rotation % 180 === 0 ? '100%' : '177.7778%', transform: `translate(-50%, -50%) rotate(${rotation}deg)` }} autoPlay playsInline muted /></div>
         <StatusIndicator label={state === 'connected' ? 'PC로 영상 전송 중' : state === 'connecting' ? '영상 연결 중' : state === 'waiting' ? 'PC 연결 대기' : state === 'error' ? '연결 오류' : '전송 대기'} tone={state === 'error' ? 'warning' : 'neutral'} />
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" disabled={pending} onClick={() => { const next = (rotation + 90) % 360; setRotation(next); peerRef.current?.setRotation(next); }}>90° 회전</Button>
-          {active || pending ? <Button variant="secondary" onClick={stop}>카메라 정지</Button> : <Button onClick={() => void start()}>카메라 시작</Button>}
+          {active || pending ? <Button variant="secondary" onClick={stop}>영상 전송 중지</Button> : <Button onClick={() => void start()}>영상 전송 시작</Button>}
+          {active ? <Button variant="ghost" disabled={pending} onClick={() => { const next = (rotation + 90) % 360; setRotation(next); peerRef.current?.setRotation(next); }}>90° 회전</Button> : null}
         </div>
-        <details>
-          <summary className="cursor-pointer py-2 text-sm text-muted">카메라 설정</summary>
-          <div className="grid gap-3 pt-2">
-        <Select label="사용할 카메라" value={deviceId} disabled={active || pending}
-          options={[{ label: '기본 카메라', value: 'default' }, ...devices.map((device, index) => ({ label: device.label || `카메라 ${String(index + 1)}`, value: device.deviceId }))]}
-          onValueChange={setDeviceId} />
-            <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" disabled={active || pending} onClick={() => void refresh().catch((cause: unknown) => setError(cameraError(cause)))}>목록 새로고침</Button>
-          <Button variant="ghost" onClick={() => { stop(); setBinding(null); setCode(''); setError(null); }}>다른 코드로 연결</Button>
-            </div>
-            <p className="text-xs text-muted">전송 중에는 이 페이지를 열어 두세요. 영상은 Episode에 저장되지 않습니다.</p>
-          </div>
-        </details>
+        {!active && !pending ? <Button variant="ghost" onClick={() => { stop(); setBinding(null); setCode(''); setError(null); }}>연결 종료</Button> : null}
       </>}
       {error ? <p role="alert" className="text-sm leading-6 text-negative">{error}</p> : null}
     </section>
@@ -165,18 +155,20 @@ function CameraSenderSlot({ initialCode, slotId, claimDevice, releaseDevice }: {
 export function CameraCollectorPage() {
   const [params] = useSearchParams();
   const [slots, setSlots] = useState([1]);
+  const [hasConnection, setHasConnection] = useState(false);
   const devicesInUse = useRef(new Map<number, string>());
   return (
     <ColorSchemeArea layer="base" scheme="dark" className="min-h-dvh text-foreground">
-      <main className="mx-auto grid w-full max-w-lg gap-6 px-5 py-10">
-        <header className="grid gap-2"><h1 className="text-2xl font-bold">카메라 연동</h1>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-6 py-10">
+        <header className="grid gap-2"><div className="flex items-center gap-3"><Brand compact linked={false} className="min-h-0" /><h1 className="text-2xl font-bold">카메라 연결</h1></div>
+          {!hasConnection ? <p className="text-sm text-muted">PC에 표시된 연결 코드를 입력하세요.</p> : null}
         </header>
-        {slots.map((slot) => <CameraSenderSlot key={slot} slotId={slot} initialCode={slot === 1 ? params.get('code')?.replace(/\D/gu, '').slice(0, 6) ?? '' : ''}
+        {slots.map((slot) => <CameraSenderSlot key={slot} slotId={slot} onPaired={() => setHasConnection(true)} initialCode={slot === 1 ? params.get('code')?.replace(/\D/gu, '').slice(0, 6) ?? '' : ''}
           claimDevice={(id, device) => {
             if ([...devicesInUse.current].some(([other, value]) => other !== id && value === device)) return false;
             devicesInUse.current.set(id, device); return true;
           }} releaseDevice={(id) => { devicesInUse.current.delete(id); }} />)}
-        <Button variant="ghost" disabled={slots.length >= 16} onClick={() => setSlots((current) => [...current, current.length + 1])}>카메라 추가 연결</Button>
+        {hasConnection ? <Button variant="ghost" disabled={slots.length >= 16} onClick={() => setSlots((current) => [...current, current.length + 1])}>카메라 추가 연결</Button> : null}
       </main>
     </ColorSchemeArea>
   );

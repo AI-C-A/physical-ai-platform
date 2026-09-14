@@ -61,8 +61,8 @@ describe('App routes', () => {
   });
 
   it.each([
-    ['/collect/quest', 'Quest 손 추적'],
-    ['/collect/camera', '카메라 연동'],
+    ['/collect/quest', 'Quest 연결'],
+    ['/collect/camera', '카메라 연결'],
     ['/control/interventions', '개입 요청'],
     ['/control/sites', '사이트 관리'],
     ['/control/coordinates', '경로·좌표 관리'],

@@ -1,12 +1,12 @@
+import { Brand } from '@/shared/ui/brand';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 import { useQuestCollector, useQuestCollectorPort } from '@/entities/hand-pose';
 import { Button } from '@/shared/ui/button';
 import { ColorSchemeArea } from '@/shared/ui/color-scheme';
 import { Input } from '@/shared/ui/input';
 import { StatusIndicator } from '@/shared/ui/status-indicator';
-import { QuestLiveMonitor } from './QuestLiveMonitor';
 
 export function QuestCollectorPage() {
   const port = useQuestCollectorPort();
@@ -18,7 +18,7 @@ export function QuestCollectorPage() {
   const submissionRef = useRef(false);
   const livePreview = port.livePreview;
   const liveOnly = livePreview !== undefined && snapshot.pairing.collection !== true;
-  const viewing = searchParams.get('view') === 'pc' && livePreview !== undefined;
+  const viewing = searchParams.get('view') === 'pc';
 
   useEffect(() => {
     if (viewing) return;
@@ -58,30 +58,27 @@ export function QuestCollectorPage() {
     : snapshot.backend.lastReceivedTimestampMs === null ? '첫 전송 대기' : 'PC로 손 데이터 전송 중';
   const operationError = error
     ?? (snapshot.recording.state === 'error' ? '녹화를 완료하지 못했습니다. PC에서 수집 상태를 확인하세요.' : null)
-    ?? (snapshot.immersive.state === 'error' ? 'MR 모드를 시작하지 못했습니다. 권한과 기기 연결을 확인하고 다시 시도하세요.' : null);
+    ?? (snapshot.immersive.state === 'error' ? '손 추적을 시작하지 못했습니다. 권한과 기기 연결을 확인하고 다시 시도하세요.' : null);
 
-  if (viewing && livePreview !== undefined) return <QuestLiveMonitor port={livePreview} />;
+  if (viewing) return <Navigate to="/mlops/collection" replace />;
 
   return (
     <ColorSchemeArea className="min-h-dvh text-foreground" layer="base" scheme="dark">
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-6 py-10">
         <header>
-          <h1 className="text-2xl font-bold">Quest 손 추적</h1>
+          <div className="flex items-center gap-3"><Brand compact linked={false} className="min-h-0" /><h1 className="text-2xl font-bold">Quest 연결</h1></div>
           <p className="mt-2 text-sm leading-6 text-muted">
             {!paired ? 'PC에 표시된 연결 코드를 입력하세요.'
               : running ? liveOnly ? 'PC에서 손 추적 수신 상태를 확인하세요.' : '손 추적을 유지하세요. 녹화는 PC에서 조작합니다.'
-                : 'MR 모드를 시작하고 손 추적 권한을 허용하세요.'}
+                : '손 추적을 시작하고 권한을 허용하세요.'}
           </p>
         </header>
 
-        {livePreview !== undefined && !paired ? (
-          <Link className="self-start py-3 text-sm text-foreground underline underline-offset-4" to="/collect/quest?view=pc">PC에서 연결 코드 만들고 손 추적 보기</Link>
-        ) : null}
 
         {!supported && snapshot.support.state !== 'checking' ? (
           <div role="alert" className="text-sm leading-6 text-negative">
             <p>이 기기에서 손 추적을 시작할 수 없습니다.</p>
-            <p>{snapshot.support.secureContext ? '기기의 손 추적 지원 여부와 브라우저 권한을 확인하세요.' : '보안 연결이 필요합니다. HTTPS 주소로 접속하세요.'}</p>
+            <p>{snapshot.support.secureContext ? 'Quest 헤드셋의 브라우저에서 이 주소를 열고 손 추적을 켜세요.' : '보안 연결이 필요합니다. HTTPS 주소로 접속하세요.'}</p>
           </div>
         ) : null}
 
@@ -91,20 +88,20 @@ export function QuestCollectorPage() {
             if (pairingCode.length !== 6 || !supported || snapshot.backend.state === 'unavailable') return;
             void run(() => port.pair(pairingCode), '세션에 연결하지 못했습니다. PC의 연결 코드와 연결 상태를 확인하고 다시 시도하세요.');
           }}>
-            <Input label="6자리 페어링 코드" inputMode="numeric" autoComplete="one-time-code"
-              maxLength={6} pattern="[0-9]{6}" required disabled={pending}
+            <Input label="6자리 연결 코드" inputMode="numeric" autoComplete="one-time-code"
+              maxLength={6} pattern="[0-9]{6}" required disabled={pending || !supported}
               value={pairingCode}
               onChange={(event) => setPairingCode(event.target.value.replace(/\D/gu, '').slice(0, 6))}
             />
             <Button className="min-h-12" disabled={pairingCode.length !== 6 || !supported || snapshot.backend.state === 'unavailable'} isLoading={pending} type="submit">
-              세션 연결
+              연결
             </Button>
             {snapshot.backend.state === 'unavailable' ? <p role="alert" className="text-sm text-warning">수집 서버가 설정되지 않았습니다. 관리자에게 연결 설정을 요청하세요.</p> : null}
             {snapshot.support.state === 'checking' ? <p role="status" className="text-sm text-muted">손 추적 지원 확인 중</p> : null}
           </form>
         ) : (
           <section aria-label="연결된 세션" className="grid gap-5">
-            <p className="text-sm text-muted">PC 수집 세션에 연결되었습니다.</p>
+            <p className="text-sm text-muted">PC에 연결되었습니다.</p>
             {running ? (
               <>
                 <section aria-label="Collector 운영 상태" className="grid gap-4" aria-live="polite">
@@ -120,10 +117,10 @@ export function QuestCollectorPage() {
                     })}
                   </div>
                 </section>
-                <Button className="min-h-12" isLoading={pending} variant="secondary" onClick={() => void run(() => port.endImmersiveSession())}>MR 모드 종료</Button>
+                <Button className="min-h-12" isLoading={pending} variant="secondary" onClick={() => void run(() => port.endImmersiveSession())}>손 추적 중지</Button>
               </>
             ) : (
-              <Button className="min-h-12" disabled={!supported || needsReconnect} isLoading={pending} onClick={() => void run(() => port.startImmersiveSession())}>MR 모드 시작</Button>
+              <Button className="min-h-12" disabled={!supported || needsReconnect} isLoading={pending} onClick={() => void run(() => port.startImmersiveSession())}>손 추적 시작</Button>
             )}
             {needsReconnect ? (
               <div className="grid gap-3">
@@ -138,7 +135,7 @@ export function QuestCollectorPage() {
                   port.leaveCollector();
                   setError(null);
                   setPairingCode('');
-                }}>다른 코드로 연결</Button>
+                }}>연결 종료</Button>
               </>
             ) : null}
           </section>
