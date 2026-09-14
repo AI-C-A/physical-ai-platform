@@ -1558,7 +1558,7 @@ export function HumanoidCollectionDetailPage() {
                       setDetailsOpen(true);
                       requestAnimationFrame(() => document.getElementById('collection-tab-sources')?.focus());
                     }} />}
-                    {...(port.supportsBrowserCameras === true && reviewEpisode === null && session.stoppedAtMs === null ? { sessionId: session.id } : {})}>
+                    {...(session.humanDemonstration !== null && port.supportsBrowserCameras === true && reviewEpisode === null && session.stoppedAtMs === null ? { sessionId: session.id } : {})}>
                   {session.humanDemonstration !== null && cameraSources.length === 0
                     && !hasHandPreview(previewStates) ? null : <SessionCollectionPreview
                     ariaLabel={recordedPreview ? 'Episode 기록 미리보기' : '실시간 수집 모니터'}
