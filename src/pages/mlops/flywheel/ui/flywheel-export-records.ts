@@ -78,6 +78,10 @@ export function createEpisodeExportRecord(episode: FlywheelEpisode) {
     startedAtMs: episode.startedAtMs,
     endedAtMs: episode.endedAtMs,
     bytesWritten: episode.bytesWritten,
+    ...(episode.frameCount === undefined ? {} : { frameCount: episode.frameCount }),
+    ...(episode.videos === undefined ? {} : { videos: episode.videos.map((video) => ({
+      id: video.id, label: video.label, role: video.role, rotation: video.rotation, status: video.status, bytesWritten: video.bytesWritten,
+    })) }),
     annotationStatus: episode.annotationStatus,
     qualityStatus: episode.qualityStatus,
     humanDemonstration: exportSourceBindings(episode.humanDemonstration),

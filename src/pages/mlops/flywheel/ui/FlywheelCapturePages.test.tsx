@@ -172,7 +172,7 @@ describe('HumanoidCollectionDetailPage', () => {
     await user.click(detailsOpen);
     expect(within(sessionInfo).queryByRole('button', { name: '수집 목록으로 이동' }))
       .not.toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(3);
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
     expect(screen.queryByRole('tab', { name: '동기화' })).not.toBeInTheDocument();
     expect(within(sessionInfo).queryByText('장치 연결과 명령 응답')).not.toBeInTheDocument();
     expect(within(sessionInfo).getByText(/task-sort-fruit/u)).toBeVisible();
@@ -246,7 +246,8 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByRole('region', { name: '수집 운영 요약' })).not.toBeInTheDocument();
     expect(captureControls).not.toHaveTextContent(/저장 상태 확인 불가|정지 후 녹화본을 검토하고 저장할 수 있습니다/u);
     const currentSessionInfo = screen.getByRole('region', { name: '세션 정보' });
-    expect(within(currentSessionInfo).getByText(/동기화 정상/u)).toBeVisible();
+    expect(within(currentSessionInfo).getByText('데이터 수신 전')).toBeVisible();
+    expect(within(currentSessionInfo).queryByText(/동기화 정상/u)).not.toBeInTheDocument();
     expect(within(currentSessionInfo).getAllByText('원본 기록')).toHaveLength(1);
     expect(within(currentSessionInfo).getAllByText('데이터 품질')).toHaveLength(1);
     expect(within(currentSessionInfo).queryByRole('button', { name: '상세 진단' })).not.toBeInTheDocument();
@@ -347,7 +348,7 @@ describe('HumanoidCollectionDetailPage', () => {
       const detailsToggle = screen.getByRole('tab', { name: '세션 정보' });
       await user.click(detailsToggle);
       expect(details).not.toBeVisible();
-      expect(screen.getAllByRole('tab')).toHaveLength(3);
+      expect(screen.getAllByRole('tab')).toHaveLength(4);
       expect(screen.getByRole('tab', { name: '세션 정보' })).toHaveAttribute('aria-selected', 'false');
       expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '문제 확인' })).not.toBeInTheDocument();
@@ -563,13 +564,10 @@ describe('HumanoidCollectionDetailPage', () => {
       await screen.findByRole('heading', { name: '소스별 수신 확인' });
       await user.click(screen.getByRole('tab', { name: '장치' }));
       const sources = screen.getByRole('region', { name: '장치 스트림 상태' });
-      expect(within(sources).getByText('최대 시간 차이 37.0 ms · 허용 20 ms')).toBeVisible();
-      const drift = within(sources).getByText('시간 차이 37.0 ms');
+      expect(within(sources).queryByLabelText('동기화 요약')).not.toBeInTheDocument();
+      expect(within(sources).queryByText(/동기화|시간 차이|허용 범위/u)).not.toBeInTheDocument();
       expect(sources.querySelector('details, summary')).toBeNull();
-      expect(drift).toHaveClass('text-warning');
-      expect(drift).toBeVisible();
-      expect(within(drift.parentElement as HTMLElement).getByRole('img', { name: /최근 10초 수신 기록 · 왼손 샘플 누락/u })).toBeVisible();
-      expect(within(sources).getAllByText('시간 차이 확인 전').length).toBeGreaterThan(0);
+      expect(within(sources).getByRole('img', { name: /최근 10초 수신 기록 · 왼손 샘플 누락/u })).toBeVisible();
       expect(within(sources).getByText(/프레임 손실 3 · 샘플 누락 7/u)).toBeVisible();
       expect(within(sources).getByText(/유효 관절 0\/25 · 연속 누락 500 ms/u)).toBeVisible();
       expect(within(sources).queryByRole('button', { name: /전체 소스 상세/u })).not.toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { registerRecordingCamera } from '@/shared/lib/episode-video';
 import { createPortal } from 'react-dom';
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cameraRequest, startCameraPeer, getCameraOwnerToken, type CameraBinding, type CameraPeerState, type CameraRole } from '@/entities/collection-camera';
@@ -7,7 +8,8 @@ import { StatusIndicator } from '@/shared/ui/status-indicator';
 import { DeviceConnectionCode } from './DeviceConnectionCode';
 import { CameraAnalysisCard } from './CameraAnalysisCard';
 
-function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, connectedTarget, onConnected, tileStyle, analysisStyle, visible }: {
+function BrowserCameraCard({ sessionId, camera, onReplace, onRemove, managementTarget, connectedTarget, onConnected, tileStyle, analysisStyle, visible }: {
+  readonly sessionId: string;
   readonly analysisStyle: CSSProperties;
   readonly visible: boolean;
   readonly tileStyle: CSSProperties;
@@ -19,6 +21,7 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, conn
   readonly onRemove: (id: string) => void;
 }) {
   const [rotation, setRotation] = useState(0);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [sourceAspectRatio, setSourceAspectRatio] = useState(16 / 9);
   const aspectRatio = rotation % 180 === 0 ? sourceAspectRatio : 1 / sourceAspectRatio;
   const updateAspectRatio = (video: HTMLVideoElement) => {
@@ -29,6 +32,7 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, conn
   const [state, setState] = useState<CameraPeerState>('waiting');
   const [playing, setPlaying] = useState(false);
   const [paired, setPaired] = useState(camera.paired);
+  useEffect(() => !paired ? undefined : registerRecordingCamera(sessionId, { id: camera.id, label: camera.label, role: camera.role, rotation, stream: recordingStream }), [paired, sessionId, camera.id, camera.label, camera.role, rotation, recordingStream]);
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -47,10 +51,12 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, conn
     if (paused) return;
     let alive = true;
     const video = videoRef.current;
+
     const peer = startCameraPeer({ id: camera.id, token: camera.viewerToken, role: 'viewer', onRotation: setRotation, onPaired: (value) => { if (alive) reportPaired(value); },
       onStream: (stream) => {
         if (!alive) return;
         setPlaying(false);
+        setRecordingStream(stream);
         if (video) {
           video.srcObject = stream;
           if (stream) void video.play().catch(() => { if (alive) setError('영상 재생 버튼을 눌러 미리보기를 시작하세요.'); });
@@ -60,8 +66,8 @@ function BrowserCameraCard({ camera, onReplace, onRemove, managementTarget, conn
     });
     const leave = () => { peer.close(); setPaused(true); setPlaying(false); };
     window.addEventListener('pagehide', leave);
-    return () => { alive = false; peer.close(); if (video) video.srcObject = null; window.removeEventListener('pagehide', leave); };
-  }, [camera.id, camera.viewerToken, camera.pairingCode, paused, attempt]);
+    return () => { alive = false; setRecordingStream(null); peer.close(); if (video) video.srcObject = null; window.removeEventListener('pagehide', leave); };
+  }, [sessionId, camera.id, camera.label, camera.role, camera.viewerToken, camera.pairingCode, paused, attempt]);
   const mutate = async (action: 'renew' | 'remove') => {
     if (busy.current) return;
     busy.current = true; setPending(true); setError(null);
@@ -142,10 +148,12 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget, connect
     if (busy.current || token === null) return;
     busy.current = true; setPending(true); setError(null);
     try {
+      const ownerToken = await getCameraOwnerToken(sessionId, new AbortController().signal);
+      setToken(ownerToken);
       const existing = cameras.find((camera) => camera.role === role && !camera.paired);
       const camera = existing
         ? await cameraRequest<CameraBinding>(`/${existing.id}/refresh-code`, existing.viewerToken, 'POST', { restart: true })
-        : await cameraRequest<CameraBinding>('', token, 'POST', { collectionId: sessionId, role, label: nextCameraLabel(role, cameras) });
+        : await cameraRequest<CameraBinding>('', ownerToken, 'POST', { collectionId: sessionId, role, label: nextCameraLabel(role, cameras) });
       setCameras((current) => existing ? current.map((item) => item.id === camera.id ? camera : item) : [...current, camera]);
       setSelection({ target: settingsTarget, id: camera.id });
       if (camera.paired) onConnected?.();
@@ -189,7 +197,7 @@ export function BrowserCameraPanel({ sessionId, preview, settingsTarget, connect
       </div> : null}
       <div className={!workspace || !hasTiles ? 'hidden' : 'collection-camera-grid min-h-0 flex-1'} style={gridStyle} data-tile-count={count} aria-label="수집 영상 그리드">
       {previewCount === 0 ? null : <div className="collection-camera-tile" style={tileStyle(0)} aria-label="손 추적 미리보기">{preview}</div>}
-      {cameras.map((camera) => <BrowserCameraCard tileStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount)} analysisStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount + 1)} visible={preview !== undefined} key={camera.id} camera={camera} managementTarget={camera.paired || camera.id === selectedId ? managementTarget : null} connectedTarget={connectedTarget} onConnected={onConnected}
+      {cameras.map((camera) => <BrowserCameraCard sessionId={sessionId} tileStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount)} analysisStyle={tileStyle(connectedCameras.findIndex((item) => item.id === camera.id) * 2 + previewCount + 1)} visible={preview !== undefined} key={camera.id} camera={camera} managementTarget={camera.paired || camera.id === selectedId ? managementTarget : null} connectedTarget={connectedTarget} onConnected={onConnected}
         onRemove={(id) => setCameras((current) => current.filter((item) => item.id !== id))}
         onReplace={(updated) => setCameras((current) => current.map((item) => item.id === updated.id ? updated : item))} />)}
       </div>

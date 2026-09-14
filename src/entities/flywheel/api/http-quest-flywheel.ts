@@ -1,3 +1,4 @@
+import { prepareEpisodeVideo, type VideoRecording } from '@/shared/lib/episode-video';
 import { questCollectionProfile as profile } from '../model/quest-collection-profile';
 import { QuestStream } from '@/shared/lib/quest-stream';
 import type {
@@ -8,6 +9,7 @@ import type {
 import { createUnavailableFlywheel } from './unavailable-flywheel';
 
 interface StoredEpisode {
+  readonly videos?: readonly { id: string; label: string; role: string; rotation: number; mimeType: string; status: string; bytesWritten: number }[];
   readonly id: string;
   readonly name: string;
   readonly status: FlywheelEpisode['status'];
@@ -75,7 +77,7 @@ function sessionFrom(record: CollectionRecord): HumanoidCaptureSession {
     provenance: { environment: 'physical', deliveryMode: 'live', controlMode: 'manual', dataOrigin: 'captured' },
     status: record.status, createdAtMs: record.createdAtMs, updatedAtMs: record.updatedAtMs,
     startedAtMs: record.startedAtMs, stoppedAtMs: record.stoppedAtMs,
-    bytesWritten: record.episodes.reduce((sum, episode) => sum + episode.bytesWritten, 0),
+    bytesWritten: record.episodes.reduce((sum, episode) => sum + episode.bytesWritten + (episode.videos ?? []).reduce((bytes, video) => bytes + video.bytesWritten, 0), 0),
     streams: profile.streams.map((stream) => ({ id: stream.streamId, displayName: stream.displayName,
       expectedRateHz: stream.targetRateHz, observedRateHz: null,
       bytesWritten: record.episodes.reduce((sum, episode) => sum + episode.bytesWritten, 0) / 2,
@@ -92,12 +94,15 @@ function sessionFrom(record: CollectionRecord): HumanoidCaptureSession {
 function episodeFrom(record: CollectionRecord, stored: StoredEpisode): FlywheelEpisode {
   const session = sessionFrom(record);
   return {
+    frameCount: stored.frameCount,
+    rawFramesUrl: `/api/quest/collections/${record.id}/frames?episodeId=${stored.id}`,
+    videos: (stored.videos ?? []).map((video) => ({ ...video, url: `/api/quest/collections/${record.id}/media?episodeId=${stored.id}&videoId=${video.id}` })),
     id: stored.id, name: stored.name, projectId: record.projectId, siteId: record.siteId,
     captureSessionId: record.id, taskId: record.taskId, instruction: record.instruction,
     robotId: null, sensorDeviceId: record.questDeviceId, humanDemonstration: session.humanDemonstration,
     provenance: { ...session.provenance, deliveryMode: stored.status === 'recording' ? 'live' : 'replay' },
     status: stored.status, outcome: stored.outcome, startedAtMs: stored.startedAtMs, endedAtMs: stored.endedAtMs,
-    bytesWritten: stored.bytesWritten, annotationStatus: 'unassigned', qualityStatus: 'pending',
+    bytesWritten: stored.bytesWritten + (stored.videos ?? []).reduce((sum, video) => sum + video.bytesWritten, 0), annotationStatus: 'unassigned', qualityStatus: 'pending',
     qualityWarnings: stored.observedFrameCount < stored.frameCount ? ['양손 추적이 누락된 프레임이 있습니다.'] : [],
     finalizationError: stored.finalizationError, events: [],
     streams: session.streams.map((stream) => ({ ...stream, bytesWritten: stored.bytesWritten / 2,
@@ -145,6 +150,7 @@ function catalogFrom(record: CollectionRecord): CatalogCollection {
 }
 
 export function createHttpQuestFlywheel(): FlywheelPort {
+  const recordings = new Map<string, { recording: VideoRecording; sessionId: string }>();
   const live = new Map<string, { record: CollectionRecord | null; metadataAt: number; pushAt: number; metadataPending: boolean;
     stream: QuestStream | null; listeners: Set<() => void>; stop: () => void }>();
   const listeners = new Set<() => void>();
@@ -156,7 +162,11 @@ export function createHttpQuestFlywheel(): FlywheelPort {
       headers: { 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (!response.ok) throw new Error('수집 서버 요청을 완료하지 못했습니다. 연결과 장치 상태를 확인하세요.');
+    if (!response.ok) {
+      const error: unknown = await response.json().catch(() => null);
+      throw new Error(typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+        ? error.message : '수집 서버 요청을 완료하지 못했습니다. 연결과 장치 상태를 확인하세요.');
+    }
     return response.json() as Promise<T>;
   }
   const readAll = (): Promise<readonly CollectionRecord[]> => {
@@ -169,8 +179,8 @@ export function createHttpQuestFlywheel(): FlywheelPort {
     if (record === undefined) throw new Error('Episode를 찾을 수 없습니다.');
     return record;
   };
-  const command = async (id: string, action: string, episodeId?: string): Promise<CollectionRecord> => {
-    const record = await request<CollectionRecord>(`/${encodeURIComponent(id)}/command`, 'POST', { command: action, episodeId });
+  const command = async (id: string, action: string, episodeId?: string, extra: Record<string, unknown> = {}): Promise<CollectionRecord> => {
+    const record = await request<CollectionRecord>(`/${encodeURIComponent(id)}/command`, 'POST', { command: action, episodeId, ...extra });
     refresh(); return record;
   };
   const episodeCommand = async (id: string, action: string): Promise<FlywheelEpisode> => {
@@ -201,12 +211,37 @@ export function createHttpQuestFlywheel(): FlywheelPort {
     stopSession: async (id) => sessionFrom(await command(id, 'finish')),
     abandonSession: async (id) => sessionFrom(await command(id, 'abandon')),
     startEpisode: async (id) => {
-      const record = await command(id, 'start-episode');
+      const recording = prepareEpisodeVideo(id);
+      const record = await command(id, 'start-episode', undefined, { cameras: recording.cameras });
       const episode = record.episodes.find((item) => item.id === record.activeEpisodeId);
       if (episode === undefined) throw new Error('Episode를 시작하지 못했습니다.');
+      recordings.set(episode.id, { recording, sessionId: id });
+      recording.start(async (videoId, sequence, data) => {
+        const params = new URLSearchParams({ episodeId: episode.id, videoId, sequence: String(sequence) });
+        const response = await fetch(`/api/quest/collections/${id}/media?${params}`, {
+          method: 'POST', headers: { Authorization: `Bearer ${record.viewerToken}`, 'Content-Type': data.type || 'application/octet-stream' },
+          body: data, signal: AbortSignal.timeout(30_000),
+        });
+        if (!response.ok) throw new Error('영상 원본을 저장하지 못했습니다. 연결과 서버 저장 공간을 확인하세요.');
+      });
       return episodeFrom(record, episode);
     },
-    stopEpisode: (id) => episodeCommand(id, 'stop-episode'),
+    stopEpisode: async (id) => {
+      const episode = await episodeCommand(id, 'stop-episode');
+      const entry = recordings.get(id);
+      if (!entry) return episode;
+      try {
+        await entry.recording.stop();
+        const record = await command(entry.sessionId, 'complete-videos', id);
+        return episodeFrom(record, record.episodes.find((item) => item.id === id)!);
+      } catch (error) {
+        await command(entry.sessionId, 'video-error', id);
+        throw error;
+      } finally {
+        entry.recording.dispose();
+        recordings.delete(id);
+      }
+    },
     saveEpisode: (id) => episodeCommand(id, 'save-episode'),
     retryEpisodeFinalization: (id) => episodeCommand(id, 'retry-finalization'),
     invalidateEpisode: (id) => episodeCommand(id, 'invalidate-episode'),
@@ -255,8 +290,8 @@ export function createHttpQuestFlywheel(): FlywheelPort {
       const episode = record?.episodes.find((item) => item.id === id);
       return record === undefined || episode === undefined ? null : episodeFrom(record, episode);
     },
-    listCatalogCollections: async () => (await readAll()).filter((record) => record.status === 'completed').map(catalogFrom),
-    getCatalogCollection: async (id) => { const record = (await readAll()).find((item) => item.id === id && item.status === 'completed'); return record === undefined ? null : catalogFrom(record); },
+    listCatalogCollections: async () => (await readAll()).filter((record) => record.status === 'completed' || record.episodes.some((episode) => episode.outcome === 'success')).map(catalogFrom),
+    getCatalogCollection: async (id) => { const record = (await readAll()).find((item) => item.id === id && (item.status === 'completed' || item.episodes.some((episode) => episode.outcome === 'success'))); return record === undefined ? null : catalogFrom(record); },
     subscribe: (listener) => { listeners.add(listener); const unsubscribe = subscribeAt(listener, 500); return () => { listeners.delete(listener); unsubscribe(); }; },
     subscribeCollectionTelemetry: (id, listener) => {
       let entry = live.get(id);
@@ -293,6 +328,6 @@ export function createHttpQuestFlywheel(): FlywheelPort {
         if (current.listeners.size === 0) { current.stop(); current.stream?.close(); live.delete(id); }
       };
     },
-    dispose: () => { live.forEach((entry) => { entry.stop(); entry.stream?.close(); }); live.clear(); timers.forEach(clearInterval); timers.clear(); listeners.clear(); cache = null; },
+    dispose: () => { recordings.forEach(({ recording }) => recording.dispose()); recordings.clear(); live.forEach((entry) => { entry.stop(); entry.stream?.close(); }); live.clear(); timers.forEach(clearInterval); timers.clear(); listeners.clear(); cache = null; },
   };
 }

@@ -163,3 +163,12 @@ it('페어링되면 코드를 없애고 연결 창에서 사이드바로 옮기�
   expect(startCameraPeer).toHaveBeenCalledOnce();
   view.unmount();
 });
+
+it('Quest 코드 갱신 후 카메라를 추가할 때 최신 세션 권한을 읽는다', async () => {
+  vi.mocked(cameraRequest).mockResolvedValueOnce([]);
+  await act(async () => { render(<BrowserCameraPanel sessionId="collection" />); await Promise.resolve(); });
+  vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ viewerToken: 'renewed-owner' }) } as Response);
+  vi.mocked(cameraRequest).mockResolvedValueOnce(camera);
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '헤드캠 연결' })); await Promise.resolve(); });
+  expect(cameraRequest).toHaveBeenLastCalledWith('', 'renewed-owner', 'POST', expect.objectContaining({ collectionId: 'collection' }));
+});

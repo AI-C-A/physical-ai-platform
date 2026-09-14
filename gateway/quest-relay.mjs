@@ -1,3 +1,5 @@
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { randomBytes, randomInt } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createQuestStream } from './quest-stream.mjs';
@@ -208,13 +210,43 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
         } else throw new RelayError(405, '지원하지 않는 수집 요청입니다.');
         return true;
       }
-      const collectionMatch = url.pathname.match(/^\/api\/quest\/collections\/([a-f0-9]{64})(?:\/(command|pose))?$/u);
+      const collectionMatch = url.pathname.match(/^\/api\/quest\/collections\/([a-f0-9]{64})(?:\/(command|pose|media|frames))?$/u);
       if (collectionMatch) {
         const id = collectionMatch[1];
         const record = await collections.get(id);
         if (!record) throw new RelayError(404, '수집 세션을 찾을 수 없습니다.');
         const current = publicCollection(record);
-        if (method === 'GET' && !collectionMatch[2]) send(response, 200, current);
+        if (method === 'POST' && collectionMatch[2] === 'media') {
+          if (request.headers.authorization !== `Bearer ${current.viewerToken}`) throw new RelayError(403, '영상 저장 권한이 없습니다.');
+          const chunks = []; let size = 0;
+          for await (const chunk of request) {
+            size += chunk.length;
+            if (size > 8 * 1_024 * 1_024) throw new RelayError(413, '영상 조각이 너무 큽니다.');
+            chunks.push(chunk);
+          }
+          if (size === 0) throw new RelayError(400, '빈 영상입니다.');
+          await collections.appendVideo(id, url.searchParams.get('episodeId'), url.searchParams.get('videoId'), Number(url.searchParams.get('sequence')), Buffer.concat(chunks));
+          send(response, 200, { stored: true });
+        } else if (method === 'GET' && ['media', 'frames'].includes(collectionMatch[2])) {
+          const artifact = await collections.artifact(id, url.searchParams.get('episodeId'), collectionMatch[2] === 'media' ? url.searchParams.get('videoId') : null);
+          const size = artifact.bytesWritten;
+          if (size === 0) throw new RelayError(404, '저장된 원본이 없습니다.');
+          let start = 0; let end = size - 1;
+          const range = request.headers.range;
+          if (range) {
+            const match = /^bytes=(\d*)-(\d*)$/u.exec(range);
+            if (!match || (!match[1] && !match[2])) { response.writeHead(416, { 'Content-Range': `bytes */${size}` }); response.end(); return true; }
+            start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+            end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1;
+            if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= size) { response.writeHead(416, { 'Content-Range': `bytes */${size}` }); response.end(); return true; }
+          }
+          response.writeHead(range ? 206 : 200, { 'Content-Type': artifact.mimeType, 'Content-Length': end - start + 1,
+            'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes',
+            ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
+            ...(url.searchParams.has('download') || collectionMatch[2] === 'frames' ? { 'Content-Disposition': `attachment; filename="${artifact.path.split('/').at(-1)}"` } : {}),
+          });
+          await pipeline(createReadStream(artifact.path, { start, end }), response);
+        } else if (method === 'GET' && !collectionMatch[2]) send(response, 200, current);
         else if (method === 'GET' && collectionMatch[2] === 'pose') {
           const offset = Number(url.searchParams.get('offsetMs') ?? 0);
           if (!Number.isFinite(offset) || offset < 0) throw new RelayError(400, '재생 위치가 올바르지 않습니다.');
@@ -313,6 +345,7 @@ export function createQuestRelayHandler({ nowMs = Date.now, collectionDirectory 
         throw new RelayError(403, '허용되지 않는 세션 작업입니다.');
       }
     } catch (error) {
+      if (response.headersSent) { response.destroy(); return true; }
       send(response, error instanceof RelayError ? error.status : 500, {
         message: error instanceof RelayError ? error.message : '손 추적 중계 요청을 처리하지 못했습니다.',
       });

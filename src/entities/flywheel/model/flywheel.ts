@@ -450,6 +450,17 @@ export interface EpisodeEvent {
 }
 
 export interface FlywheelEpisode {
+  readonly frameCount?: number;
+  readonly rawFramesUrl?: string;
+  readonly videos?: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly role: string;
+    readonly rotation: number;
+    readonly status: string;
+    readonly bytesWritten: number;
+    readonly url: string;
+  }[];
   readonly id: string;
   readonly projectId: string;
   readonly siteId: string;

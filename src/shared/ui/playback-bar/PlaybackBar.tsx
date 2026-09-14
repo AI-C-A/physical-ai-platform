@@ -99,17 +99,17 @@ export function PlaybackBar({
     <Surface
       aria-label={ariaLabel}
       as="div"
-      className="grid grid-cols-[auto_minmax(8rem,1fr)_auto_auto] items-center gap-3 px-3 py-2 max-md:grid-cols-[auto_minmax(6rem,1fr)_auto]"
+      className="grid grid-cols-[auto_minmax(8rem,1fr)_auto_auto] items-center gap-3 px-3 py-2 max-md:grid-cols-[auto_minmax(6rem,1fr)_auto] max-sm:grid-cols-[minmax(0,1fr)_auto]"
       density="compact"
       layer="soft-group"
       role="group"
     >
-      <div className="flex min-w-0 items-center gap-2 max-md:col-span-3">
+      <div className="flex min-w-0 items-center gap-2 max-md:col-span-3 max-sm:col-span-2">
         {statusLabel === null ? null : <Badge tone="info">{statusLabel}</Badge>}
         <strong className="truncate text-xs">{label}</strong>
       </div>
 
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 max-sm:col-span-2">
         <span className="min-w-10 text-right text-xs font-semibold tabular-nums text-foreground">
           {formatTime(positionMs)}
         </span>

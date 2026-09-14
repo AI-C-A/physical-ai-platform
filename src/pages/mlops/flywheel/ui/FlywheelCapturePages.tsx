@@ -1,3 +1,4 @@
+import { EpisodeRecordingPreview } from './EpisodeRecordingPreview';
 import { useCallback, useRef, useState } from "react";
 import {
   useParams,
@@ -51,7 +52,7 @@ export function FlywheelEpisodeDetailPage() {
           <>
             <PageHeader
               title={episode.name}
-              description={`${episode.taskId} · ${getExecutionEnvironmentLabel(episode.provenance.environment)}`}
+              description={`${episode.instruction} · ${getExecutionEnvironmentLabel(episode.provenance.environment)}`}
               actions={
                 <div className="flex flex-wrap items-center gap-3">
                   <StatusBadge status={getEpisodeStorageLabel(episode)} />
@@ -69,9 +70,12 @@ export function FlywheelEpisodeDetailPage() {
               }
             />
             {exportStatus ? <p className={`text-sm ${exportError ? 'text-negative' : 'text-muted'}`} role={exportError ? 'alert' : 'status'}>{exportStatus}</p> : null}
-            <Panel title="동기 멀티뷰">
+            <EpisodeRecordingPreview key={episode.id} episode={episode} />
+            {episode.rawFramesUrl ? null : <Panel title="동기 멀티뷰">
               <p className="text-sm text-muted">이 에피소드의 재생 영상이 연결되지 않았습니다. 아래에서 기록 정보를 확인하세요.</p>
-            </Panel>
+            </Panel>}
+            {episode.finalizationError ? <p role="alert" className="text-sm text-negative">{episode.finalizationError}</p> : null}
+            <DetailLink to={`/mlops/collection/${episode.captureSessionId}`}>수집 세션 열기</DetailLink>
             <Panel title="영상 / 상태 / 동작 타임라인">
               <Timeline
                 durationLabel={
@@ -92,10 +96,10 @@ export function FlywheelEpisodeDetailPage() {
                   { label: "검수 상태", value: getStatusLabel(episode.annotationStatus) },
                   { label: "품질 검사", value: getStatusLabel(episode.qualityStatus) },
                   {
-                    label: episode.humanDemonstration === null ? '로봇·센서' : '참여자·외골격 장치',
+                    label: '장치',
                     value: episode.humanDemonstration === null
                       ? `${episode.robotId ?? '미지정'} · ${episode.sensorDeviceId ?? '미지정'}`
-                      : `${episode.humanDemonstration.participantId} · ${episode.humanDemonstration.exoskeletonDeviceId}`,
+                      : episode.sensorDeviceId ?? '미지정',
                   },
                   {
                     label: "수집 용량",

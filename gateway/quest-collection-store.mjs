@@ -47,6 +47,18 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
     return episode;
   };
 
+  const videoPath = (episode, video) => path(episode.id, `${video.id}.${video.mimeType.startsWith('video/mp4') ? 'mp4' : 'webm'}`);
+  const finalize = (episode) => {
+    if (episode.status !== 'finalizing') return;
+    const acknowledged = episode.acknowledgements.some((ack) => ack.command === 'stop' && ack.state === 'acknowledged');
+    if (acknowledged && episode.frameCount > 0 && (episode.videos ?? []).every((video) => video.status === 'completed')) {
+      episode.status = 'completed'; episode.finalizationError = null;
+    }
+  };
+  const removeVideos = async (episode) => {
+    for (const video of episode.videos ?? []) await unlink(videoPath(episode, video)).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+  };
+
   return {
     list: async () => { await pending; await load(); return structuredClone([...records.values()]); },
     get: async (id) => { await pending; await load(); return records.has(id) ? requireRecord(id) : null; },
@@ -76,7 +88,17 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
       } else if (command === 'start-episode') {
         if (!input.ready || record.status !== 'active' || record.activeEpisodeId !== null) throw new Error('연결 상태와 현재 Episode를 확인하세요.');
         if (record.episodes.length >= 100) throw new Error('새 수집 세션에서 계속하세요.');
-        const episode = { id: randomBytes(32).toString('hex'), name: `Episode ${String(record.episodes.length + 1).padStart(2, '0')}`,
+        const cameras = input.cameras ?? [];
+        if (!Array.isArray(cameras) || cameras.length > 16) throw new Error('카메라 수가 올바르지 않습니다.');
+        const videos = cameras.map((camera) => {
+          if (typeof camera !== 'object' || camera === null || typeof camera.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/u.test(camera.id) || typeof camera.label !== 'string' || camera.label.length > 200
+            || !['head', 'full-body'].includes(camera.role) || !['video/webm;codecs=vp8', 'video/webm', 'video/mp4'].includes(camera.mimeType)
+            || ![0, 90, 180, 270].includes(camera.rotation)) throw new Error('카메라 녹화 정보가 올바르지 않습니다.');
+          return { id: camera.id, label: camera.label, role: camera.role, mimeType: camera.mimeType, rotation: camera.rotation,
+            status: 'recording', bytesWritten: 0, lastSequence: -1 };
+        });
+        if (new Set(videos.map((video) => video.id)).size !== videos.length) throw new Error('중복 카메라입니다.');
+        const episode = { videos, id: randomBytes(32).toString('hex'), name: `Episode ${String(record.episodes.length + 1).padStart(2, '0')}`,
           status: 'recording', outcome: null, startedAtMs: now, endedAtMs: null,
           bytesWritten: 0, frameCount: 0, observedFrameCount: 0, lastSequence: -1,
           frameEpoch: null, epochDeviceTimestampMs: null, epochOffsetMs: 0, lastOffsetMs: 0,
@@ -86,6 +108,16 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
       } else if (command === 'stop-episode') {
         const episode = requireEpisode(record, input.episodeId);
         if (episode.status === 'recording') { episode.status = 'finalizing'; episode.endedAtMs = now; }
+      } else if (command === 'complete-videos') {
+        const episode = requireEpisode(record, input.episodeId);
+        if (episode.status === 'completed') return record;
+        if (episode.status !== 'finalizing') throw new Error('녹화를 먼저 정지하세요.');
+        if ((episode.videos ?? []).some((video) => video.bytesWritten === 0)) throw new Error('수신된 카메라 영상이 없습니다.');
+        for (const video of episode.videos ?? []) video.status = 'completed';
+        finalize(episode);
+      } else if (command === 'video-error') {
+        const episode = requireEpisode(record, input.episodeId);
+        episode.finalizationError = '카메라 영상 전송이 중단되었습니다. 이 에피소드를 폐기하고 다시 녹화하세요.';
       } else if (command === 'save-episode') {
         const episode = requireEpisode(record, input.episodeId);
         if (episode.status !== 'completed' || episode.frameCount === 0) throw new Error('원본 전송이 끝난 녹화본만 저장할 수 있습니다.');
@@ -97,12 +129,14 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
         if (!episode.acknowledgements.some((ack) => ack.command === 'stop' && ack.state === 'acknowledged')) {
           throw new Error('Quest에서 전송 완료 응답을 기다리고 있습니다.');
         }
-        episode.status = 'completed'; episode.finalizationError = null;
+        finalize(episode);
+        if (episode.status !== 'completed') throw new Error('카메라 영상 전송 완료를 기다리고 있습니다.');
       } else if (command === 'delete-episode' || command === 'invalidate-episode') {
         const episode = requireEpisode(record, input.episodeId);
         if (episode.status === 'recording') throw new Error('녹화를 먼저 정지하세요.');
         if (command === 'delete-episode') {
           await unlink(path(episode.id, 'ndjson')).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+          await removeVideos(episode);
           record.episodes = record.episodes.filter((item) => item.id !== episode.id);
         } else { episode.status = 'invalid'; episode.outcome = 'aborted'; }
         if (record.activeEpisodeId === episode.id) record.activeEpisodeId = null;
@@ -125,7 +159,7 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
       episode.acknowledgements = episode.acknowledgements.filter((ack) => ack.command !== input.command);
       episode.acknowledgements.push({ command: input.command, state: input.state, acknowledgedAtMs: nowMs(), detail: typeof input.detail === 'string' ? input.detail.slice(0, 500) : null });
       if (input.command === 'stop' && input.state === 'acknowledged') {
-        if (episode.frameCount > 0) { episode.status = 'completed'; episode.finalizationError = null; }
+        if (episode.frameCount > 0) finalize(episode);
         else episode.finalizationError = '수신된 손 추적 프레임이 없습니다.';
       }
       await persist(record);
@@ -163,6 +197,28 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
       await persist(record);
       return retained.at(-1) ?? null;
     }),
+    appendVideo: (id, episodeId, videoId, sequence, data) => serial(async () => {
+      const record = requireRecord(id);
+      const episode = requireEpisode(record, episodeId);
+      const video = episode.videos?.find((item) => item.id === videoId);
+      if (!video || record.activeEpisodeId !== episode.id || !['recording', 'finalizing'].includes(episode.status) || video.status !== 'recording') throw new Error('녹화 중인 영상이 아닙니다.');
+      if (!Number.isSafeInteger(sequence) || sequence < 0) throw new Error('영상 순서가 올바르지 않습니다.');
+      if (sequence <= video.lastSequence) return;
+      if (sequence !== video.lastSequence + 1) throw new Error('영상 조각이 누락되었습니다.');
+      if (video.bytesWritten + data.length > 512 * 1_024 * 1_024) throw new Error('영상 보관 한도에 도달했습니다. 새 에피소드를 시작하세요.');
+      await appendFile(videoPath(episode, video), data);
+      video.bytesWritten += data.length; video.lastSequence = sequence;
+      record.updatedAtMs = nowMs();
+      await persist(record);
+    }),
+    artifact: async (id, episodeId, videoId) => {
+      await pending; await load();
+      const episode = requireEpisode(requireRecord(id), episodeId);
+      if (videoId === null) return { path: path(episode.id, 'ndjson'), mimeType: 'application/x-ndjson', bytesWritten: episode.bytesWritten };
+      const video = episode.videos?.find((item) => item.id === videoId);
+      if (!video) throw new Error('영상을 찾을 수 없습니다.');
+      return { path: videoPath(episode, video), mimeType: video.mimeType, bytesWritten: video.bytesWritten };
+    },
     poseAt: async (id, episodeId, offsetMs) => {
       await pending; await load();
       requireEpisode(requireRecord(id), episodeId);
@@ -181,7 +237,10 @@ export function createQuestCollectionStore(directory, nowMs = Date.now) {
     delete: (id) => serial(async () => {
       const record = requireRecord(id);
       if (record.episodes.some((episode) => episode.status === 'recording')) throw new Error('녹화를 먼저 정지하세요.');
-      for (const episode of record.episodes) await unlink(path(episode.id, 'ndjson')).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+      for (const episode of record.episodes) {
+        await unlink(path(episode.id, 'ndjson')).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+        await removeVideos(episode);
+      }
       await unlink(path(id, 'json'));
       records.delete(id);
     }),

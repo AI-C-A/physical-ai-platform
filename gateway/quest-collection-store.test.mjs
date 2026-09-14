@@ -75,3 +75,46 @@ test('머리 자세를 손 프레임과 같은 시각으로 저장하고 재생�
   assert.deepEqual((await reopened.poseAt(id, episodeId, 0)).viewerPose, viewerPose);
   assert.equal((await reopened.poseAt(id, episodeId, 100)).viewerPose, null);
 });
+
+test('손과 영상 원본이 모두 전송된 에피소드만 저장하고 재시작 후 다시 연다', async (t) => {
+  const { directory, store, id, episodeId, frame } = await setup(t);
+  await store.command(id, 'stop-episode', { episodeId });
+  await store.command(id, 'delete-episode', { episodeId });
+  const started = await store.command(id, 'start-episode', { ready: true, cameras: [
+    { id: 'camera-1', label: '헤드캠', role: 'head', rotation: 0, mimeType: 'video/webm' },
+  ] });
+  const nextId = started.activeEpisodeId;
+  await store.appendFrames(id, [{ ...frame(0), episodeId: nextId }]);
+  await store.appendVideo(id, nextId, 'camera-1', 0, Buffer.from('first'));
+  await store.appendVideo(id, nextId, 'camera-1', 0, Buffer.from('first'));
+  await assert.rejects(store.appendVideo(id, nextId, 'camera-1', 2, Buffer.from('gap')), /누락/);
+  await store.command(id, 'stop-episode', { episodeId: nextId });
+  await store.acknowledge(id, { episodeId: nextId, command: 'stop', state: 'acknowledged' });
+  await assert.rejects(store.command(id, 'save-episode', { episodeId: nextId }), /전송이 끝난/);
+  await store.appendVideo(id, nextId, 'camera-1', 1, Buffer.from('last'));
+  await store.command(id, 'complete-videos', { episodeId: nextId });
+  await store.command(id, 'save-episode', { episodeId: nextId });
+  const reopened = createQuestCollectionStore(directory);
+  const saved = (await reopened.get(id)).episodes[0];
+  assert.equal(saved.status, 'completed');
+  assert.equal(saved.outcome, 'success');
+  assert.equal(saved.videos[0].bytesWritten, 9);
+  const artifact = await reopened.artifact(id, nextId, 'camera-1');
+  assert.equal(await readFile(artifact.path, 'utf8'), 'firstlast');
+  await reopened.command(id, 'delete-episode', { episodeId: nextId });
+  await assert.rejects(readFile(artifact.path), { code: 'ENOENT' });
+});
+
+test('빈 영상 및 경로를 벗어나는 카메라 식별자를 허용하지 않는다', async (t) => {
+  const { store, id, episodeId } = await setup(t);
+  await store.command(id, 'stop-episode', { episodeId });
+  await store.command(id, 'delete-episode', { episodeId });
+  await assert.rejects(store.command(id, 'start-episode', { ready: true, cameras: [
+    { id: '../escape', label: '헤드', role: 'head', rotation: 0, mimeType: 'video/webm' },
+  ] }), /올바르지/);
+  const result = await store.command(id, 'start-episode', { ready: true, cameras: [
+    { id: 'head', label: '헤드', role: 'head', rotation: 0, mimeType: 'video/webm' },
+  ] });
+  await store.command(id, 'stop-episode', { episodeId: result.activeEpisodeId });
+  await assert.rejects(store.command(id, 'complete-videos', { episodeId: result.activeEpisodeId }), /수신된 카메라 영상/);
+});

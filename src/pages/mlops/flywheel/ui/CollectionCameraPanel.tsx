@@ -1,3 +1,4 @@
+import { registerRecordingCamera } from '@/shared/lib/episode-video';
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/shared/ui/button';
@@ -9,7 +10,9 @@ import { CameraAnalysisCard } from './CameraAnalysisCard';
 import type { CameraRole } from '@/entities/collection-camera';
 import { BrowserCameraPanel } from './BrowserCameraPanel';
 
-function CameraSource({ label, role }: { readonly label: string; readonly role: CameraRole }) {
+function CameraSource({ label, role, sessionId }: { readonly label: string; readonly role: CameraRole; readonly sessionId?: string | undefined }) {
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  useEffect(() => !sessionId || !recordingStream ? undefined : registerRecordingCamera(sessionId, { id: `external-${role}`, label, role, rotation: 0, stream: recordingStream }), [sessionId, label, role, recordingStream]);
   const [address, setAddress] = useState('');
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const updateAspectRatio = (video: HTMLVideoElement) => {
@@ -29,6 +32,7 @@ function CameraSource({ label, role }: { readonly label: string; readonly role: 
     generationRef.current += 1;
     connectionRef.current?.close();
     connectionRef.current = null;
+    setRecordingStream(null);
     if (videoRef.current) videoRef.current.srcObject = null;
   };
   const connect = () => {
@@ -48,6 +52,7 @@ function CameraSource({ label, role }: { readonly label: string; readonly role: 
       connectionRef.current = connectCollectionCamera(endpoint, {
         onStream: (stream) => {
           if (generation !== generationRef.current || !videoRef.current) return;
+          setRecordingStream(stream);
           videoRef.current.srcObject = stream;
           void videoRef.current.play().catch(() => failed('영상 재생을 시작하지 못했습니다. 다시 연결하세요.'));
         },
@@ -93,10 +98,10 @@ export function CollectionCameraPanel({ sessionId }: { readonly sessionId?: stri
       <h3 className="text-base font-semibold">외부 WebRTC 주소로 연결</h3>
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold">시연 카메라</h2>
-        <p className="text-xs leading-5 text-muted">라즈베리파이 등에서 보내는 WebRTC 영상을 연결하세요. 실시간 확인용이며 Episode에는 영상이 저장되지 않습니다.</p>
+        <p className="text-xs leading-5 text-muted">라즈베리파이 등에서 보내는 WebRTC 영상을 연결하세요. 연결된 영상은 에피소드 녹화 시 함께 저장됩니다.</p>
       </div>
-      <CameraSource label="헤드캠" role="head" />
-      <CameraSource label="전신 카메라" role="full-body" />
+      <CameraSource sessionId={sessionId} label="헤드캠" role="head" />
+      <CameraSource sessionId={sessionId} label="전신 카메라" role="full-body" />
       </section>
     </section>
   );

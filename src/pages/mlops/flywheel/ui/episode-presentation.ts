@@ -5,7 +5,7 @@ const eventLabels = { contact: '접촉', grasp: '파지', release: '놓기', col
 
 export function getEpisodeStorageLabel(episode: FlywheelEpisode): string {
   if (episode.status === 'invalid') return '제외됨';
-  if (episode.status === 'completed') return '저장됨';
+  if (episode.status === 'completed') return episode.outcome === null ? '검토 대기' : '저장됨';
   if (episode.status === 'recording') return '녹화 중';
   if (episode.status === 'finalizing') return episode.finalizationError === null ? '파일 정리 중' : '저장 확인 필요';
   return '검토 대기';

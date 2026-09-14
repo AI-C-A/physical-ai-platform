@@ -59,3 +59,22 @@ it('서버 재시작으로 바뀐 보기 토큰으로 스트림을 다시 연다
   expect(streams[1]!.close).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('진행 중인 세션에서도 저장한 에피소드를 카탈로그에 공개한다', async () => {
+  const episode = { id: 'episode', name: 'Episode 01', status: 'completed', outcome: 'success', startedAtMs: 0,
+    endedAtMs: 1000, bytesWritten: 100, frameCount: 10, observedFrameCount: 10, acknowledgements: [], finalizationError: null,
+    videos: [{ id: 'head', label: '헤드', role: 'head', rotation: 0, mimeType: 'video/webm', status: 'completed', bytesWritten: 200 }] };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json([{ ...record(), episodes: [episode] }])));
+  const port = createHttpQuestFlywheel();
+  expect(await port.listCatalogCollections()).toEqual([expect.objectContaining({ id: 'session', episodeIds: ['episode'] })]);
+  expect(await port.getCatalogCollection('session')).not.toBeNull();
+  expect(await port.getEpisode('episode')).toMatchObject({ bytesWritten: 300, frameCount: 10, videos: [expect.objectContaining({ id: 'head' })] });
+  port.dispose();
+});
+
+it('서버에서 제공한 수집 실패 이유를 숨기지 않는다', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ message: 'Quest 손 추적 연결을 먼저 완료하세요.' }, { status: 409 })));
+  const port = createHttpQuestFlywheel();
+  await expect(port.startSession('session')).rejects.toThrow('Quest 손 추적 연결을 먼저 완료하세요.');
+  port.dispose();
+});

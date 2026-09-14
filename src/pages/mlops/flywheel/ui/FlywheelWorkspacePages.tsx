@@ -1,3 +1,5 @@
+import { EpisodeRecordingPreview } from './EpisodeRecordingPreview';
+import { SessionEpisodeRecordings } from './SessionEpisodeRecordings';
 import { Brand } from '@/shared/ui/brand';
 import { CollectionCameraPanel } from './CollectionCameraPanel';
 import {
@@ -271,13 +273,6 @@ function qualityLabel(snapshot: CollectionTelemetrySnapshot | null): string {
   if (snapshot?.qualityVerdict === 'review') return '품질 검토 필요';
   if (snapshot?.qualityVerdict === 'not-ready') return '학습 사용 불가';
   return '판정 대기';
-}
-
-function syncLabel(snapshot: CollectionTelemetrySnapshot | null): string {
-  if (snapshot?.sync.state === 'aligned') return '동기화 정상';
-  if (snapshot?.sync.state === 'warning') return '동기화 확인 필요';
-  if (snapshot?.sync.state === 'out-of-sync') return '동기화 범위 이탈';
-  return '동기화 정보 없음';
 }
 
 function getRecordingSummary(
@@ -715,14 +710,8 @@ function CollectionStreamsSection({ telemetry, questConnection, cameraConnection
               ? ''
               : `유효 관절 ${String(stream.handTracking.validJointCount)}/25 · 연속 누락 ${String(stream.handTracking.consecutiveMissingMs)} ms`}
           </span>
-          {stream.lastSampleAtMs === null || stream.driftMs === null || telemetry === null || Math.abs(stream.driftMs) <= telemetry.sync.toleranceMs ? null : (
-            <span className="mt-1 block text-sm tabular-nums text-warning">시간 차이 {stream.driftMs.toFixed(1)} ms · 허용 범위 초과</span>
-          )}
           {stream.origin === 'derived' || stream.modality === 'hand-pose' ? null : <span className="block text-sm tabular-nums text-foreground">{rateLabel(stream)}</span>}
           <p>{stream.lastSampleAtMs === null ? '수신 기록 없음' : `${formatRelativeTime(stream.lastSampleAtMs)} 수신`}</p>
-          {stream.origin === 'derived' ? null : <p className={`text-sm tabular-nums ${stream.lastSampleAtMs !== null && stream.driftMs !== null && telemetry !== null && Math.abs(stream.driftMs) > telemetry.sync.toleranceMs ? 'text-warning' : 'text-muted'}`}>
-          {stream.lastSampleAtMs === null || stream.driftMs === null ? '시간 차이 확인 전' : `시간 차이 ${stream.driftMs.toFixed(1)} ms`}
-          </p>}
           <CollectionStreamTimeline stream={stream} telemetry={telemetry} />
           {stream.sourceDeviceId == null ? null : <p className="wrap-anywhere text-xs">장치 <span className="font-mono">{stream.sourceDeviceId}</span></p>}
         </div>
@@ -731,10 +720,6 @@ function CollectionStreamsSection({ telemetry, questConnection, cameraConnection
 
   return (
     <section aria-label="장치 스트림 상태" className="py-4">
-      {telemetry === null || telemetry.sync.state === 'unavailable' ? null : <div className="mb-6 text-sm" aria-label="동기화 요약">
-        <p className="font-semibold">{syncLabel(telemetry)}</p>
-        <p className="mt-1 leading-relaxed tabular-nums text-muted">{telemetry.sync.maxDriftMs === null ? '시간 차이 확인 전' : `최대 시간 차이 ${telemetry.sync.maxDriftMs.toFixed(1)} ms`} · 허용 {telemetry.sync.toleranceMs} ms</p>
-      </div>}
       <h2 className="mb-4 text-base font-semibold">장치</h2>
       <div className="collection-stream-list grid gap-4">
         {questStreams.length === 0 && questConnection == null && questSetupState !== 'paired' ? null : (
@@ -1237,6 +1222,7 @@ export function HumanoidCollectionDetailPage() {
   const [exitError, setExitError] = useState<string | null>(null);
   const [retakeDialogOpen, setRetakeDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedRecordingId, setSelectedRecordingId] = useState<string | null>(null);
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [reviewPositionMs, setReviewPositionMs] = useState(0);
   const [actionStatus, setActionStatus] = useState('');
@@ -1268,7 +1254,7 @@ export function HumanoidCollectionDetailPage() {
       setConflictingSessionId(reason instanceof SessionConflictError ? reason.sessionId : null);
       setActionError(reason instanceof SessionConflictError
         ? '다른 세션에서 수집 장치를 사용 중입니다. 해당 세션을 확인하세요.'
-        : '작업을 완료하지 못했습니다. 장치 연결과 수집 상태를 확인하고 다시 시도하세요.');
+        : reason instanceof Error ? reason.message : '작업을 완료하지 못했습니다. 장치 연결과 수집 상태를 확인하고 다시 시도하세요.');
       return false;
     } finally {
       setPending(false);
@@ -1307,6 +1293,8 @@ export function HumanoidCollectionDetailPage() {
           && episode.outcome !== 'aborted'
           && episode.outcome !== 'failure'
         ));
+        const recordedReview = reviewEpisode?.rawFramesUrl ? reviewEpisode : null;
+        const selectedRecording = reviewEpisode === null ? savedEpisodes.find((episode) => episode.id === selectedRecordingId) ?? null : null;
         const shouldRetryProcessing = session.status === 'failed'
           && session.stoppedAtMs !== null
           && savedEpisodes.length > 0;
@@ -1549,7 +1537,18 @@ export function HumanoidCollectionDetailPage() {
                 className="collection-preview"
                 data-preview-workspace
               >
-                <div className={reviewEpisode === null
+                {recordedReview === null ? null : <section aria-label="녹화 검토" className="grid h-full min-h-0 content-start gap-4 overflow-auto p-4">
+                  <h2 className="text-lg font-semibold">{recordedReview.name} · 녹화 검토</h2>
+                  <EpisodeRecordingPreview key={recordedReview.id} episode={recordedReview} />
+                </section>}
+                {selectedRecording === null ? null : <section aria-label="에피소드 재생" className="grid h-full min-h-0 content-start gap-4 overflow-auto p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold">{selectedRecording.name}</h2>
+                    <Button variant="secondary" onClick={() => setSelectedRecordingId(null)}>실시간 수집 보기</Button>
+                  </div>
+                  {selectedRecording.rawFramesUrl ? <EpisodeRecordingPreview key={selectedRecording.id} episode={selectedRecording} /> : <p className="text-sm text-muted">재생 가능한 원본이 연결되지 않았습니다.</p>}
+                </section>}
+                <div hidden={selectedRecording !== null || recordedReview !== null} className={selectedRecording !== null || recordedReview !== null ? 'hidden' : reviewEpisode === null
                   ? 'h-full min-h-0'
                   : 'collection-review-layout grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2'}>
                   <BrowserCameraWorkspace
@@ -1559,7 +1558,7 @@ export function HumanoidCollectionDetailPage() {
                       setDetailsOpen(true);
                       requestAnimationFrame(() => document.getElementById('collection-tab-sources')?.focus());
                     }} />}
-                    {...(session.humanDemonstration !== null && port.supportsBrowserCameras === true && reviewEpisode === null && session.stoppedAtMs === null ? { sessionId: session.id } : {})}>
+                    {...(session.humanDemonstration !== null && port.supportsBrowserCameras === true && session.stoppedAtMs === null ? { sessionId: session.id } : {})}>
                   {session.humanDemonstration !== null && cameraSources.length === 0
                     && !hasHandPreview(previewStates) ? null : <SessionCollectionPreview
                     ariaLabel={recordedPreview ? 'Episode 기록 미리보기' : '실시간 수집 모니터'}
@@ -1621,7 +1620,7 @@ export function HumanoidCollectionDetailPage() {
                         <dt className="text-muted">데이터 품질</dt>
                         <dd className="mt-1">
                           <span className="block font-semibold">{qualityLabel(telemetry)}</span>
-                          <span className="mt-1 block text-xs text-muted">{syncLabel(telemetry)} · {telemetry === null || telemetry.totalSampleCount === 0 ? '데이터 수신 전' : `${telemetry.completenessPercent.toFixed(1)}% 완전성`}</span>
+                          <span className="mt-1 block text-xs text-muted">{telemetry === null || telemetry.totalSampleCount === 0 ? '데이터 수신 전' : `${telemetry.completenessPercent.toFixed(1)}% 완전성`}</span>
                         </dd>
                       </div>
                     </dl> : null}
@@ -1657,9 +1656,12 @@ export function HumanoidCollectionDetailPage() {
                         </Dialog>
                       ) : null} cameraDevices={<div ref={setCameraDevicesTarget} className="grid" />} />
                       {session.humanDemonstration === null ? null : <CollectorCommandStatus binding={session.humanDemonstration} />}
-                      {session.humanDemonstration?.profile.id === 'human-demo-quest-hand-v1' && session.stoppedAtMs === null ? <CollectionCameraPanel key={session.id} /> : null}
+                      {session.humanDemonstration?.profile.id === 'human-demo-quest-hand-v1' && session.stoppedAtMs === null ? <CollectionCameraPanel key={session.id} sessionId={session.id} /> : null}
 
                     </div>
+                </RailTabPanel>
+                <RailTabPanel value="episodes" labelledBy="collection-tab-episodes">
+                  <SessionEpisodeRecordings episodes={savedEpisodes} selectedId={selectedRecording?.id ?? null} onSelect={setSelectedRecordingId} />
                 </RailTabPanel>
                 <RailTabPanel value="issues" labelledBy="collection-tab-issues">{issuesContent}</RailTabPanel>
                 </div>
@@ -1668,6 +1670,7 @@ export function HumanoidCollectionDetailPage() {
                 {([
                   { value: 'session', label: '세션 정보', shortLabel: '세션', icon: 'table' },
                   { value: 'sources', label: '장치', shortLabel: '장치', icon: 'activity' },
+                  { value: 'episodes', label: '에피소드', shortLabel: '에피소드', icon: 'play' },
                   { value: 'issues', label: '문제', shortLabel: '문제', icon: 'events' },
                 ] as const).map((item) => (
                   <RailTab
@@ -1677,7 +1680,7 @@ export function HumanoidCollectionDetailPage() {
                     label={item.label}
                     shortLabel={item.shortLabel}
                     icon={item.icon}
-                    count={item.value === 'issues' ? problemCount : 0}
+                    count={item.value === 'issues' ? problemCount : item.value === 'episodes' ? savedEpisodes.length : 0}
                     onReselect={closeDetails}
                   />
                 ))}
@@ -1753,6 +1756,7 @@ export function HumanoidCollectionDetailPage() {
                                 await port.startSession(session.id);
                               }
                               await port.startEpisode(session.id);
+                              setSelectedRecordingId(null);
                             },
                             savedEpisodes.length === 0
                               ? 'Episode 기록을 시작했습니다.'
