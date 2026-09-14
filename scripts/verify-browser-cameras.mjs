@@ -43,40 +43,39 @@ try {
   await expect(pc.getByRole('button', { name: '카메라 연결', exact: true })).toHaveCount(0);
   await pc.goto(`${origin}/mlops/collection/${collection.id}`);
   const mainPreview = pc.locator('[data-preview-workspace]');
-  await expect(mainPreview.getByRole('region', { name: '브라우저 카메라 연동', exact: true })).toBeVisible();
-  await pc.getByRole('tab', { name: '수집 상태', exact: true }).click();
+  await expect(mainPreview.getByRole('region', { name: '카메라 연결', exact: true })).toBeVisible();
+  if (await pc.getByRole('tab', { name: '장치', exact: true }).getAttribute('aria-selected') !== 'true') await pc.getByRole('tab', { name: '장치', exact: true }).click();
   await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
   const settings = pc.getByRole('dialog', { name: '카메라 연결', exact: true });
   const senders = [];
-  for (const [name, role] of [['Head 정면', 'Head · 헤드캠'], ['Head 측면', 'Head · 헤드캠'], ['Full body 정면', 'Full body · 전신']]) {
-    await settings.getByRole('combobox', { name: '카메라 용도' }).click();
-    await pc.getByRole('option', { name: role, exact: true }).click();
-    await settings.getByLabel('카메라 이름 · 선택').fill(name);
-    await settings.getByRole('button', { name: '카메라 추가', exact: true }).click();
+  for (const [name, role] of [['헤드캠 1', '헤드캠 연결'], ['헤드캠 2', '헤드캠 연결'], ['전신 카메라 1', '전신 카메라 연결']]) {
+    if (senders.length > 0) await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
+    await settings.getByRole('button', { name: role, exact: true }).click();
     const card = pc.locator(`section[aria-label="${name} 카메라"]`);
-    const manager = settings.getByRole('region', { name: `${name} 설정`, exact: true });
+    const manager = pc.getByRole('region', { name: `${name} 설정`, exact: true });
+    const code = await settings.getByLabel(`${name} 연결 코드`).innerText();
+    await expect(settings.getByRole('timer')).toContainText('5:00');
     if (senders.length === 0) await pc.screenshot({ path: resolve(directory, 'pairing-card.png'), fullPage: true });
-    const code = await manager.getByLabel(`${name} 연결 코드`).innerText();
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${origin}/collect/camera?code=${code}`);
-    await page.getByRole('button', { name: '세션 연결', exact: true }).click();
+    await page.getByRole('button', { name: '연결', exact: true }).click();
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-    await expect(page.getByText(role, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '카메라 시작', exact: true }).click();
+    await page.getByRole('button', { name: '영상 전송 시작', exact: true }).click();
     await expect(page.getByText('PC로 영상 전송 중', { exact: true })).toBeVisible({ timeout: 35_000 });
     await expect(manager.getByText('영상 수신 중', { exact: true })).toBeVisible({ timeout: 35_000 });
+    await expect(settings).toHaveCount(0);
+    await expect(pc.locator('aside').getByRole('region', { name: `${name} 설정`, exact: true })).toBeVisible();
     await expect(mainPreview.locator(`section[aria-label="${name} 카메라"]`)).toBeVisible();
     await expect(pc.locator('aside').getByRole('region', { name: `${name} 카메라`, exact: true })).toHaveCount(0);
     await expect.poll(() => card.locator('video').evaluate((video) => video.getVideoPlaybackQuality().totalVideoFrames)).toBeGreaterThan(2);
     senders.push({ name, page, card, manager });
   }
-  await settings.getByRole('button', { name: '닫기', exact: true }).click();
   await expect(settings).toHaveCount(0);
   for (const sender of senders) {
     const { name } = sender;
-    const analysis = mainPreview.getByRole('region', { name: `${name} · ${name.startsWith('Head') ? '세그멘테이션 + 핸드' : '4D Humans'}`, exact: true });
+    const analysis = mainPreview.getByRole('region', { name: `${name} · ${name.startsWith('헤드캠') ? '세그멘테이션 + 핸드' : '4D Humans'}`, exact: true });
     await expect(analysis.getByText('분석 수신 중', { exact: true })).toBeVisible({ timeout: 15_000 });
     await analysis.getByRole('button', { name: `${name} 분석 정지` }).click();
     await expect(analysis.locator('img')).not.toHaveAttribute('src');
@@ -104,46 +103,40 @@ try {
   await senders[0].page.screenshot({ path: resolve(directory, 'sender-mobile.png'), fullPage: true });
   // Switching inspector tabs must not tear down camera peers.
   await pc.getByRole('tab', { name: '세션 정보', exact: true }).click();
-  await pc.getByRole('tab', { name: '수집 상태', exact: true }).click();
+  if (await pc.getByRole('tab', { name: '장치', exact: true }).getAttribute('aria-selected') !== 'true') await pc.getByRole('tab', { name: '장치', exact: true }).click();
   for (const sender of senders) await expect(mainPreview.getByRole('region', { name: `${sender.name} 카메라`, exact: true })).toBeVisible();
   for (const sender of senders) await expect.poll(() => sender.card.locator('video').evaluate((video) => video.getVideoPlaybackQuality().totalVideoFrames)).toBeGreaterThan(2);
   // Reload the PC and renegotiate with already paired senders.
   await pc.reload();
-  await expect(mainPreview.getByRole('region', { name: '브라우저 카메라 연동', exact: true })).toBeVisible();
-  await pc.getByRole('tab', { name: '수집 상태', exact: true }).click();
-  await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
+  await expect(mainPreview.getByRole('region', { name: '카메라 연결', exact: true })).toBeVisible();
+  if (await pc.getByRole('tab', { name: '장치', exact: true }).getAttribute('aria-selected') !== 'true') await pc.getByRole('tab', { name: '장치', exact: true }).click();
   for (const sender of senders) await expect(sender.manager.getByText('영상 수신 중', { exact: true })).toBeVisible({ timeout: 35_000 });
   // Removing one camera must revoke its sender without stopping the others.
-  await senders[0].manager.getByText('관리', { exact: true }).click();
-  await senders[0].manager.getByRole('button', { name: '카메라 제거' }).click();
+  await senders[0].manager.getByRole('button', { name: `${senders[0].name} 삭제` }).click();
   await expect(senders[0].card).toHaveCount(0);
   await expect(senders[0].page.getByRole('alert')).toContainText('만료', { timeout: 10_000 });
   assert.equal(await senders[0].page.locator('video').evaluate((video) => video.srcObject === null), true);
   for (const sender of senders.slice(1)) await expect(sender.manager.getByText('영상 수신 중', { exact: true })).toBeVisible();
-  // New code revokes old credentials and allows a fresh sender to attach.
-  await senders[1].manager.getByText('관리', { exact: true }).click();
-  await senders[1].manager.getByRole('button', { name: '새 코드 받기' }).click();
-  const renewedCode = await senders[1].manager.getByLabel(`${senders[1].name} 연결 코드`).innerText();
-  await expect(senders[1].page.getByRole('alert')).toContainText('권한', { timeout: 10_000 });
-  await senders[1].page.getByText('카메라 설정', { exact: true }).click();
-  await senders[1].page.getByRole('button', { name: '다른 코드로 연결' }).click();
-  await senders[1].page.getByLabel('6자리 카메라 연결 코드').fill(renewedCode);
-  await senders[1].page.getByRole('button', { name: '세션 연결', exact: true }).click();
-  await senders[1].page.getByRole('button', { name: '카메라 시작', exact: true }).click();
-  await expect(senders[1].manager.getByText('영상 수신 중', { exact: true })).toBeVisible({ timeout: 35_000 });
-  await senders[2].page.getByRole('button', { name: '카메라 정지', exact: true }).click();
-  assert.equal(await senders[2].page.locator('video').evaluate((video) => video.srcObject === null), true);
+  // Pairing only exposes connection controls; deletion belongs to the sidebar.
+  await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
+  await settings.getByRole('button', { name: '헤드캠 연결', exact: true }).click();
+  const pendingCamera = settings.getByRole('region', { name: '헤드캠 1 연결 안내', exact: true });
+  await expect(pendingCamera.getByLabel('헤드캠 1 연결 코드')).toBeVisible();
+  await expect(settings.getByRole('button', { name: /삭제/u })).toHaveCount(0);
   await settings.getByRole('button', { name: '닫기', exact: true }).click();
   await expect(settings).toHaveCount(0);
+  for (const sender of senders.slice(1)) await expect(sender.manager.getByText('영상 수신 중', { exact: true })).toBeVisible();
+  await senders[2].page.getByRole('button', { name: '영상 전송 중지', exact: true }).click();
+  assert.equal(await senders[2].page.locator('video').evaluate((video) => video.srcObject === null), true);
   for (const width of [768, 1024, 1440]) {
     await pc.setViewportSize({ width, height: 900 });
-    await expect(pc.getByRole('region', { name: '브라우저 카메라 연동', exact: true })).toBeVisible();
+    await expect(pc.getByRole('region', { name: '카메라 연결', exact: true })).toBeVisible();
     assert.equal(await pc.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
     await pc.screenshot({ path: resolve(directory, `pc-${width}.png`), fullPage: true });
   }
   assert.deepEqual(errors, []);
   await writeFile(resolve(directory, 'result.json'), JSON.stringify({ passed: true, cameras: 3, roles: ['head', 'head', 'full-body'], errors,
-    checks: ['separate Quest and camera dialogs', 'sender rotation synced to PC', 'real HTTP pairing', 'real WebRTC video frames', 'preview without controls', 'settings preserve video', 'inspector tabs', 'PC reload', 'isolated removal', 'code renewal', 'sender track cleanup', '768/1024/1440 layouts'],
+    checks: ['separate Quest and camera dialogs', 'sender rotation synced to PC', 'real HTTP pairing', 'real WebRTC video frames', 'preview without controls', 'settings preserve video', 'inspector tabs', 'PC reload', 'isolated removal', 'pairing dialog has no deletion action', 'sender track cleanup', '768/1024/1440 layouts'],
     hardware: 'Chromium fake video capture; real hardware latency not measured' }, null, 2));
   console.log(`Browser camera verification passed: ${directory}`);
 } catch (error) {

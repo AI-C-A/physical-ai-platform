@@ -1,0 +1,38 @@
+import { chromium, expect } from '@playwright/test';
+import { createServer } from 'vite';
+import { mkdir } from 'node:fs/promises';
+const vite = await createServer({ mode: 'mock', configLoader: 'runner', server: { host: '127.0.0.1', port: 5203, strictPort: true } });
+const directory = `artifacts/mock-camera-${Date.now()}`;
+await mkdir(directory, { recursive: true });
+let browser;
+try {
+  await vite.listen();
+  browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  const context = await browser.newContext();
+  const pc = await context.newPage();
+  const errors = [];
+  pc.on('pageerror', (error) => errors.push(error.message));
+  await pc.goto('http://127.0.0.1:5203/mlops/collection/new');
+  await pc.getByRole('textbox', { name: '작업 지시' }).fill('mock 카메라 연결 검증');
+  await pc.getByRole('button', { name: '세션 생성', exact: true }).click();
+  await expect(pc.getByRole('tab', { name: '장치', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await pc.getByRole('button', { name: '카메라 연결', exact: true }).click();
+  await pc.getByRole('button', { name: '헤드캠 연결', exact: true }).click();
+  const code = await pc.getByLabel('헤드캠 1 연결 코드', { exact: true }).innerText();
+  await expect(pc.getByRole('timer')).toContainText('5:00');
+  await expect(pc.getByRole('region', { name: '헤드캠 1 카메라', exact: true })).toBeHidden();
+  await pc.screenshot({ path: `${directory}/pairing.png` });
+  const sender = await context.newPage();
+  await sender.goto('http://127.0.0.1:5203/collect/camera');
+  await sender.getByRole('textbox', { name: '6자리 연결 코드' }).fill(code);
+  await sender.getByRole('button', { name: '연결', exact: true }).click();
+  await expect(pc.getByRole('dialog', { name: '카메라 연결', exact: true })).toBeHidden();
+  await expect(pc.getByRole('region', { name: '헤드캠 1 설정', exact: true })).toBeVisible();
+  await sender.getByRole('button', { name: '영상 전송 시작', exact: true }).click();
+  await expect(pc.getByRole('region', { name: '헤드캠 1 설정', exact: true })).toContainText('영상 수신 중', { timeout: 30000 });
+  await pc.screenshot({ path: `${directory}/connected.png` });
+  await pc.reload();
+  await expect(pc.getByRole('region', { name: '헤드캠 1 설정', exact: true })).toContainText('영상 수신 중', { timeout: 30000 });
+  if (errors.length) throw new Error(errors.join('\n'));
+  console.log(`PASS mock code → pair → sidebar → WebRTC video → reload: ${directory}`);
+} finally { await browser?.close(); await vite.close(); }

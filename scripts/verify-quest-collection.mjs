@@ -65,19 +65,21 @@ try {
   await pc.getByRole('link', { name: '새 수집', exact: true }).click();
   const dialog = pc.getByRole('dialog', { name: '새 데이터 수집' });
   await dialog.getByRole('textbox', { name: '세션 이름' }).fill('실제 연결 경로 검증');
-  await dialog.getByRole('textbox', { name: '작업 ID' }).fill('test-task');
   await dialog.getByRole('textbox', { name: '작업 지시' }).fill('양손으로 물체를 집어 올립니다.');
-  await dialog.getByRole('textbox', { name: 'Quest 손 추적 장치 ID' }).fill('test-quest');
+  await expect(dialog.getByRole('textbox', { name: /장치 ID|카메라 ID/u })).toHaveCount(0);
   await expect(dialog.getByRole('textbox', { name: '외골격 장치 ID' })).toHaveCount(0);
   await dialog.getByRole('button', { name: '세션 생성' }).click();
-  const code = await pc.getByLabel('Quest pairing code').innerText();
+  if (await pc.getByRole('tab', { name: '장치', exact: true }).getAttribute('aria-selected') !== 'true') await pc.getByRole('tab', { name: '장치', exact: true }).click();
+  await pc.getByRole('button', { name: 'Quest 연결', exact: true }).click();
+  const code = await pc.getByLabel('Quest 연결 코드').innerText();
   assert.match(code, /^\d{6}$/u);
   await pc.screenshot({ path: resolve(directory, 'pairing.png'), fullPage: true });
   await quest.goto(`http://127.0.0.1:5199/collect/quest?code=${code}`);
   headsetTimeOrigin = await quest.evaluate(() => performance.timeOrigin);
-  await quest.getByRole('button', { name: '세션 연결', exact: true }).click();
-  await quest.getByRole('button', { name: 'MR 모드 시작' }).click();
-  await pc.getByRole('button', { name: '수집 콘솔 열기' }).click();
+  await quest.getByRole('button', { name: '연결', exact: true }).click();
+  await quest.getByRole('button', { name: '손 추적 시작' }).click();
+  await expect(pc.getByRole('dialog', { name: 'Quest 연결' })).toHaveCount(0);
+  await expect(pc.getByRole('region', { name: 'Quest 손 추적 장치' })).toBeVisible();
   await expect(pc.getByLabel('Quest 양손 3D 손 모델 캔버스')).toBeVisible();
   await expect(pc.getByRole('button', { name: 'Episode 녹화 시작', exact: true })).toBeEnabled({ timeout: 15_000 });
   await pc.screenshot({ path: resolve(directory, 'collection-ready.png'), fullPage: true });
@@ -129,7 +131,7 @@ try {
   await pc.reload();
   await expect(pc.getByText('저장 완료 1개', { exact: true })).toBeVisible();
   assert.deepEqual(errors, []);
-  console.log(`PASS: collection menu → new session → pairing → same-session console → recording → stop ACK → saved raw file → PC reload. ${frames.length} real HTTP frames from emulated WebXR. Evidence: ${directory}`);
+  console.log(`PASS: collection menu → new session → same-session console → pairing → recording → stop ACK → saved raw file → PC reload. ${frames.length} real HTTP frames from emulated WebXR. Evidence: ${directory}`);
 } finally {
   await browser?.close();
   await vite.close();
