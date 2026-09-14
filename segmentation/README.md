@@ -44,6 +44,15 @@ macOS 또는 Linux:
 npm run segmentation:dev
 ```
 
+Windows GPU 서버에 Mac에서 접속할 경우 PowerShell에서 다음과 같이 실행한다. WebStorm의 npm Run 설정을 사용한다면 Environment variables에 `SEGMENTATION_HOST=0.0.0.0`을 지정한다.
+
+```powershell
+$env:SEGMENTATION_HOST = "0.0.0.0"
+npm run segmentation:dev
+```
+
+이 명령은 **8790의 RF-DETR 서버만** 시작한다. 수집 화면의 전신 카메라에는 별도의 `npm run perception:body`(8791), 헤드 카메라에는 헤드 분석 서버(8792)가 필요하다. Windows WSL 실행과 Mac 연결은 [카메라 분석 서버 안내](../perception/README.md)를 참고한다.
+
 기본 설정:
 
 | 항목 | 값 |

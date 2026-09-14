@@ -22,6 +22,7 @@
     "test:segmentation": "node scripts/test-segmentation.mjs",
     "smoke:patrol-camera": "node --env-file-if-exists=.env.local scripts/patrol-camera-smoke.mjs",
     "segmentation:dev": "node scripts/run-segmentation.mjs",
+    "perception:body": "node scripts/run-body-analysis.mjs",
     "gateway:dev": "node --env-file-if-exists=.env.local gateway/server.mjs",
     "gateway:quest": "node --env-file-if-exists=.env.local gateway/quest-server.mjs",
     "test:e2e": "npm run build && playwright test",

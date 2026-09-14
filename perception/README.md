@@ -57,6 +57,48 @@ Mac 터미널에서 `curl --max-time 5 http://<데스크탑-IP>:8790/health`를 
 
 ## NVIDIA 데스크탑 준비
 
+### Windows의 WebStorm / PowerShell에서 실행
+
+아래는 모델 설치를 마친 뒤의 실행 순서다. 4D Humans는 WSL의 CUDA·EGL 환경과 모델 파일이 필요하며 npm 명령이 이를 설치하지는 않는다.
+
+1. Windows에서 `wsl --list --verbose`로 기본 배포판과 WSL 2 여부를 확인한다. 실행기는 `PERCEPTION_WSL_DISTRO`에 지정한 배포판을 사용하며, 생략하면 기본 배포판을 사용한다. Docker 내부 배포판 대신 모델을 설치한 Ubuntu 등의 배포판을 선택한다.
+2. 해당 WSL에 아래 모델별 설치 절차를 완료한다. RF-DETR는 기존 Windows Python 환경을 계속 사용할 수 있다.
+3. Windows 저장소 루트에서 `npm ci`를 실행하고, 서비스마다 별도 Run 항목 또는 터미널을 사용한다.
+
+**RF-DETR — Windows PowerShell:**
+
+```powershell
+$env:SEGMENTATION_HOST = "0.0.0.0"
+# 프로젝트 .venv 외의 Python을 쓰는 경우에만 지정
+# $env:SEGMENTATION_PYTHON = "C:\path\to\python.exe"
+npm run segmentation:dev
+```
+
+**4D Humans — Windows PowerShell:**
+
+```powershell
+# 실제 WSL 설치 경로로 변경. 기본 ~/4D-Humans와 내부 .venv 사용 시 생략 가능
+# wsl --list --verbose에 나온 실제 배포판 이름으로 변경
+$env:PERCEPTION_WSL_DISTRO = "Ubuntu-24.04"
+$env:FOUR_D_HUMANS_DIR = "/opt/4D-Humans"
+$env:PERCEPTION_PYTHON = "/opt/miniconda3/envs/4dhumans/bin/python"
+npm run perception:body
+```
+
+WebStorm에서는 **Desktop (GPU 4D Humans)**을 선택하고 위 세 변수를 **Run → Edit Configurations → Environment variables**에 입력하면 된다. 이 항목은 `.run/Desktop_GPU_4D_Humans.run.xml`에 공유되어 있다. 목록에 없다면 `.run` 파일이 현재 checkout에 있는지 확인하거나 `perception:body` npm 항목을 직접 만든다. 기존 **Desktop (GPU Segmentation)**은 `.idea` 로컬 설정이므로 다른 PC에 없다면 `segmentation:dev` npm 항목을 만들고 `SEGMENTATION_HOST=0.0.0.0`을 지정한다. 이 실행기들은 `.env.local`을 직접 읽지 않으므로 실행용 환경변수는 Run 설정 또는 실행 터미널에 넣는다.
+
+**헤드 분석 — WSL Bash:**
+
+별도 MediaPipe 환경을 활성화하고 아래 예시의 경로와 주소를 바꾼다. 현재 헤드 분석용 공유 Run 항목이나 npm 실행기는 없으므로 이 Python 명령을 사용한다.
+
+```bash
+HAND_LANDMARKER_MODEL=/opt/models/hand_landmarker.task \
+PERCEPTION_SEGMENTATION_URL=http://<RF-DETR에-접속-가능한-주소>:8790/infer \
+python /mnt/c/path/to/robot-army-tiger-fe/perception/server.py --mode head --host 0.0.0.0
+```
+
+RF-DETR와 헤드 서버가 같은 네트워크 환경에 있으면 `127.0.0.1`을 쓸 수 있다. RF-DETR는 Windows, 헤드는 WSL에서 실행하는 경우 localhost 연결 가능 여부를 먼저 확인하고, 연결되지 않으면 WSL에서 접근 가능한 Windows 주소를 사용한다. `0.0.0.0`은 수신 바인딩 값이며 프록시의 목적지 주소가 아니다.
+
 4D Humans의 Detectron2·EGL 의존성 때문에 Linux 환경을 기준으로 한다. Windows에서는 CUDA·EGL 사용 가능 여부를 확인한 WSL2 환경을 사용한다. Mac에 CUDA 패키지를 설치하지 않는다. 아래 절차는 구현용 설치 가이드이며 이 Mac에서 GPU 조합 검증을 완료한 것은 아니다.
 
 세 모델의 의존성 충돌을 피하도록 별도 Python 환경/프로세스를 사용한다. 체크포인트와 SMPL 파일은 Git에 넣지 않는다.
@@ -72,6 +114,8 @@ SEGMENTATION_HOST=0.0.0.0 SEGMENTATION_DEVICE=cuda:0 npm run segmentation:dev
 `SEGMENTATION_PYTHON`으로 해당 환경의 Python을 지정할 수 있다. Mac의 관제 화면에서도 접속할 수 있도록 바인딩하고, 같은 데스크탑의 헤드 서버는 localhost로 접속한다.
 
 ### 2. 4D Humans · 포트 8791
+
+WebStorm의 공유 Run 설정 **Desktop (GPU 4D Humans)** 또는 `npm run perception:body`로 실행한다. Windows에서는 `PERCEPTION_WSL_DISTRO`로 선택한 WSL 배포판의 셸/Python을 사용한다. 생략하면 기본 배포판을 사용한다. 기본 모델 폴더는 WSL의 `~/4D-Humans`, Python은 그 안의 `.venv/bin/python`이다. 설치 위치가 다르면 Run 설정의 환경변수 `FOUR_D_HUMANS_DIR`, `PERCEPTION_PYTHON`에 각각 **WSL/Linux 절대 경로**를 지정한다. 예: `/opt/4D-Humans`, `/opt/miniconda3/envs/4dhumans/bin/python`. 모델과 의존성 설치는 아래 절차로 먼저 완료해야 한다. Mac에서는 GPU 실행 없이 안내하고 종료한다. 서버는 8791 포트의 `0.0.0.0`에 바인딩하며, Mac에서 Windows/WSL까지의 접근 경로는 별도로 확인한다.
 
 [공식 설치 안내](https://github.com/shubham-goel/4D-Humans)에 따라 Python 3.10 환경에 CUDA용 PyTorch와 `pip install -e '.[all]'`로 4D Humans를 설치한다. 드라이버에 맞는 PyTorch 설치 명령은 [공식 선택기](https://pytorch.org/get-started/locally/)를 사용한다. SMPL neutral 파일은 공식 안내의 등록·다운로드 절차를 직접 완료해야 한다.
 
@@ -134,6 +178,38 @@ PERCEPTION_HEAD_TARGET=http://desktop.local:8792
 - 프레임/결과는 디스크에 저장하지 않는다. 고정 worker에서 모델 생성과 추론을 실행해 EGL thread 소유권을 유지한다.
 
 ## 검증
+
+### 실행 확인과 오류 해결
+
+서버를 실행한 환경에서 먼저 `/health`를 확인하고, 다음으로 Mac에서 확인한다. 아래 주소는 실제 서버 주소로 바꾼다. Windows PowerShell에서는 `curl` 대신 `curl.exe`를 사용한다.
+
+```bash
+curl --max-time 5 http://<세그멘테이션-서버주소>:8790/health
+curl --max-time 5 http://<4D-Humans-서버주소>:8791/health
+curl --max-time 5 http://<헤드-분석-서버주소>:8792/health
+```
+
+4D Humans 응답은 `{"ready": true, "mode": "full-body"}`, 헤드 응답은 `{"ready": true, "mode": "head"}`다. Mac의 Vite 실행 후 프록시도 확인한다.
+
+```bash
+curl --max-time 5 http://127.0.0.1:5173/api/perception/full-body/health
+curl --max-time 5 http://127.0.0.1:5173/api/perception/head/health
+```
+
+| 증상 | 확인할 항목 |
+| --- | --- |
+| 이전 실행기의 `/bin/sh: bash: not found` | `wsl --list --verbose`로 배포판을 확인하고 `PERCEPTION_WSL_DISTRO`에 모델이 설치된 배포판 이름을 지정한다. Windows checkout의 `scripts/run-body-analysis.mjs`도 최신 파일로 반영한다. 현재 실행기는 `/bin/sh`에 스크립트를 표준 입력으로 전달한다. |
+| 모델 경로를 입력했는데 오류 메시지의 경로가 비어 있음 | Windows 실행기가 최신인지 확인한다. 현재 실행기는 경로와 스크립트를 표준 입력으로 전달하여 WSL 명령행에서 셸 변수가 먼저 해석되는 것을 피한다. |
+| 전신 카드 HTTP 502 | 8790의 RF-DETR만 실행한 것은 아닌지 확인한다. 8791의 4D Humans 실행 로그, 직접 `/health`, `PERCEPTION_BODY_TARGET` 순으로 확인한다. |
+| 서버 PC에서는 성공하고 Mac에서는 연결 실패 | `127.0.0.1` 대신 `0.0.0.0` 바인딩인지, Mac이 접근하는 주소·포트가 맞는지, Windows/WSL 라우팅과 방화벽이 해당 연결을 허용하는지 확인한다. Tailscale 연결만으로 WSL 서비스 접근까지 보장되지는 않는다. |
+| 직접 `/health`는 성공하지만 Vite 경유 요청 실패 | `.env.local`의 역할별 주소와 실행 환경의 같은 변수를 확인하고 Vite를 재시작한다. |
+| 모델 폴더 또는 Python을 찾을 수 없음 | `FOUR_D_HUMANS_DIR`, `PERCEPTION_PYTHON`이 선택한 WSL 배포판 내부의 실제 절대 경로인지 확인한다. Windows `C:\...` 경로를 넣지 않는다. |
+| CUDA·모델·EGL 초기화 실패 | 해당 WSL Python 환경의 의존성, GPU 사용 가능 여부, HMR2·SMPL 파일을 확인한다. 서버가 ready가 되기 전의 마지막 traceback을 확인한다. |
+| HTTP 429 | 서버가 다른 프레임을 처리 중이다. 카드가 자동 재시도한다. |
+| HTTP 422 / 503 | 분석 서버 로그에서 프레임 처리·연동 서비스·모델 오류를 확인한다. 헤드는 `PERCEPTION_SEGMENTATION_URL`도 확인한다. |
+| `/health` 성공 후에도 영상 없음 | 실제 카메라 프레임 추론을 확인한다. 헤드 `/health`는 RF-DETR 연결을 검사하지 않는다. |
+
+### 자동 검사
 
 ```bash
 python -m unittest discover -s perception -p 'test_*.py'

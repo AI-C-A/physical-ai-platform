@@ -93,6 +93,48 @@ npm run segmentation:dev
 
 `SEGMENTATION_PYTHON`을 지정하지 않으면 프로젝트 `.venv`와 시스템 Python 순서로 실행 파일을 찾는다. 설치 방법은 [segmentation/README.md](segmentation/README.md)를 참고한다.
 
+## Mac 수집 화면 + Windows GPU 분석 실행
+
+카메라 수집 분석은 역할마다 별도 서버를 사용한다. `segmentation:dev`만 실행하면 **전신 카메라의 4D Humans 분석은 시작되지 않는다.** 최초 Python 환경·모델 준비와 전체 연결 절차는 [카메라 분석 서버 안내](perception/README.md)를 따른다.
+
+| 실행 PC | 실행 항목 | 명령 | 포트 |
+| --- | --- | --- | --- |
+| Mac | 수집 화면 | `npm run dev:real` | 5173 |
+| Mac | Quest gateway | `npm run gateway:quest` | 8787 |
+| Mac | Quest용 HTTPS | `npm run dev:funnel` | 5173으로 전달 |
+| Windows GPU | RF-DETR 세그멘테이션 | `npm run segmentation:dev` | 8790 |
+| Windows GPU → WSL | 4D Humans 전신 분석 | `npm run perception:body` | 8791 |
+| GPU PC의 Python 환경 | 세그멘테이션 + 손 분석 | `python perception/server.py --mode head --host 0.0.0.0` | 8792 |
+
+각 서비스는 별도 터미널에서 실행한다. 전신 카메라에는 8791, 헤드 카메라에는 8792와 그 서버가 연결하는 8790이 필요하다. Quest gateway와 Patrol gateway는 같은 포트를 사용하므로 함께 실행하지 않는다.
+
+Windows WebStorm에서는 공유 Run 설정 **Desktop (GPU 4D Humans)**을 선택한다. 이 설정은 [`.run/Desktop_GPU_4D_Humans.run.xml`](.run/Desktop_GPU_4D_Humans.run.xml)에 저장되어 있으며 Windows의 WSL 배포판에서 실행된다. `PERCEPTION_WSL_DISTRO`를 지정하면 해당 배포판을 사용하고, 생략하면 기본 배포판을 사용한다. 기본 모델 위치는 WSL의 `~/4D-Humans`, Python은 `~/4D-Humans/.venv/bin/python`이다. 설치 위치가 다르면 **Run → Edit Configurations → Environment variables**에서 다음 값을 지정한다.
+
+```text
+PERCEPTION_WSL_DISTRO=Ubuntu-24.04
+FOUR_D_HUMANS_DIR=/opt/4D-Humans
+PERCEPTION_PYTHON=/opt/miniconda3/envs/4dhumans/bin/python
+```
+
+위 경로는 예시이며 실제 **WSL 절대 경로**로 바꾼다. 모델과 Python 의존성은 미리 설치해야 한다. Mac에서는 이 실행 항목이 안내만 출력하고 종료한다. 기존 `.idea`의 `Real`, `Desktop (GPU Segmentation)` 등은 로컬 설정이라 다른 PC로 자동 공유되지 않는다. 없는 항목은 위 npm 명령으로 생성한다. Mac의 `Real` compound에는 frontend, Quest gateway, Funnel을 넣는다.
+
+Windows 세그멘테이션을 Mac에서 사용할 때는 Run 환경변수에 `SEGMENTATION_HOST=0.0.0.0`을 넣는다. 터미널에서는:
+
+```powershell
+$env:SEGMENTATION_HOST = "0.0.0.0"
+npm run segmentation:dev
+```
+
+Mac의 `.env.local`에는 실제로 각 서버에 접근할 수 있는 주소를 지정한 뒤 Vite를 재시작한다. Windows와 WSL의 접속 주소가 다르면 각 항목에 해당 주소를 따로 입력한다.
+
+```dotenv
+SEGMENTATION_TARGET=http://<세그멘테이션-서버주소>:8790
+PERCEPTION_BODY_TARGET=http://<4D-Humans-서버주소>:8791
+PERCEPTION_HEAD_TARGET=http://<헤드-분석-서버주소>:8792
+```
+
+GPU 서버를 먼저 실행하고 Mac에서 각 `/health` 연결을 확인한 다음 수집 화면을 연다. `/health` 성공은 실제 추론 성공과 별개이므로 카드의 분석 영상까지 확인한다. **HTTP 502**, localhost 바인딩, Windows↔WSL 연결 문제의 확인 순서는 [실행 확인과 오류 해결](perception/README.md#실행-확인과-오류-해결)에 정리되어 있다.
+
 ## Mock과 Real의 차이
 
 | 기능 | Mock | Real |
@@ -282,3 +324,4 @@ Real 모드는 동일한 Route와 Port 계약을 유지하지만 신규 Backend 
 - [디자인 시스템](docs/design-system.md)
 - [기여 및 검증 규칙](CONTRIBUTING.md)
 - [세그멘테이션 설치와 실행](segmentation/README.md)
+- [Mac·Windows 카메라 분석 서버 실행과 오류 해결](perception/README.md)

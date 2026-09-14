@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Desktop (GPU 4D Humans)" type="js.build_tools.npm" folderName="Desktop">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="perception:body" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="PERCEPTION_WSL_DISTRO" value="Ubuntu-22.04" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>
