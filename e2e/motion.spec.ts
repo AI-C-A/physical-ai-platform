@@ -713,20 +713,33 @@ test.describe('reduced motion', () => {
     await expectApplicationReady(page);
     await page.getByRole('region', { name: '로봇 선택', exact: true })
       .getByRole('button', { name: /사족보행 로봇/u }).click();
-    const model = page.getByRole('group', { name: '로봇 3D 모델' }).locator('model-viewer');
-    await expect(model).toHaveJSProperty('loaded', true);
-    await expect(model).toHaveJSProperty('availableAnimations', ['Walk']);
-    await expect(model).toHaveJSProperty('paused', true);
+    const preview = page.getByRole('figure', { name: '로봇 3D 모델' }).locator('div').first();
+    const nextFrames = () => page.evaluate(async () => {
+      for (let frame = 0; frame < 12; frame++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    });
+    await expect(preview).toBeVisible();
+    await expect(page.getByRole('region', { name: '사족보행 로봇 3D 모델', exact: true })).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByText('3D 모델을 표시할 수 없습니다.', { exact: true })).toHaveCount(0);
+    await nextFrames();
+    const still = await preview.screenshot();
+    await nextFrames();
+    expect((await preview.screenshot()).equals(still)).toBe(true);
+
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(model).toHaveJSProperty('paused', false);
-    await expect.poll(() => model.evaluate((element) => (
-      element as HTMLElement & { readonly duration: number }
-    ).duration)).toBeCloseTo(0.8, 4);
-    await expect.poll(() => model.evaluate((element) => (
-      element as HTMLElement & { readonly currentTime: number }
-    ).currentTime)).toBeGreaterThan(0.1);
+    // 실제 그려진 모델이 바뀌어야 하므로 빈 canvas나 재생 플래그만으로는 통과하지 않는다.
+    await expect.poll(async () => {
+      await nextFrames();
+      return (await preview.screenshot()).equals(still);
+    }).toBe(false);
+
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(model).toHaveJSProperty('paused', true);
+    await nextFrames();
+    const paused = await preview.screenshot();
+    await nextFrames();
+    expect((await preview.screenshot()).equals(paused)).toBe(true);
+
   });
 
   test('overlay·toast는 1ms로 줄이고 tabs 전환을 제거한다', async ({ page }) => {

@@ -61,6 +61,7 @@ export function createCarouselScene(host: HTMLElement, robots: readonly RobotDes
   const modelSizes = robots.map(() => new THREE.Vector3(1, 2, 1));
   const surfaceColors: { material: THREE.MeshStandardMaterial; color: THREE.Color }[][] = robots.map(() => []);
   const loader = new GLTFLoader();
+  const mixers: THREE.AnimationMixer[] = [];
   let disposed = false;
   function disposeObject(root: THREE.Object3D) {
     root.traverse((object) => {
@@ -81,6 +82,12 @@ export function createCarouselScene(host: HTMLElement, robots: readonly RobotDes
     void loader.loadAsync(`${import.meta.env.BASE_URL}assets/${model.file}`).then((gltf) => {
       if (disposed) { disposeObject(gltf.scene); return; }
       const root = gltf.scene;
+      const clip = gltf.animations[0];
+      if (clip) {
+        const mixer = new THREE.AnimationMixer(root);
+        mixer.clipAction(clip).play();
+        mixers.push(mixer);
+      }
       if (modelId === 'rbq10') root.rotation.x = -Math.PI / 2;
       root.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(root);
@@ -142,6 +149,7 @@ export function createCarouselScene(host: HTMLElement, robots: readonly RobotDes
     camera.updateProjectionMatrix();
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
+    if (!motion.matches) mixers.forEach((mixer) => mixer.update(dt));
     current += (target - current) * (motion.matches ? 1 : 1 - Math.exp(-dt * 9));
     const blend = motion.matches ? 1 : 1 - Math.exp(-dt * 7);
     const easedTravel = motion.matches ? 1 : presentationProgress();
@@ -236,6 +244,10 @@ export function createCarouselScene(host: HTMLElement, robots: readonly RobotDes
       disposed = true;
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', resizeBuffer);
+      mixers.forEach((mixer) => {
+        mixer.stopAllAction();
+        mixer.uncacheRoot(mixer.getRoot());
+      });
       disposeObject(scene);
       environment.dispose();
       renderer.dispose();
