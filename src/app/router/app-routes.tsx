@@ -57,6 +57,7 @@ const CollectionPage = lazy(async () => ({ default: (await FlywheelPages()).Coll
 const NewCollectionPage = lazy(async () => ({ default: (await FlywheelPages()).NewHumanoidCollectionPage }));
 const CollectionConnectionPage = lazy(async () => ({ default: (await FlywheelPages()).CollectionConnectionPage }));
 const CollectionDetailPage = lazy(async () => ({ default: (await FlywheelPages()).HumanoidCollectionDetailPage }));
+const CollectionSimulationPage = lazy(async () => ({ default: (await FlywheelPages()).SimulationCollectionPage }));
 const ReviewPage = lazy(async () => ({ default: (await FlywheelPages()).ReviewWorkspacePage }));
 const OperationsPage = lazy(async () => ({ default: (await FlywheelPages()).OperationsWorkspacePage }));
 const LegacySessionRedirectPage = lazy(async () => ({ default: (await FlywheelPages()).LegacyHumanoidSessionRedirectPage }));
@@ -191,6 +192,7 @@ export const APP_ROUTES: RouteObject[] = [
         ],
       },
       { path: ROUTE_PATHS.mlopsCollectionDetail, element: <CollectionDetailPage /> },
+      { path: ROUTE_PATHS.mlopsCollectionSimulation, element: <CollectionSimulationPage /> },
       { path: ROUTE_PATHS.mlopsReview, element: <ReviewPage /> },
       { path: ROUTE_PATHS.mlopsOperations, element: <OperationsPage /> },
       {

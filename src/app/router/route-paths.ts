@@ -16,6 +16,7 @@ export const ROUTE_PATHS = {
   mlopsNewCollection: '/mlops/collection/new',
   mlopsCollectionSetup: '/mlops/collection/:sessionId/setup',
   mlopsCollectionDetail: '/mlops/collection/:sessionId',
+  mlopsCollectionSimulation: '/mlops/collection/:sessionId/simulation',
   mlopsReview: '/mlops/review',
   mlopsOperations: '/mlops/operations',
   mlopsCapture: '/mlops/capture',

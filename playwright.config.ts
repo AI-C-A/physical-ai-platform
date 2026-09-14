@@ -7,6 +7,7 @@ const baseUse = {
 };
 const commonTestMatch = [
   '**/routes.spec.ts',
+  '**/simulation-collection.spec.ts',
   '**/startup.spec.ts',
   '**/workflows.spec.ts',
 ];

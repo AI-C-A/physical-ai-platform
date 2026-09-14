@@ -359,7 +359,7 @@ export function PlatformShell({ miniApps, navigationTransition = false }: Platfo
     /^\/control\/monitoring\/[^/]+$/u.test(location.pathname);
   const isImmersiveCaptureRoute =
     location.pathname !== '/mlops/collection/new'
-    && /^\/mlops\/collection\/[^/]+$/u.test(location.pathname);
+    && /^\/mlops\/collection\/[^/]+(?:\/simulation)?$/u.test(location.pathname);
   const isImmersiveRoute =
     isImmersiveMonitoringRoute || isImmersiveCaptureRoute;
   const isFullBleedRoute = isMonitoringRoute || isImmersiveCaptureRoute;

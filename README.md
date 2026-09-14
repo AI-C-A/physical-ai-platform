@@ -53,6 +53,8 @@ npm run dev:mock
 
 새 수집 화면에서 작업 ID·작업 지시·장치 ID를 직접 입력한 뒤 세션을 생성한다. Mock 시연용 입력값은 [시연 가이드](docs/demo-guide.md#데이터-수집--카탈로그--데이터셋)를 참고한다. Real 모드도 PC의 **수집 → 새 수집**에서 Quest 손 추적 세션을 생성한다. Quest 브라우저의 `/collect/quest`에서 세션 코드를 입력하고 MR을 시작하면 PC 수집 콘솔에서 손 추적 확인, Episode 녹화·정지·저장을 할 수 있다. 원본은 gateway의 `data/quest/`에 보관한다. 실행과 연결 순서는 [Real Quest 수집 안내](docs/quest-live.md)를 따른다. 실행 방식 선택은 Composition에서 처리하고 제품 화면에는 표시하지 않는다.
 
+수집 콘솔의 **장치** 탭에서 **시뮬레이션 수집**으로 이동하면, Quest로 WebXR 시뮬레이션에서 임무를 수행하면서 시뮬레이션 화면·수집 카메라·실시간 수집 데이터를 한 화면에서 함께 본다. 접속 주소는 `VITE_SIMULATION_ORIGIN`으로 설정하며 연결 순서는 [시뮬레이션 수집 안내](docs/simulation-collection.md)를 따른다.
+
 ## Real 실행
 
 Real은 Patrol Robot API와 Kinesis 영상을 사용한다. `.env.local`에 다음 항목을 설정한다.

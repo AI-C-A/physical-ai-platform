@@ -6,7 +6,8 @@ function collectionLevel(pathname: string): 'list' | 'session' | null {
     || pathname === '/mlops/collection/new'
     || /^\/mlops\/collection\/[^/]+\/setup$/u.test(pathname)
   ) return 'list';
-  return /^\/mlops\/collection\/[^/]+$/u.test(pathname) ? 'session' : null;
+  // 시뮬레이션 수집 화면은 콘솔과 같은 층이라 콘솔과 오갈 때는 전환 방향을 주지 않는다.
+  return /^\/mlops\/collection\/[^/]+(?:\/simulation)?$/u.test(pathname) ? 'session' : null;
 }
 
 /** 모달 경로는 목록과 같은 층으로 취급하고 수집 콘솔 진입·복귀에만 방향을 부여한다. */

@@ -680,12 +680,14 @@ function CollectionSensorSection({ label, title, connection, children }: {
   </section>;
 }
 
-function CollectionStreamsSection({ telemetry, questConnection, cameraConnection, cameraDevices, questSetupState, connectionState = 'live' }: {
+function CollectionStreamsSection({ telemetry, questConnection, cameraConnection, cameraDevices, simulationConnection, questSetupState, connectionState = 'live' }: {
   readonly telemetry: CollectionTelemetrySnapshot | null;
   readonly questConnection?: ReactNode;
   readonly connectionState?: CollectionTelemetryConnectionState;
   readonly cameraConnection?: ReactNode;
   readonly cameraDevices?: ReactNode;
+  /** 시뮬레이션 수집 화면으로 가는 진입점. 장치가 아니라 별도 화면이므로 스트림 상태는 붙지 않는다. */
+  readonly simulationConnection?: ReactNode;
   readonly questSetupState?: 'pending' | 'paired' | undefined;
 }) {
   const streams = telemetry?.streams ?? [];
@@ -743,6 +745,11 @@ function CollectionStreamsSection({ telemetry, questConnection, cameraConnection
           </CollectionSensorSection>
         )}
         {cameraConnection == null && cameraDevices == null ? null : <CollectionSensorSection label="카메라 장치" title="카메라" connection={cameraConnection}>{cameraDevices}</CollectionSensorSection>}
+        {simulationConnection == null ? null : (
+          <CollectionSensorSection label="시뮬레이션 수집" title="시뮬레이션" connection={simulationConnection}>
+            <p className="text-sm text-muted">Quest로 시뮬레이션 임무를 수행하면서 시뮬레이션·카메라·수집 데이터를 한 화면에서 봅니다.</p>
+          </CollectionSensorSection>
+        )}
         {required.filter((stream) => !questStreams.includes(stream)).map((stream) => renderStream(stream))}
         {telemetry !== null ? null : <p className="py-3 text-xs text-muted">장치의 수신 상태를 기다리고 있습니다.</p>}
         {telemetry === null || required.length > 0 ? null : <p className="py-3 text-xs text-muted">필수 수집 소스가 없습니다. 세션의 장치 구성을 확인하세요.</p>}
@@ -1655,7 +1662,16 @@ export function HumanoidCollectionDetailPage() {
                         <Dialog title="카메라 연결" open={cameraConnectionOpen} onOpenChange={setCameraConnectionOpen} cancelLabel="닫기" trigger={<Button variant="secondary">카메라 연결</Button>}>
                           <div ref={setCameraSettingsTarget} />
                         </Dialog>
-                      ) : null} cameraDevices={<div ref={setCameraDevicesTarget} className="grid" />} />
+                      ) : null} cameraDevices={<div ref={setCameraDevicesTarget} className="grid" />}
+                      simulationConnection={session.stoppedAtMs === null && reviewEpisode === null ? (
+                        <Link
+                          className={getButtonClassName('secondary')}
+                          to={{ pathname: `/mlops/collection/${session.id}/simulation`, search: searchParams.toString() }}
+                          viewTransition
+                        >
+                          시뮬레이션 수집
+                        </Link>
+                      ) : null} />
                       {session.humanDemonstration === null ? null : <CollectorCommandStatus binding={session.humanDemonstration} />}
                       {session.humanDemonstration?.profile.id === 'human-demo-quest-hand-v1' && session.stoppedAtMs === null ? <CollectionCameraPanel key={session.id} /> : null}
 

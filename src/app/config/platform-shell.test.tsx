@@ -66,6 +66,7 @@ function renderShell(initialPath = '/control/monitoring') {
               path="mlops/collection/new"
             />
             <Route element={<p>장치 연결 모달 화면</p>} path="mlops/collection/:sessionId/setup" />
+            <Route element={<p>시뮬레이션 수집 몰입형 화면</p>} path="mlops/collection/:sessionId/simulation" />
             <Route
               element={<p>수집 세션 몰입형 화면</p>}
               path="mlops/collection/:sessionId"
@@ -178,6 +179,7 @@ describe('PlatformShell', () => {
 
   it.each([
     ['/mlops/collection/capture-h-0001', '수집 세션 몰입형 화면'],
+    ['/mlops/collection/capture-h-0001/simulation', '시뮬레이션 수집 몰입형 화면'],
   ])('수집 콘솔에서는 글로벌 메뉴를 숨긴다', (path, content) => {
     renderShell(path);
 
