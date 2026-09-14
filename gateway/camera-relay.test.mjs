@@ -113,3 +113,16 @@ test('automatic renewal refreshes only expired unused codes and preserves a pair
   assert.equal(preserved.body.pairingCode, null);
   assert.equal((await request(`/${camera.id}`, 'GET', sender.senderToken)).status, 200);
 });
+
+test('explicit connection restarts an unused code for five minutes without disconnecting a racing sender', async (t) => {
+  const { request, create, tick } = await setup(t);
+  const camera = await create();
+  tick(120_000);
+  const restarted = (await request(`/${camera.id}/refresh-code`, 'POST', camera.viewerToken, { restart: true })).body;
+  assert.notEqual(restarted.pairingCode, camera.pairingCode);
+  assert.equal(restarted.pairingExpiresAtMs, 121_000 + 300_000);
+  const sender = (await request('/pair', 'POST', undefined, { pairingCode: restarted.pairingCode })).body;
+  const retained = (await request(`/${camera.id}/refresh-code`, 'POST', camera.viewerToken, { restart: true })).body;
+  assert.equal(retained.paired, true);
+  assert.equal((await request(`/${camera.id}`, 'GET', sender.senderToken)).status, 200);
+});

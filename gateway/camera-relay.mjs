@@ -114,10 +114,10 @@ export function createCameraRelay({ authorizeCollection, nowMs = Date.now, iceSe
       } else if (method === 'DELETE' && !match[2] && viewer) {
         cameras.delete(camera.id); send(200, { removed: true });
       } else if (method === 'POST' && (match[2] === 'renew' || match[2] === 'refresh-code') && viewer) {
-        await json(request);
+        const input = await json(request);
         assertCurrent();
         // 자동 갱신 요청과 페어링이 겹쳐도 이미 연결된 송신자를 해제하지 않는다.
-        if (match[2] === 'renew' || (camera.senderToken === null && camera.pairingExpiresAtMs <= nowMs())) renew(camera);
+        if (match[2] === 'renew' || (camera.senderToken === null && (input.restart === true || camera.pairingExpiresAtMs <= nowMs()))) renew(camera);
         send(200, ownerView(camera));
       } else if (method === 'POST' && match[2] === 'leave') {
         const input = await json(request);
