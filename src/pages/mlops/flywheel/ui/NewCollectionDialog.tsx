@@ -26,19 +26,14 @@ export interface CollectionSetupContext {
 
 export function NewHumanoidCollectionPage() {
   const port = useFlywheelPort();
-  const questOnly = port.collectionMode === 'quest-hands';
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const context = useOutletContext<CollectionSetupContext | undefined>();
   const [fields, setFields] = useState(() => ({
     name: defaultSessionName(),
-    taskId: '',
     instruction: '',
-    exoskeletonDeviceId: '',
-    questDeviceId: '',
-    headCameraDeviceId: '',
-    externalCameraDeviceId: '',
   }));
+  const [sessionScope] = useState(() => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join(''));
   const [fieldErrors, setFieldErrors] = useState<CollectionSetupErrors>({});
   const [pending, setPending] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(true);
@@ -54,7 +49,7 @@ export function NewHumanoidCollectionPage() {
     name: key,
     value: fields[key],
     disabled: pending,
-    required: key !== 'externalCameraDeviceId',
+    required: true,
     ...(fieldErrors[key] ? { error: fieldErrors[key] } : {}),
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => updateField(key, event.target.value),
   });
@@ -71,7 +66,7 @@ export function NewHumanoidCollectionPage() {
         }
       }}
       onAfterClose={() => {
-        void navigate({ pathname: nextPathRef.current, search: params.toString() }, { replace: true });
+        void navigate({ pathname: nextPathRef.current, search: params.toString() }, { replace: true, viewTransition: createdRef.current });
       }}
       onCloseAutoFocus={(event) => {
         event.preventDefault();
@@ -85,7 +80,7 @@ export function NewHumanoidCollectionPage() {
         onSubmit={(event) => {
           event.preventDefault();
           if (submissionRef.current) return;
-          const errors = validateCollectionSetup(fields, questOnly);
+          const errors = validateCollectionSetup(fields);
           setFieldErrors(errors);
           if (Object.keys(errors).length > 0) {
             event.currentTarget.querySelector<HTMLElement>(`[name="${Object.keys(errors)[0]}"]`)?.focus();
@@ -98,16 +93,16 @@ export function NewHumanoidCollectionPage() {
             projectId: 'project-tiger',
             siteId: 'site-lab',
             name: fields.name.trim(),
-            taskId: fields.taskId.trim(),
+            taskId: `task-${sessionScope}`,
             instruction: fields.instruction.trim(),
-            exoskeletonDeviceId: fields.exoskeletonDeviceId.trim(),
-            questDeviceId: fields.questDeviceId.trim(),
-            headCameraDeviceId: fields.headCameraDeviceId.trim(),
-            externalCameraDeviceId: fields.externalCameraDeviceId.trim(),
-            profileId: questOnly ? 'quest-hand-collection-v1' : 'human-demo-quest-hand-v1',
+            exoskeletonDeviceId: '',
+            questDeviceId: `quest-${sessionScope}`,
+            headCameraDeviceId: '',
+            externalCameraDeviceId: '',
+            profileId: 'quest-hand-collection-v1',
           }).then((session) => {
             createdRef.current = true;
-            nextPathRef.current = `/mlops/collection/${encodeURIComponent(session.id)}/setup`;
+            nextPathRef.current = `/mlops/collection/${encodeURIComponent(session.id)}`;
             setDialogOpen(false);
           }).catch(() => {
             setError('세션을 생성하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.');
@@ -117,10 +112,7 @@ export function NewHumanoidCollectionPage() {
         }}
       >
         <div className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="세션 이름" {...inputProps('name')} />
-            <Input label="작업 ID" {...inputProps('taskId')} />
-          </div>
+          <Input label="세션 이름" {...inputProps('name')} />
           <Textarea label="작업 지시" name="instruction" rows={2} required disabled={pending}
             value={fields.instruction}
             onChange={(event) => updateField('instruction', event.target.value)}
@@ -129,16 +121,6 @@ export function NewHumanoidCollectionPage() {
           />
           {fieldErrors.instruction ? <p className="text-sm text-negative" id="collection-instruction-error">{fieldErrors.instruction}</p> : null}
         </div>
-        <fieldset className="min-w-0 border-t border-border pt-4">
-          <legend className="pr-2 text-sm font-semibold">수집 장치</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {questOnly ? null : <Input label="외골격 장치 ID" {...inputProps('exoskeletonDeviceId')} />}
-            <Input label="Quest 손 추적 장치 ID" {...inputProps('questDeviceId')} />
-            {questOnly ? null : <Input label="RBP 헤드 카메라 ID" {...inputProps('headCameraDeviceId')} />}
-            {questOnly ? null : <Input label="외부 카메라 ID · 선택" {...inputProps('externalCameraDeviceId')} />}
-          </div>
-        </fieldset>
-        <p className="text-xs text-muted">{questOnly ? '세션을 생성하면 Quest 연결 코드가 표시됩니다. 연결 후 수집 콘솔에서 양손 추적을 확인하고 녹화하세요.' : '세션을 생성하면 장치 연결로 이어집니다.'}</p>
         {error ? <p className="text-sm text-negative" role="alert">{error}</p> : null}
       </form>
     </Dialog>

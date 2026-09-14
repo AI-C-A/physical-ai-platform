@@ -1,3 +1,4 @@
+import { BrandingContext } from '@/shared/config';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -37,11 +38,11 @@ describe('collection preview state', () => {
       await port.updateHumanDemonstrationSource(session.id, 'quest-1', 'ready');
       await port.updateHumanDemonstrationSource(session.id, 'head-1', 'offline');
       await port.updateHumanDemonstrationSource(session.id, 'external-1', 'offline');
-      render(<MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      render(<BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <FlywheelContext.Provider value={port}><Routes>
           <Route path="/mlops/collection/:sessionId" element={<HumanoidCollectionDetailPage />} />
         </Routes></FlywheelContext.Provider>
-      </MemoryRouter>);
+      </MemoryRouter></BrandingContext.Provider>);
       const cameras = await screen.findByRole('region', { name: '실시간 수집 카메라' });
       await waitFor(() => expect(within(cameras).getAllByText('연결과 전원 상태를 확인하세요.')).toHaveLength(2));
       expect(within(cameras).queryByText('수신 대기')).not.toBeInTheDocument();

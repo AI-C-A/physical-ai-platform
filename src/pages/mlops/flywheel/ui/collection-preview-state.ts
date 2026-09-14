@@ -1,6 +1,12 @@
 import type { CollectionTelemetrySnapshot, HumanoidCaptureSession } from '@/entities/flywheel';
 import type { MediaStreamState } from '@/shared/ui/media-panel';
 
+export function hasHandPreview(states: Readonly<Record<string, MediaStreamState>>): boolean {
+  return ['quest-hand-left', 'quest-hand-right'].some((id) => (
+    states[id] === 'live' || states[id] === 'stale' || states[id] === 'recorded'
+  ));
+}
+
 export function collectionPreviewState(
   session: HumanoidCaptureSession,
   telemetry: CollectionTelemetrySnapshot | null,

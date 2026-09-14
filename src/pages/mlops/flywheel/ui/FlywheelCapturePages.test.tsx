@@ -1,3 +1,4 @@
+import { BrandingContext } from '@/shared/config';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -14,12 +15,53 @@ import { fillCollectionSetup } from '@/test/fill-collection-setup';
 import { CatalogDetailPage, CatalogPage } from './FlywheelDataPages';
 import {
   CollectionWorkspacePage,
-  CollectionConnectionPage,
   HumanoidCollectionDetailPage,
   NewHumanoidCollectionPage,
 } from './FlywheelWorkspacePages';
 
 describe('HumanoidCollectionDetailPage', () => {
+  it('콘솔에서 삭제 실패는 복구할 수 있고 삭제 성공은 수집 목록으로 이동한다', async () => {
+    const user = userEvent.setup();
+    const port = createInMemoryFlywheel({ nowMs: () => Date.now() });
+    try {
+      const session = await port.createHumanoidSession({
+        instruction: '삭제 흐름 확인', name: '삭제 검증 세션', projectId: 'project-tiger',
+        robotId: 'robot-003', sensorDeviceId: 'sensor-rig-001', siteId: 'site-lab', taskId: 'task-delete',
+      });
+      const remove = vi.spyOn(port, 'deleteOperationalSession').mockRejectedValueOnce(new Error('삭제 실패'));
+      render(<BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <FlywheelContext.Provider value={port}><Routes>
+          <Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" />
+          <Route element={<h1>수집 목록으로 이동 완료</h1>} path="/mlops/collection" />
+        </Routes></FlywheelContext.Provider>
+      </MemoryRouter></BrandingContext.Provider>);
+      await user.click(await screen.findByRole('button', { name: '세션 메뉴' }));
+      await user.click(screen.getByRole('menuitem', { name: '세션 삭제' }));
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '세션 삭제' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('세션을 삭제하지 못했습니다.');
+      expect(await port.getSession(session.id)).not.toBeNull();
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '세션 삭제' }));
+      expect(await screen.findByRole('heading', { name: '수집 목록으로 이동 완료' })).toBeVisible();
+      expect(remove).toHaveBeenCalledTimes(2);
+      expect(await port.getSession(session.id)).toBeNull();
+      expect(screen.queryByText('수집 세션을 찾을 수 없습니다.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally { port.dispose(); }
+  });
+
+  it('삭제된 세션 주소로 다시 들어와도 수집 목록으로 이동한다', async () => {
+    const port = createInMemoryFlywheel({ nowMs: () => Date.now() });
+    try {
+      render(<BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={['/mlops/collection/deleted-session']}>
+        <FlywheelContext.Provider value={port}><Routes>
+          <Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" />
+          <Route element={<h1>수집 목록으로 이동 완료</h1>} path="/mlops/collection" />
+        </Routes></FlywheelContext.Provider>
+      </MemoryRouter></BrandingContext.Provider>);
+      expect(await screen.findByRole('heading', { name: '수집 목록으로 이동 완료' })).toBeVisible();
+    } finally { port.dispose(); }
+  });
+
   it('Episode 조회 실패를 안내하고 재시도 후 녹화 작업을 복구한다', async () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
@@ -31,16 +73,16 @@ describe('HumanoidCollectionDetailPage', () => {
       await port.validateSession(session.id);
       const listEpisodes = vi.spyOn(port, 'listEpisodes').mockRejectedValue(new Error('Episode 조회 실패'));
       render(
-        <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
             <Routes>
               <Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" />
             </Routes>
           </FlywheelContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter></BrandingContext.Provider>,
       );
       await user.click(await screen.findByRole('tab', { name: /^문제 · \d+$/u }));
-      expect(await screen.findByRole('heading', { name: '데이터를 불러오지 못했습니다' })).toBeVisible();
+      expect(await screen.findByText('Episode 기록을 불러오지 못했습니다. 다시 시도해 현재 녹화와 저장 상태를 확인하세요.')).toBeVisible();
       expect(screen.getByText('Episode 상태 확인 필요')).toBeVisible();
       expect(screen.queryByRole('button', { name: 'Episode 녹화 시작' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '수집 콘솔 닫기' })).toBeDisabled();
@@ -71,7 +113,7 @@ describe('HumanoidCollectionDetailPage', () => {
     const episode = await port.startEpisode(session.id);
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -83,7 +125,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: 'OpenArm collection' })).toBeInTheDocument();
@@ -117,14 +159,14 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(detailsOpen).toHaveAttribute('aria-selected', 'false');
     await waitFor(() => expect(detailsOpen).toHaveFocus());
     await user.keyboard('{ArrowDown}');
-    expect(screen.getByRole('tab', { name: '수집 상태' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: '장치' })).toHaveFocus();
     expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
     await user.keyboard('{Enter}');
-    expect(screen.getByRole('tabpanel', { name: '수집 상태' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '장치' })).toBeVisible();
     await user.keyboard('{Enter}');
     expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
     await user.keyboard(' ');
-    expect(screen.getByRole('tabpanel', { name: '수집 상태' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '장치' })).toBeVisible();
     await user.keyboard(' ');
     expect(screen.queryByRole('complementary', { name: '수집 상세' })).not.toBeInTheDocument();
     await user.click(detailsOpen);
@@ -134,10 +176,10 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByRole('tab', { name: '동기화' })).not.toBeInTheDocument();
     expect(within(sessionInfo).queryByText('장치 연결과 명령 응답')).not.toBeInTheDocument();
     expect(within(sessionInfo).getByText(/task-sort-fruit/u)).toBeVisible();
-    expect(within(sessionInfo).getByText('robot-003')).toBeVisible();
-    expect(within(sessionInfo).getByText('preset-humanoid-default')).toBeVisible();
-    expect(within(sessionInfo).getByText('sensor-rig-001')).toBeVisible();
-    expect(within(sessionInfo).getByText('로봇 시연')).toBeVisible();
+    expect(within(sessionInfo).queryByText('robot-003')).not.toBeInTheDocument();
+    expect(within(sessionInfo).queryByText('preset-humanoid-default')).not.toBeInTheDocument();
+    expect(within(sessionInfo).queryByText('sensor-rig-001')).not.toBeInTheDocument();
+    expect(within(sessionInfo).queryByText('수집 방식')).not.toBeInTheDocument();
     expect(within(sessionInfo).getByText('project-tiger')).toBeVisible();
     expect(within(sessionInfo).getByText('site-lab')).toBeVisible();
     expect(within(sessionInfo).getByText('생성 시각')).toBeVisible();
@@ -176,7 +218,7 @@ describe('HumanoidCollectionDetailPage', () => {
     expect(screen.queryByText('OpenArm · 5지 시각화')).not.toBeInTheDocument();
     expect(screen.queryByText('3D 스켈레톤')).not.toBeInTheDocument();
     expect(screen.getAllByText('실시간').length).toBeGreaterThan(0);
-    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
+    await user.click(screen.getByRole('tab', { name: '장치' }));
     expect(screen.getAllByText(/FPS/u).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('tab', { name: '세션 정보' }));
     expect(screen.getByRole('region', {
@@ -247,7 +289,7 @@ describe('HumanoidCollectionDetailPage', () => {
     port.dispose();
   });
 
-  it.each(['normal', 'warning', 'critical', 'offline', 'stale', 'error'] as const)(
+  it.each(['normal', 'warning', 'critical', 'offline', 'stale', 'error', 'root-offline', 'degraded-duplicate'] as const)(
     '상세가 접혀 있어도 필요한 수집 경고만 표시한다: %s', async (scenario) => {
       const user = userEvent.setup();
       const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
@@ -258,17 +300,34 @@ describe('HumanoidCollectionDetailPage', () => {
       await port.validateSession(session.id);
       const snapshot = await port.getCollectionTelemetry(session.id);
       if (snapshot === null) throw new Error('Missing telemetry fixture');
-      const qualityIssues = scenario === 'warning' || scenario === 'critical'
+      const firstRequired = snapshot.streams.find((stream) => stream.required && stream.origin !== 'derived');
+      if (firstRequired === undefined) throw new Error('Missing required stream');
+      if (scenario === 'root-offline') {
+        const getSession = port.getSession.bind(port);
+        vi.spyOn(port, 'getSession').mockImplementation(async (id) => {
+          const current = await getSession(id);
+          return current === null ? null : { ...current, preflight: [
+            { id: 'quest-hands', label: 'Quest 양손 추적', state: 'failed', detail: '양손 추적을 시작하세요.' },
+            { id: 'storage', label: '저장 공간', state: 'failed', detail: '공간 부족' },
+          ] };
+        });
+      }
+      const qualityIssues = scenario === 'root-offline' ? [
+        { id: `disconnected-${firstRequired.streamId}`, streamId: firstRequired.streamId, severity: 'critical' as const, message: '중복 연결 경고' },
+        { id: 'calibration-policy-pending', streamId: null, severity: 'warning' as const, message: '보정 확인 필요' },
+      ] : scenario === 'degraded-duplicate' ? [
+        { id: `degraded-${firstRequired.streamId}`, streamId: firstRequired.streamId, severity: 'warning' as const, message: '소스 수신 지연' },
+      ] : scenario === 'warning' || scenario === 'critical'
         ? [{ id: 'test-quality', streamId: null, severity: scenario, message: '수집 데이터 점검 필요' }]
         : [];
       const getTelemetry = vi.spyOn(port, 'getCollectionTelemetry');
       if (scenario === 'error') getTelemetry.mockRejectedValue(new Error('상태 조회 실패'));
       else getTelemetry.mockResolvedValue({
         ...snapshot, observedAtMs: Date.now(), qualityIssues,
-        connectionState: scenario === 'stale' ? 'stale' : 'live',
+        connectionState: scenario === 'root-offline' ? 'offline' : scenario === 'stale' ? 'stale' : 'live',
         streams: snapshot.streams.map((stream) => ({
           ...stream, connectionState: scenario === 'offline' && stream.required ? 'offline' : 'live',
-          health: scenario === 'offline' && stream.required ? 'disconnected' : 'healthy',
+          health: scenario === 'degraded-duplicate' && stream.streamId === firstRequired.streamId ? 'degraded' : scenario === 'offline' && stream.required ? 'disconnected' : 'healthy',
           handTracking: scenario === 'offline' ? {
             qualityState: 'tracking', poseObserved: true, sourcePresent: true,
             consecutiveMissingMs: 0, validJointCount: 25,
@@ -276,11 +335,11 @@ describe('HumanoidCollectionDetailPage', () => {
         })),
       });
       render(
-        <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
             <Routes><Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" /></Routes>
           </FlywheelContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter></BrandingContext.Provider>,
       );
       await screen.findByRole('heading', { name: 'Minimal collection' });
       await waitFor(() => expect(getTelemetry).toHaveBeenCalled());
@@ -304,7 +363,19 @@ describe('HumanoidCollectionDetailPage', () => {
         if (scenario === 'critical' || scenario === 'warning') expect(alerts).toHaveTextContent('수집 데이터 점검 필요');
         else if (scenario === 'offline') expect(alerts).toHaveTextContent('장치 연결과 수신 상태를 확인하세요');
         else if (scenario === 'stale') expect(alerts).toHaveTextContent('갱신 지연');
-        else expect(alerts).toHaveTextContent('상태 조회 실패');
+        else if (scenario === 'root-offline') {
+          expect(alerts).toHaveTextContent('수집 장치 연결 끊김');
+          expect(alerts).not.toHaveTextContent('Quest 양손 추적');
+          expect(alerts).not.toHaveTextContent('중복 연결 경고');
+          expect(alerts).not.toHaveTextContent('장치 연결과 수신 상태');
+          expect(alerts).toHaveTextContent('공간 부족');
+          expect(alerts).toHaveTextContent('보정 확인 필요');
+          expect(screen.getByRole('tab', { name: '문제 · 3' })).toBeVisible();
+        } else if (scenario === 'degraded-duplicate') {
+          expect(alerts).toHaveTextContent('소스 수신 지연');
+          expect(alerts).not.toHaveTextContent('장치 연결과 수신 상태');
+          expect(screen.getByRole('tab', { name: '문제 · 1' })).toBeVisible();
+        } else expect(alerts).toHaveTextContent('상태 조회 실패');
         expect(details).toBeVisible();
         expect(screen.getByRole('tab', { name: /^문제(?: · \d+)?$/u })).toHaveAttribute('aria-selected', 'true');
         if (scenario === 'offline') {
@@ -321,47 +392,49 @@ describe('HumanoidCollectionDetailPage', () => {
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
 
     render(
-      <MemoryRouter initialEntries={['/mlops/collection/new']}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={['/mlops/collection/new']}>
         <FlywheelContext.Provider value={port}>
           <Routes>
             <Route element={<NewHumanoidCollectionPage />} path="/mlops/collection/new" />
-            <Route element={<CollectionConnectionPage />} path="/mlops/collection/:sessionId/setup" />
+            <Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" />
           </Routes>
         </FlywheelContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: '새 데이터 수집' }))
       .toBeInTheDocument();
     const setup = screen.getByRole('dialog', { name: '새 데이터 수집' });
-    expect(within(setup).getByRole('group', { name: '수집 장치' })).toBeVisible();
+    expect(within(setup).queryByRole('textbox', { name: /장치 ID|카메라 ID/u })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /미리보기/u })).not.toBeInTheDocument();
     expect(within(setup).getByRole('button', { name: '취소' })).toBeEnabled();
-    expect(screen.getByLabelText('작업 ID')).toHaveValue('');
-    expect(screen.getByLabelText('외부 카메라 ID · 선택')).toHaveValue('');
+    expect(screen.queryByLabelText('작업 ID')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '세션 생성' }));
-    expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Quest 연결 코드' })).not.toBeInTheDocument();
     await fillCollectionSetup(user);
-    expect(screen.getByLabelText('외부 카메라 ID · 선택')).toHaveValue('external-camera-001');
-    expect(screen.getByLabelText('외부 카메라 ID · 선택')).not.toHaveAttribute('readonly');
 
     await user.click(screen.getByRole('button', { name: '세션 생성' }));
 
-    const pairingCode = await screen.findByRole('status', { name: 'Quest pairing code' });
+    await screen.findByRole('region', { name: '수집 작업 컨트롤' });
+    expect(screen.queryByRole('dialog', { name: 'Quest 연결' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Episode 녹화 시작' })).not.toBeInTheDocument();
+    if (screen.getByRole('tab', { name: '장치' }).getAttribute('aria-selected') !== 'true') await user.click(screen.getByRole('tab', { name: '장치' }));
+    await user.click(screen.getByRole('button', { name: 'Quest 연결' }));
+    const pairingCode = await screen.findByRole('status', { name: 'Quest 연결 코드' });
     expect(screen.getByRole('dialog', { name: 'Quest 연결' })).toBeInTheDocument();
     expect(pairingCode).toHaveTextContent(/^\d{6}$/u);
-    expect(screen.getByText(/를 열고 아래 코드를 입력하세요/u)).toBeVisible();
+    expect(screen.getByText(/주소를 열고 연결 코드를 입력하세요/u)).toBeVisible();
     const pairing = await port.pairHumanDemonstrationSource({
       pairingCode: pairingCode.textContent ?? '',
-      sourceDeviceId: 'quest2-001',
+      sourceDeviceId: (await port.listOperationalSessions()).find((item) => item.name.startsWith('휴머노이드 수집'))!.humanDemonstration!.sourceBindings.find((source) => source.role === 'xr-hand-tracking')!.sourceDeviceId,
       integrationProfileId: 'quest-webxr-hand-pose-v1',
       capabilities: ['left-hand-pose', 'right-hand-pose'],
     });
-    expect(await screen.findByRole('heading', { name: 'Quest 연결 완료' })).toBeVisible();
-    expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
+    expect(await screen.findByText('연결됨 · Quest에서 손 추적 시작 대기')).toBeVisible();
+    expect(screen.queryByRole('dialog', { name: 'Quest 연결' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Quest 연결 코드' })).not.toBeInTheDocument();
     await port.updateHumanDemonstrationSource(pairing.sessionId, pairing.sourceDeviceId, 'ready');
-    expect(screen.queryByRole('region', { name: /미리보기/u })).not.toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: '수집 콘솔 열기' })).toBeVisible();
+    expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toBeVisible();
     expect(screen.queryByRole('button', { name: '사전점검 실행' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '장치 준비 상태' })).not.toBeInTheDocument();
     port.dispose();
@@ -383,7 +456,7 @@ describe('HumanoidCollectionDetailPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -391,42 +464,53 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: 'Quest hands only' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Collector 열기' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Quest pairing code' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Quest 연결 코드' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '수집 작업 컨트롤' })).queryByRole('button', { name: 'Quest 연결' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '현재 문제와 조치' })).not.toBeInTheDocument();
     expect(screen.queryByText('저장 상태 확인 불가')).not.toBeInTheDocument();
     expect(screen.queryByText('데이터 품질')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
+    await user.click(screen.getByRole('tab', { name: '장치' }));
     expect(within(screen.getByRole('region', { name: 'Quest 손 추적 장치' })).getByRole('button', { name: 'Quest 연결' })).toBeVisible();
+    expect(within(screen.getByRole('region', { name: 'Quest 손 추적 장치' })).queryByText('연결 전')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Quest 손 추적 장치' })).queryByText('왼손 추적')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /^문제/u }));
+    expect(screen.queryByText(/수집 장치 연결 끊김/u)).not.toBeInTheDocument();
+    if (screen.getByRole('tab', { name: '장치' }).getAttribute('aria-selected') !== 'true') await user.click(screen.getByRole('tab', { name: '장치' }));
     await user.click(screen.getByRole('button', { name: 'Quest 연결' }));
     const pairingDialog = screen.getByRole('dialog', { name: 'Quest 연결' });
-    expect(within(pairingDialog).getByRole('region', { name: 'Quest 연결' })).toHaveTextContent('Quest 브라우저에서 /collect/quest를 열고 아래 코드를 입력하세요.');
+    expect(within(pairingDialog).getByRole('region', { name: 'Quest 연결 안내' })).toHaveTextContent('Quest 브라우저에서 아래 주소를 열고 연결 코드를 입력하세요.');
     await user.click(within(pairingDialog).getByRole('button', { name: '닫기' }));
     expect(screen.getByRole('button', { name: 'Quest 연결' })).toHaveFocus();
     const preview = screen.getByRole('region', { name: '실시간 수집 모니터' });
     expect(preview).toHaveClass('collection-visual-grid');
     expect(await within(preview).findByRole('region', { name: '전신 휴머노이드 3D' })).toBeVisible();
     expect(within(preview).getByRole('region', { name: 'Head RGB Depth와 세그멘테이션' })).toBeVisible();
+    expect(within(preview).queryByRole('region', { name: 'Quest 손 포즈 3D' })).not.toBeInTheDocument();
+    await port.updateHumanDemonstrationSource(session.id, 'quest2-001', 'ready');
     expect(await within(preview).findByRole('region', { name: 'Quest 손 포즈 3D' })).toBeVisible();
+    await port.updateHumanDemonstrationSource(session.id, 'quest2-001', 'offline');
+    await waitFor(() => expect(within(preview).queryByRole('region', { name: 'Quest 손 포즈 3D' })).not.toBeInTheDocument());
     expect(within(preview).getByRole('region', { name: '전신 휴머노이드 3D' }).querySelector('model-viewer'))
       .toHaveAttribute('src', '/assets/unitree-g1.glb');
     await user.click(screen.getByRole('tab', { name: '세션 정보' }));
     const sessionInfo = screen.getByRole('region', { name: '세션 정보' });
     expect(within(sessionInfo).queryByText('Collector 명령 응답')).not.toBeInTheDocument();
-    for (const value of ['사람 시연', 'exoskeleton-001', 'quest2-001', 'rbp-headcam-001', 'external-camera-001', '시작 전']) {
-      expect(within(sessionInfo).getByText(value)).toBeVisible();
+    expect(screen.queryByText('수집 방식', { exact: true })).not.toBeInTheDocument();
+    for (const value of ['exoskeleton-001', 'quest2-001', 'rbp-headcam-001', 'external-camera-001']) {
+      expect(within(sessionInfo).queryByText(value)).not.toBeInTheDocument();
     }
-    await user.click(screen.getByRole('tab', { name: '수집 상태' }));
-    const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
+    expect(within(sessionInfo).getByText('시작 전')).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: '장치' }));
+    const sources = screen.getByRole('region', { name: '장치 스트림 상태' });
     expect(within(sources).getAllByText('quest2-001').length).toBeGreaterThan(0);
     expect(screen.queryByRole('region', { name: 'Collector 명령 응답' })).not.toBeInTheDocument();
     expect(screen.queryByText('Episode command 대기 중')).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '수집 상태' })).not.toBeInTheDocument();
+    expect(within(sources).getByRole('heading', { name: '장치' })).toBeVisible();
     expect(preview).toBeVisible();
     expect(screen.getByRole('region', { name: '수집 작업 컨트롤' })).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -435,7 +519,7 @@ describe('HumanoidCollectionDetailPage', () => {
     port.dispose();
   });
 
-  it('수집 상태는 이상 징후를 먼저 보여주고 수신 상세와 선택·파생 소스를 펼쳐 확인한다', async () => {
+  it('장치는 접기 없이 이상 징후와 모든 수신 정보를 표시한다', async () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     try {
@@ -470,21 +554,18 @@ describe('HumanoidCollectionDetailPage', () => {
         },
       });
       render(
-        <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
             <Routes><Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" /></Routes>
           </FlywheelContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter></BrandingContext.Provider>,
       );
       await screen.findByRole('heading', { name: '소스별 수신 확인' });
-      await user.click(screen.getByRole('tab', { name: '수집 상태' }));
-      const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
+      await user.click(screen.getByRole('tab', { name: '장치' }));
+      const sources = screen.getByRole('region', { name: '장치 스트림 상태' });
       expect(within(sources).getByText('최대 시간 차이 37.0 ms · 허용 20 ms')).toBeVisible();
       const drift = within(sources).getByText('시간 차이 37.0 ms');
-      expect(drift).not.toBeVisible();
-      expect(within(sources).getByText('시간 차이 37.0 ms · 허용 범위 초과')).toBeVisible();
-      const disclosure = drift.closest('details') as HTMLDetailsElement;
-      await user.click(within(disclosure).getByLabelText('Left Hand Pose · Quest 수신 상세'));
+      expect(sources.querySelector('details, summary')).toBeNull();
       expect(drift).toHaveClass('text-warning');
       expect(drift).toBeVisible();
       expect(within(drift.parentElement as HTMLElement).getByRole('img', { name: /최근 10초 수신 기록 · 왼손 샘플 누락/u })).toBeVisible();
@@ -496,8 +577,6 @@ describe('HumanoidCollectionDetailPage', () => {
         { label: '선택 소스', streams: snapshot.streams.filter((stream) => !stream.required && stream.origin !== 'derived') },
         { label: '파생 데이터', streams: snapshot.streams.filter((stream) => stream.origin === 'derived') },
       ]) {
-        for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).not.toBeVisible();
-        await user.click(within(sources).getByText(`${group.label} ${String(group.streams.length)}`));
         for (const stream of group.streams) expect(within(sources).getByText(stream.displayName)).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       }
@@ -522,15 +601,15 @@ describe('HumanoidCollectionDetailPage', () => {
       if (snapshot === null) throw new Error('Missing telemetry fixture');
       vi.spyOn(port, 'getCollectionTelemetry').mockResolvedValue(state === 'waiting' ? null : { ...snapshot, streams: [] });
       render(
-        <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
             <Routes><Route element={<HumanoidCollectionDetailPage />} path="/mlops/collection/:sessionId" /></Routes>
           </FlywheelContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter></BrandingContext.Provider>,
       );
       await screen.findByRole('heading', { name: '수신 대기' });
-      await user.click(screen.getByRole('tab', { name: '수집 상태' }));
-      const sources = screen.getByRole('region', { name: 'Sensor stream 상태' });
+      await user.click(screen.getByRole('tab', { name: '장치' }));
+      const sources = screen.getByRole('region', { name: '장치 스트림 상태' });
       expect(within(sources).getByText(state === 'waiting'
         ? '장치의 수신 상태를 기다리고 있습니다.'
         : '필수 수집 소스가 없습니다. 세션의 장치 구성을 확인하세요.')).toBeVisible();
@@ -550,7 +629,7 @@ describe('HumanoidCollectionDetailPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -558,7 +637,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     const controls = await screen.findByRole('region', { name: '수집 작업 컨트롤' });
@@ -593,7 +672,7 @@ describe('HumanoidCollectionDetailPage', () => {
     const episode = await port.startEpisode(session.id);
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -601,7 +680,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     const recordingControls = await screen.findByRole('region', { name: '수집 작업 컨트롤' });
@@ -741,7 +820,7 @@ describe('HumanoidCollectionDetailPage', () => {
       });
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -751,7 +830,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     await screen.findByRole('group', { name: 'Episode 재생 컨트롤' });
@@ -784,7 +863,7 @@ describe('HumanoidCollectionDetailPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -793,7 +872,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     await screen.findByRole('heading', { name: 'preserved empty session' });
@@ -819,7 +898,7 @@ describe('HumanoidCollectionDetailPage', () => {
     await port.completeEpisode(episode.id, 'success');
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -828,7 +907,7 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     const controls = await screen.findByRole('region', { name: '수집 작업 컨트롤' });
@@ -882,11 +961,11 @@ describe('HumanoidCollectionDetailPage', () => {
     await port.startSession(active.id);
 
     render(
-      <MemoryRouter>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter>
         <FlywheelContext.Provider value={port}>
           <CollectionWorkspacePage />
         </FlywheelContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: '데이터 수집' })).toBeInTheDocument();
@@ -920,11 +999,11 @@ describe('HumanoidCollectionDetailPage', () => {
   it('Backend 미구성 환경을 빈 세션으로 표시하지 않는다', async () => {
     const port = createUnavailableFlywheel();
     render(
-      <MemoryRouter>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter>
         <FlywheelContext.Provider value={port}>
           <CollectionWorkspacePage />
         </FlywheelContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: '현재 사용할 수 없습니다' })).toBeInTheDocument();
@@ -953,7 +1032,7 @@ describe('HumanoidCollectionDetailPage', () => {
     await port.startSession(active.id);
 
     render(
-      <MemoryRouter initialEntries={[`/mlops/collection/${blocked.id}`]}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${blocked.id}`]}>
         <ToastProvider>
           <FlywheelContext.Provider value={port}>
             <Routes>
@@ -961,11 +1040,11 @@ describe('HumanoidCollectionDetailPage', () => {
             </Routes>
           </FlywheelContext.Provider>
         </ToastProvider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
     const recordingControls = await screen.findByRole('region', { name: '수집 작업 컨트롤' });
     expect(screen.queryByText('현재 작업', { exact: true })).not.toBeInTheDocument();
-    await user.click(within(recordingControls).getByRole('button', { name: 'Episode 녹화 시작' }));
+    await user.click(await within(recordingControls).findByRole('button', { name: 'Episode 녹화 시작' }));
 
     await user.click(await screen.findByRole('tab', { name: /^문제 · \d+$/u }));
     const conflictLink = await screen.findByRole('link', { name: '사용 중인 세션 열기' });
@@ -978,14 +1057,14 @@ describe('HumanoidCollectionDetailPage', () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     render(
-      <MemoryRouter initialEntries={['/mlops/catalog/capture-h-001']}>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={['/mlops/catalog/capture-h-001']}>
         <FlywheelContext.Provider value={port}>
           <Routes>
             <Route element={<CatalogDetailPage />} path="/mlops/catalog/:collectionId" />
             <Route element={<p>Dataset 생성 화면</p>} path="/mlops/datasets/new" />
           </Routes>
         </FlywheelContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     expect(await screen.findByRole('heading', { name: 'Desktop sorting batch' })).toBeInTheDocument();
@@ -1001,11 +1080,11 @@ describe('HumanoidCollectionDetailPage', () => {
     const user = userEvent.setup();
     const port = createInMemoryFlywheel({ nowMs: () => 1_800_000_000_000 });
     render(
-      <MemoryRouter>
+      <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter>
         <FlywheelContext.Provider value={port}>
           <CatalogPage />
         </FlywheelContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter></BrandingContext.Provider>,
     );
 
     const catalogName = await screen.findByText('Desktop sorting batch');

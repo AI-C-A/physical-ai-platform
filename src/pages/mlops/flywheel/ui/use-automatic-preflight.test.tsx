@@ -22,12 +22,13 @@ describe('automatic preflight', () => {
         const query = useFlywheelQuery(load);
         return useAutomaticPreflight(query.status === 'ready' ? query.data : null);
       }, { wrapper });
-      await waitFor(() => expect(validate).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(result.current.error).toContain('필수 장치'));
+      await act(async () => { await Promise.resolve(); });
+      expect(validate).not.toHaveBeenCalled();
+      expect(result.current).toEqual({ checking: false, error: null });
       await act(async () => { await port.updateHumanDemonstrationSource(session.id, 'quest-1', 'ready'); });
       await waitFor(() => expect(result.current).toEqual({ checking: false, error: null }));
       expect(await port.getSession(session.id)).toMatchObject({ status: 'ready', activeEpisodeId: null });
-      expect(validate).toHaveBeenCalledTimes(2);
+      expect(validate).toHaveBeenCalledTimes(1);
 
       await act(async () => { await port.updateHumanDemonstrationSource(session.id, 'head-1', 'offline'); });
       await waitFor(() => expect(result.current.error).not.toBeNull());

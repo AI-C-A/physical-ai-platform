@@ -10,11 +10,13 @@ export function useAutomaticPreflight(session: FlywheelCaptureSession | null) {
   const sources = session?.kind === 'humanoid' ? session.humanDemonstration?.sourceBindings : undefined;
   const sourcesReady = sources === undefined || sources.filter((source) => source.required)
     .every((source) => source.state === 'ready' || source.state === 'recording');
+  const waitingForConnection = sources?.some((source) => source.required && ['pending', 'paired'].includes(source.state)) === true
+    && sources.filter((source) => source.required).every((source) => ['pending', 'paired', 'ready', 'recording'].includes(source.state));
   const validationKey = eligible ? JSON.stringify([sessionId, sources?.map((source) => [source.sourceDeviceId, source.state])]) : null;
   const [result, setResult] = useState<{ key: string; error: string | null } | null>(null);
 
   useEffect(() => {
-    if (sessionId === null || validationKey === null) return;
+    if (sessionId === null || validationKey === null || waitingForConnection) return;
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     async function check() {
@@ -31,10 +33,10 @@ export function useAutomaticPreflight(session: FlywheelCaptureSession | null) {
     }
     void check();
     return () => { cancelled = true; clearTimeout(retryTimer); };
-  }, [port, sessionId, validationKey, sourcesReady]);
+  }, [port, sessionId, validationKey, sourcesReady, waitingForConnection]);
 
   return {
-    checking: validationKey !== null && result?.key !== validationKey,
-    error: validationKey !== null && result?.key === validationKey ? result.error : null,
+    checking: !waitingForConnection && validationKey !== null && result?.key !== validationKey,
+    error: !waitingForConnection && validationKey !== null && result?.key === validationKey ? result.error : null,
   };
 }

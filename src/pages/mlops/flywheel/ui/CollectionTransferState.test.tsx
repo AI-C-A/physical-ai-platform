@@ -1,3 +1,4 @@
+import { BrandingContext } from '@/shared/config';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
@@ -25,11 +26,11 @@ it('필수 원본 전송을 기다리는 동안 검토 작업을 숨기고 정�
     const discard = vi.spyOn(port, 'deleteEpisode');
     await act(async () => {
       ({ unmount } = render(
-        <MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
+        <BrandingContext.Provider value={{ productName: 'ROBOT Army TIGER+', shortName: 'ROBOT Army TIGER+', logo: '/assets/army-tiger-logo.png' }}><MemoryRouter initialEntries={[`/mlops/collection/${session.id}`]}>
           <FlywheelContext.Provider value={port}>
             <Routes><Route path="/mlops/collection/:sessionId" element={<HumanoidCollectionDetailPage />} /></Routes>
           </FlywheelContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter></BrandingContext.Provider>,
       ));
       await vi.advanceTimersByTimeAsync(0);
     });

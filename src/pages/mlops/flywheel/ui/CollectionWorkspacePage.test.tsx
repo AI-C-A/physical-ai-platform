@@ -99,7 +99,6 @@ describe('CollectionWorkspacePage 필터', () => {
       expect(screen.getByRole('link', { name: ready.name })).toBeVisible();
       expect(screen.queryByRole('link', { name: '설정 중인 세션' })).not.toBeInTheDocument();
       await user.type(screen.getByRole('searchbox', { name: '수집 검색' }), '존재하지 않는 작업');
-      expect(screen.getByRole('heading', { name: '조건에 맞는 결과가 없습니다' })).toBeVisible();
       expect(screen.getByText(/‘존재하지 않는 작업’ 검색 결과가 없습니다/u)).toBeVisible();
       await user.click(screen.getByRole('button', { name: '검색·필터 초기화' }));
       expect(screen.getByRole('searchbox', { name: '수집 검색' })).toHaveValue('');
@@ -132,11 +131,13 @@ describe('CollectionWorkspacePage 필터', () => {
       if (state === 'recording') {
         expect(within(row).getByText('녹화 중')).toBeVisible();
         expect(within(row).getByText('장치 연결 확인 필요')).toBeVisible();
-        expect(within(row).getByRole('link', { name: '녹화 계속' })).toHaveAttribute('href', `/mlops/collection/${session.id}`);
+        expect(within(row).queryByRole('link', { name: '녹화 계속' })).not.toBeInTheDocument();
       } else {
         expect(within(row).getByText('장치 연결 필요')).toBeVisible();
-        expect(within(row).getByRole('link', { name: '장치 연결' })).toHaveAttribute('href', `/mlops/collection/${session.id}/setup`);
+        expect(within(row).queryByRole('link', { name: '세션 열기' })).not.toBeInTheDocument();
       }
+      expect(within(row).getAllByRole('link')).toHaveLength(1);
+      expect(within(row).getByRole('link', { name: session.name })).toHaveAttribute('href', `/mlops/collection/${session.id}`);
       expect(within(row).queryByText('녹화 준비 완료')).not.toBeInTheDocument();
       await user.click(screen.getByRole('tab', { name: '확인 필요 1개' }));
       expect(screen.getByRole('link', { name: session.name })).toBeVisible();
