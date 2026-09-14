@@ -85,7 +85,10 @@ for (const width of [1440, 390]) {
         pageTransform: newPage.transform,
       };
     });
-    expect(styles).toEqual({ oldDuration: '0.09s', newDuration: '0.15s', newDelay: '0.09s', oldOpacity: '0', rootAnimation: 'none', pageTransform: 'none' });
+    expect(styles).toMatchObject({ oldDuration: '0.09s', newDuration: '0.28s', newDelay: '0.09s', oldOpacity: '0', rootAnimation: 'none' });
+    const scale = Number(styles.pageTransform.match(/^matrix\(([^,]+)/u)?.[1]);
+    expect(scale).toBeGreaterThan(1);
+    expect(scale).toBeLessThan(1.04);
     await testInfo.attach(`sidebar-page-${String(width)}`, { body: await page.screenshot(), contentType: 'image/png' });
     await finishTransition();
     await expect(page.getByRole('main')).toBeFocused();
@@ -128,6 +131,7 @@ for (const width of [1440, 390]) {
     await expect(page).toHaveURL('/mlops/settings?siteId=site-lab');
     await expect(page.locator('html')).toHaveAttribute('data-sidebar-motion-count', String(completedTransitions + 1));
     expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::view-transition-new(sidebar-page)').animationDuration)).toBe('0.001s');
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::view-transition-new(sidebar-page)').transform)).toBe('none');
     await finishTransition();
     await page.evaluate(() => { Object.defineProperty(document, 'startViewTransition', { configurable: true, value: undefined }); });
     await selectMenu('수집');

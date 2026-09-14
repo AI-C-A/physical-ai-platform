@@ -1,5 +1,6 @@
-[data-sidebar-page-transition] .platform-shell-content {
+[data-sidebar-page-transition] .platform-shell-content > main {
   view-transition-name: sidebar-page;
+  transition: none;
 }
 
 :root:has([data-sidebar-page-transition]) {
@@ -16,6 +17,7 @@
 
 ::view-transition-group(sidebar-page) {
   animation: none;
+  overflow: clip;
 }
 
 ::view-transition-old(sidebar-page),
@@ -25,6 +27,7 @@
   object-fit: none;
   object-position: top left;
   mix-blend-mode: normal;
+  transform-origin: center;
 }
 
 ::view-transition-old(sidebar-page) {
@@ -41,6 +44,17 @@
 }
 
 @keyframes sidebar-page-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: scale(1.04); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(sidebar-page) {
+    transform: none;
+  }
+
+  @keyframes sidebar-page-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
