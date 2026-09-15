@@ -1,13 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { useFlywheelPort, useFlywheelQuery, type HumanoidCaptureSession } from '@/entities/flywheel';
-import {
-  deriveRoomCode,
-  normalizeSimulationRoom,
-  simulationPageUrl,
-  useSimulationBridge,
-} from '@/entities/simulation-collection';
+import { useFlywheelPort, useFlywheelQuery } from '@/entities/flywheel';
+import { simulationOrigin, useSimulationBridge, useSimulationSession } from '@/entities/simulation-collection';
 import { Brand } from '@/shared/ui/brand';
 import { Button, getButtonClassName } from '@/shared/ui/button';
 import { ColorSchemeArea } from '@/shared/ui/color-scheme';
@@ -25,17 +20,9 @@ import { SimulationMosaic, type MosaicTile } from './SimulationMosaic';
 import { SimulationPoseViz } from './SimulationPoseViz';
 import './simulation-collection.css';
 
-/** PC 콘솔이 관전자로 여는 iframe의 참가자 이름. */
-const STAGE_PEER_NAME = 'MONITOR';
-
-function roomFor(session: Pick<HumanoidCaptureSession, 'id'>, requested: string | null): string {
-  const trimmed = requested?.trim();
-  return trimmed ? normalizeSimulationRoom(trimmed) : deriveRoomCode(session.id);
-}
-
 export function SimulationCollectionPage() {
   const { sessionId = '' } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const port = useFlywheelPort();
   const loadSession = useCallback((value: ReturnType<typeof useFlywheelPort>) => value.getSession(sessionId), [sessionId]);
   const sessionQuery = useFlywheelQuery(loadSession);
@@ -46,21 +33,16 @@ export function SimulationCollectionPage() {
 
   const session = sessionQuery.status === 'ready' && sessionQuery.data?.kind === 'humanoid' ? sessionQuery.data : null;
   const liveSession = session !== null && session.status !== 'completed' && session.status !== 'abandoned';
-  const room = session === null ? deriveRoomCode(sessionId) : roomFor(session, searchParams.get('room'));
+  // 콘솔이 릴레이에서 5자리 코드를 받아, 관전 iframe과 헤드셋이 같은 코드 방으로 들어가게 한다.
+  const relaySession = useSimulationSession({ enabled: liveSession });
   const { feed, latestRef } = useSimulationBridge({ enabled: liveSession });
   const status = feedStatus(feed);
+  const consoleLocation = { pathname: `/mlops/collection/${sessionId}`, search: searchParams.toString() };
 
-  const consoleSearch = new URLSearchParams(searchParams);
-  consoleSearch.delete('room');
-  const consoleLocation = { pathname: `/mlops/collection/${sessionId}`, search: consoleSearch.toString() };
-  const changeRoom = (next: string) => {
-    const params = new URLSearchParams(searchParams);
-    if (session !== null && normalizeSimulationRoom(next) === deriveRoomCode(session.id)) params.delete('room');
-    else params.set('room', normalizeSimulationRoom(next));
-    setSearchParams(params, { replace: true });
-  };
-
-  const stageUrl = simulationPageUrl(room, { name: STAGE_PEER_NAME, spectate: true });
+  // 코드를 받은 뒤에야 관전 iframe을 그 코드 방으로 연다(헤드셋과 반드시 같은 방).
+  const stageUrl = relaySession.code === null
+    ? null
+    : `${simulationOrigin()}/?code=${relaySession.code}&spectate=1&name=MONITOR`;
   const cameraSessionId = session !== null && session.humanDemonstration !== null && session.stoppedAtMs === null && port.supportsBrowserCameras === true
     ? session.id
     : null;
@@ -78,23 +60,25 @@ export function SimulationCollectionPage() {
             </Button>
           </>
         ),
-        node: (
+        node: stageUrl === null ? (
+          <div className="grid h-full place-items-center p-4 text-center">
+            <p className="text-sm text-muted" role="status">
+              {relaySession.status === 'connected' ? '세션 코드를 발급받는 중…' : '시뮬레이션 릴레이에 연결하는 중…'}
+            </p>
+          </div>
+        ) : (
           <iframe
             allow="fullscreen; autoplay; xr-spatial-tracking; microphone"
             className="simulation-stage-frame"
-            key={`${room}:${String(stageGeneration)}`}
+            key={`${relaySession.code ?? ''}:${String(stageGeneration)}`}
             src={stageUrl}
             title="시뮬레이션 화면"
           />
         ),
       },
-      { id: 'pose', title: '수집 자세', node: <SimulationPoseViz connected={feed.connected} latestRef={latestRef} /> },
+      { id: 'pose', title: '수집 자세 · 손 추적', node: <SimulationPoseViz connected={feed.connected} latestRef={latestRef} /> },
       { id: 'data', title: '실시간 수집 데이터', node: <SimulationDataPanel feed={feed} /> },
-      {
-        id: 'connect',
-        title: 'VR 접속 안내',
-        node: <SimulationConnectionPanel connected={feed.connected} participantCount={feed.participants.length} room={room} onRoomChange={changeRoom} />,
-      },
+      { id: 'connect', title: 'VR 접속 안내', node: <SimulationConnectionPanel participantCount={feed.participants.length} session={relaySession} /> },
     ];
     if (cameraSessionId !== null) {
       list.push({
@@ -161,11 +145,11 @@ export function SimulationCollectionPage() {
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
                   <StatusIndicator
-                    label={feed.participants.length > 0 ? `${feed.participants[0]!.name} 작업 중` : feed.connected ? '참가자 대기' : '연결 대기'}
+                    label={feed.participants.length > 0 ? `${feed.participants[0]!.name} 작업 중` : feed.connected ? '헤드셋 입장 대기' : '연결 대기'}
                     pulse={feed.task !== null}
                     tone={feed.task !== null ? 'negative' : feed.participants.length > 0 ? 'positive' : 'neutral'}
                   />
-                  <span className="text-xs text-muted">방 코드 <span className="font-mono text-foreground">{room}</span></span>
+                  {relaySession.code === null ? null : <span className="text-xs text-muted">인증 코드 <span className="font-mono text-foreground">{relaySession.code}</span></span>}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-3 max-sm:[&>button]:flex-1">
                   {cameraSessionId !== null ? (

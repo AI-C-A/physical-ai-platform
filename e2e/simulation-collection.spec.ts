@@ -39,6 +39,14 @@ const STUB_IFRAME = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 test('수집 콘솔에서 시뮬레이션 수집으로 이동해 브리지 스냅샷을 실시간으로 보여준다', async ({ page }) => {
   const issues = observeBrowserIssues(page);
   await page.route(`https://${SIMULATION_HOST}/**`, (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: STUB_IFRAME }));
+  // 콘솔이 코드를 받으러 여는 릴레이 소켓을 흉내낸다: hello→welcome, new_code→5자리 코드.
+  await page.routeWebSocket(new RegExp(`wss://${SIMULATION_HOST}/party`), (ws) => {
+    ws.onMessage((message) => {
+      const text = typeof message === 'string' ? message : '';
+      if (text.includes('"hello"')) ws.send(JSON.stringify({ t: 'welcome', id: 'm', room: 'main', code: null, publicUrl: `https://${SIMULATION_HOST}`, peers: [] }));
+      else if (text.includes('"new_code"')) ws.send(JSON.stringify({ t: 'code', code: '48213' }));
+    });
+  });
 
   await page.goto('/mlops/collection/new');
   await expectApplicationReady(page);
@@ -54,8 +62,9 @@ test('수집 콘솔에서 시뮬레이션 수집으로 이동해 브리지 스�
   await expect(page).toHaveURL(`/mlops/collection/${collectionId}/simulation`);
   await expect(page.locator('main')).toHaveAttribute('data-page-shell', 'full-bleed');
 
+  // 발급된 코드 방으로 관전 iframe이 열린다(헤드셋과 동일한 코드).
   const stage = page.getByTitle('시뮬레이션 화면');
-  await expect(stage).toHaveAttribute('src', new RegExp(`https://${SIMULATION_HOST}/\\?room=[^&]+&name=MONITOR&spectate=1`));
+  await expect(stage).toHaveAttribute('src', `https://${SIMULATION_HOST}/?code=48213&spectate=1&name=MONITOR`);
 
   // 브리지 스냅샷이 데이터 패널을 채운다.
   const panel = page.getByRole('region', { name: '실시간 수집 데이터' });
@@ -63,10 +72,10 @@ test('수집 콘솔에서 시뮬레이션 수집으로 이동해 브리지 스�
   await expect(panel.getByText('MISSION 01 · 전술 무전기 준비')).toBeVisible();
   await expect(panel.getByRole('log')).toContainText('radio_antenna → radio_antenna_port 결합');
 
-  // 연결 안내에 방 코드와 접속 주소가 보인다.
+  // 연결 안내에 인증 코드와 접속 주소가 보인다.
   const connect = page.getByRole('region', { name: 'VR 접속 안내' });
-  await expect(connect.getByLabel('방 코드', { exact: true })).toHaveText(/^[A-Z0-9]{4,}$/u);
-  await expect(connect.getByLabel('헤드셋 접속 주소', { exact: true })).toContainText(`https://${SIMULATION_HOST}/?room=`);
+  await expect(connect.getByLabel('인증 코드', { exact: true })).toHaveText('48213');
+  await expect(connect.getByLabel('헤드셋 접속 주소', { exact: true })).toHaveText(`https://${SIMULATION_HOST}/?code=48213`);
 
   // 타일을 크게 보고 되돌린다.
   await page.getByRole('button', { name: '시뮬레이션 · 판교 정비창 크게 보기' }).click();

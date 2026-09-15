@@ -33,6 +33,19 @@ export function simulationPageUrl(room: string, options: { readonly name?: strin
   return url.href;
 }
 
+/**
+ * PC 콘솔이 관전 모니터로 여는 iframe 주소. 방/코드를 미리 지정하지 않는다.
+ * `monitor=1`이면 시뮬레이션이 릴레이에서 5자리 코드를 발급받아(그 코드 방으로 이동해)
+ * 관전하고, 코드와 공개 주소를 부모 창(콘솔)으로 올린다.
+ */
+export function simulationMonitorUrl(): string {
+  const url = new URL('/', simulationOrigin());
+  url.searchParams.set('spectate', '1');
+  url.searchParams.set('monitor', '1');
+  url.searchParams.set('name', 'MONITOR');
+  return url.href;
+}
+
 // 사람이 헤드셋에서 입력하기 쉬운 코드 문자셋: 헷갈리는 0/O/1/I/5/S 제외.
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRTUVWXY2346789';
 const ROOM_CODE_LENGTH = 6;
@@ -61,10 +74,10 @@ export function deriveRoomCode(sessionId: string): string {
   return code;
 }
 
-/** 모니터가 여는 릴레이 WebSocket 주소. */
-export function simulationRelayUrl(room: string): string {
+/** 모니터가 여는 릴레이 WebSocket 주소. 방을 주면 그 방으로, 없으면 기본 방으로 붙는다. */
+export function simulationRelayUrl(room?: string): string {
   const url = new URL('/party', simulationOrigin());
   url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:';
-  url.searchParams.set('room', normalizeSimulationRoom(room));
+  if (room !== undefined) url.searchParams.set('room', normalizeSimulationRoom(room));
   return url.href;
 }

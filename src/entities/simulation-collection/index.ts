@@ -26,6 +26,8 @@ export {
   type SimulationTaskProgress,
 } from './model/simulation-monitor';
 export { useSimulationMonitor, type SimulationMonitor } from './model/use-simulation-monitor';
+export { useSimulationSession } from './model/use-simulation-session';
+export { SimulationCodeClient, type SimulationSession, type SimulationRelayState as SimulationSessionRelayState } from './api/simulation-code-client';
 export {
   describeBridgeEvent,
   parseSimulationBridgeSnapshot,
@@ -45,6 +47,7 @@ export {
   deriveRoomCode,
   normalizeSimulationRoom,
   SIMULATION_ROOM_MAX,
+  simulationMonitorUrl,
   simulationOrigin,
   simulationPageUrl,
   simulationRelayUrl,
