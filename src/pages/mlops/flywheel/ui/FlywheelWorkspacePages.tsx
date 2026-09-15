@@ -1,3 +1,4 @@
+import { CameraAnalysisIssueContext, type CameraAnalysisIssue } from '../model/camera-analysis-issues';
 import { EpisodeRecordingPreview } from './EpisodeRecordingPreview';
 import { SessionEpisodeRecordings } from './SessionEpisodeRecordings';
 import { Brand } from '@/shared/ui/brand';
@@ -1195,6 +1196,17 @@ export function CollectionConnectionPage() {
 }
 
 export function HumanoidCollectionDetailPage() {
+  const [analysisIssues, setAnalysisIssues] = useState<Record<string, CameraAnalysisIssue>>({});
+  const reportAnalysisIssue = useCallback((id: string, issue: CameraAnalysisIssue | null) => {
+    setAnalysisIssues((current) => {
+      if (issue === null && !(id in current)) return current;
+      if (issue !== null && current[id]?.title === issue.title && current[id]?.message === issue.message) return current;
+      const next = { ...current };
+      if (issue === null) delete next[id];
+      else next[id] = issue;
+      return next;
+    });
+  }, []);
   const [cameraSettingsTarget, setCameraSettingsTarget] = useState<HTMLDivElement | null>(null);
   const [cameraDevicesTarget, setCameraDevicesTarget] = useState<HTMLDivElement | null>(null);
   const [cameraConnectionOpen, setCameraConnectionOpen] = useState(false);
@@ -1406,7 +1418,8 @@ export function HumanoidCollectionDetailPage() {
           monitoring: !recordedPreview,
           awaitingStreamIds,
         });
-        const problemCount = collectionIssues.count + Number(episodesQuery.status === 'error');
+        const analysisIssueEntries = Object.entries(analysisIssues);
+        const problemCount = collectionIssues.count + Number(episodesQuery.status === 'error') + analysisIssueEntries.length;
         const issuesContent = (
           <div className="grid gap-2 empty:hidden">
             {episodesQuery.status === 'error' ? (
@@ -1414,15 +1427,23 @@ export function HumanoidCollectionDetailPage() {
                 <QueryFeedback kind="error" message="Episode 기록을 불러오지 못했습니다. 다시 시도해 현재 녹화와 저장 상태를 확인하세요." onRetry={episodesQuery.retry} />
               </section>
             ) : null}
-            {episodesQuery.status === 'error' && collectionIssues.count === 0 ? null : <CollectionIssuesSection issues={collectionIssues}
+            {(episodesQuery.status === 'error' || analysisIssueEntries.length > 0) && collectionIssues.count === 0 ? null : <CollectionIssuesSection issues={collectionIssues}
               onCheckConnections={() => {
                 setDetailsTab('sources'); setDetailsOpen(true);
                 requestAnimationFrame(() => document.getElementById('collection-tab-sources')?.focus());
               }}
               onRetry={() => { telemetryQuery.retry(); sessionQuery.retry(); }} />}
+            {analysisIssueEntries.map(([id, issue]) => (
+              <Surface key={id} density="compact">
+                <p role="status" className="text-sm text-foreground">
+                  {issue.title} · {issue.message} 자동으로 다시 시도합니다.
+                </p>
+              </Surface>
+            ))}
           </div>
         );
         return (
+          <CameraAnalysisIssueContext value={reportAnalysisIssue}>
           <ColorSchemeArea
             className="flex h-dvh min-h-0 flex-col overflow-hidden"
             layer="base"
@@ -1804,6 +1825,7 @@ export function HumanoidCollectionDetailPage() {
                     </div>
                   </StickyActionBar>
           </ColorSchemeArea>
+          </CameraAnalysisIssueContext>
         );
       }}
     </AsyncState>

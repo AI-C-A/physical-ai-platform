@@ -1,4 +1,5 @@
-import { useRef, useState, type RefObject } from 'react';
+import { CameraAnalysisIssueContext } from '../model/camera-analysis-issues';
+import { useContext, useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useCameraAnalysis, type CameraRole } from '@/entities/collection-camera';
 import { Button } from '@/shared/ui/button';
 import { FittedMedia, MediaPanel } from '@/shared/ui/media-panel';
@@ -20,9 +21,15 @@ export function CameraAnalysisCard({ label, role, videoRef, playing, rotation = 
   const title = `${label} · ${role === 'head' ? '세그멘테이션 + 핸드' : '4D Humans'}`;
   const ready = playing && enabled && analysis.status === 'ready';
   const failed = playing && enabled && analysis.status === 'error';
+  const issueId = useId();
+  const reportIssue = useContext(CameraAnalysisIssueContext);
+  const error = failed ? analysis.error : null;
+  useEffect(() => {
+    reportIssue?.(issueId, error ? { title, message: error } : null);
+    return () => reportIssue?.(issueId, null);
+  }, [error, issueId, reportIssue, title]);
   const status = !enabled ? '분석 정지' : !playing ? '영상 대기' : analysis.status === 'error' ? '분석 연결 오류' : ready ? '분석 수신 중' : '분석 대기';
   return <FittedMedia aspectRatio={aspectRatio} className="items-center"><MediaPanel className="collection-camera-panel h-auto" aria-label={title} title={title}
-    footer={failed && analysis.error ? <span role="status">{analysis.error} 자동으로 다시 시도합니다.</span> : undefined}
     status={<div className="flex flex-wrap items-center gap-2"><StatusIndicator label={status} tone={failed ? 'warning' : 'neutral'} />
       <Button variant="ghost" aria-label={`${label} 분석 ${enabled ? '정지' : '시작'}`} onClick={() => setEnabled((value) => !value)}>{enabled ? '정지' : '시작'}</Button></div>}>
     <div data-aspect-media-viewport className="relative min-h-0 min-w-0 overflow-hidden" style={{ aspectRatio }}>
