@@ -12,7 +12,8 @@ data/quest/
 .env
 .env.*
 !.env.example
-.idea
+# JetBrains 공유 실행 설정은 .run/에 저장한다.
+.idea/
 .vscode/*
 !.vscode/extensions.json
 *.log

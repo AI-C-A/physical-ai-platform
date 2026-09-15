@@ -95,6 +95,24 @@ npm run segmentation:dev
 
 `SEGMENTATION_PYTHON`을 지정하지 않으면 프로젝트 `.venv`와 시스템 Python 순서로 실행 파일을 찾는다. 설치 방법은 [segmentation/README.md](segmentation/README.md)를 참고한다.
 
+## IDE Run 설정
+
+WebStorm/IntelliJ 공유 실행 설정은 [`.run/`](.run/)에 저장한다. checkout 후 프로젝트를 열면 같은 실행 항목을 사용할 수 있다. 새 공유 설정도 이 폴더에 저장한다. 기본 실행은 **Mock**(시연)과 **Real**(실제 순찰·수집) 중에서 선택한다. **Collection**은 순찰 API 없이 실제 수집만 사용할 때 선택한다.
+
+| 실행 항목 | 구성 / 용도 |
+| --- | --- |
+| **Mock** | 외부 서버 없이 Mock 화면 실행 |
+| **Collection** | 수집 frontend + Quest gateway + Tailscale Funnel. 관제는 Mock, 수집은 실제 장치 연결 |
+| **Real** | Patrol frontend + Patrol·Quest 통합 gateway + Tailscale Funnel |
+| **Frontend** 폴더 | Collection / Patrol 화면만 개별 실행 |
+| **Gateway** 폴더 | Quest 전용 / Patrol + Quest 통합 서버 개별 실행 |
+| **Network** 폴더 | Tailscale Funnel 개별 실행 |
+| **GPU** 폴더 | Segmentation / 4D Humans 분석 서버 개별 실행 |
+
+`Collection`과 `Real`은 둘 중 하나를 실행한다. 두 묶음은 frontend 5173과 gateway 8787을 사용하므로 동시에 실행하지 않는다. 묶음을 실행했다면 그 안의 개별 서버를 다시 실행할 필요가 없다. Collection frontend도 5173을 고정해 Funnel 대상과 일치시킨다.
+
+Real은 위의 `.env.local` 설정이 필요하다. 두 묶음의 Funnel은 Tailscale 로그인과 HTTPS/Funnel 활성화, `.env.local`의 `DEV_ALLOWED_HOSTS` 설정이 필요하며 frontend와 프록시 API를 인터넷에 공개한다. GPU 환경과 모델은 실행 PC에서 별도로 준비한다. 로컬에서만 사용할 때는 Frontend와 Gateway 항목만 실행한다.
+
 ## Mac 수집 화면 + Windows GPU 분석 실행
 
 카메라 수집 분석은 역할마다 별도 서버를 사용한다. `segmentation:dev`만 실행하면 **전신 카메라의 4D Humans 분석은 시작되지 않는다.** 최초 Python 환경·모델 준비와 전체 연결 절차는 [카메라 분석 서버 안내](perception/README.md)를 따른다.
@@ -110,7 +128,7 @@ npm run segmentation:dev
 
 각 서비스는 별도 터미널에서 실행한다. 전신 카메라에는 8791, 헤드 카메라에는 8792와 그 서버가 연결하는 8790이 필요하다. Quest gateway와 Patrol gateway는 같은 포트를 사용하므로 함께 실행하지 않는다.
 
-Windows WebStorm에서는 공유 Run 설정 **Desktop (GPU 4D Humans)**을 선택한다. 이 설정은 [`.run/Desktop_GPU_4D_Humans.run.xml`](.run/Desktop_GPU_4D_Humans.run.xml)에 저장되어 있으며 Windows의 WSL 배포판에서 실행된다. `PERCEPTION_WSL_DISTRO`를 지정하면 해당 배포판을 사용하고, 생략하면 기본 배포판을 사용한다. 기본 모델 위치는 WSL의 `~/4D-Humans`, Python은 `~/4D-Humans/.venv/bin/python`이다. 설치 위치가 다르면 **Run → Edit Configurations → Environment variables**에서 다음 값을 지정한다.
+Windows WebStorm에서는 공유 Run 설정 **GPU (4D Humans)**을 선택한다. 이 설정은 [`.run/GPU_4D_Humans.run.xml`](.run/GPU_4D_Humans.run.xml)에 저장되어 있으며 Windows의 WSL 배포판에서 실행된다. `PERCEPTION_WSL_DISTRO`를 지정하면 해당 배포판을 사용하고, 생략하면 기본 배포판을 사용한다. 기본 모델 위치는 WSL의 `~/4D-Humans`, Python은 `~/4D-Humans/.venv/bin/python`이다. 설치 위치가 다르면 **Run → Edit Configurations → Environment variables**에서 다음 값을 지정한다.
 
 ```text
 PERCEPTION_WSL_DISTRO=Ubuntu-24.04
@@ -118,7 +136,7 @@ FOUR_D_HUMANS_DIR=/opt/4D-Humans
 PERCEPTION_PYTHON=/opt/miniconda3/envs/4dhumans/bin/python
 ```
 
-위 경로는 예시이며 실제 **WSL 절대 경로**로 바꾼다. 모델과 Python 의존성은 미리 설치해야 한다. Mac에서는 이 실행 항목이 안내만 출력하고 종료한다. 기존 `.idea`의 `Real`, `Desktop (GPU Segmentation)` 등은 로컬 설정이라 다른 PC로 자동 공유되지 않는다. 없는 항목은 위 npm 명령으로 생성한다. Mac의 `Real` compound에는 frontend, Quest gateway, Funnel을 넣는다.
+위 경로는 예시이며 실제 **WSL 절대 경로**로 바꾼다. 모델과 Python 의존성은 미리 설치해야 한다. Mac에서는 이 실행 항목이 안내만 출력하고 종료한다. Mac에서는 공유 `Collection` 묶음으로 수집 화면, Quest gateway, Funnel을 함께 실행한다. 순찰 연동까지 필요하면 `Real` 묶음을 사용한다.
 
 Windows 세그멘테이션을 Mac에서 사용할 때는 Run 환경변수에 `SEGMENTATION_HOST=0.0.0.0`을 넣는다. 터미널에서는:
 

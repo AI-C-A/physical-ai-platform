@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Real" type="CompoundRunConfigurationType">
+    <toRun name="Frontend (Patrol)" type="js.build_tools.npm" />
+    <toRun name="Gateway (Patrol + Quest)" type="js.build_tools.npm" />
+    <toRun name="HTTPS (Tailscale Funnel)" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

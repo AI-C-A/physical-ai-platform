@@ -40,7 +40,7 @@ Funnel이 출력하는 HTTPS 주소 뒤에 `/collect/quest`를 붙여 Quest에�
 
 주소는 매 실행마다 바뀌지 않는다. Tailscale 기기 이름이나 tailnet 이름을 변경하면 접속 주소와 `DEV_ALLOWED_HOSTS`도 갱신한다. Quest에는 Tailscale 앱이나 별도 인증서를 설치할 필요가 없다.
 
-WebStorm에서도 frontend, gateway와 `npm run dev:funnel`을 compound 실행 설정으로 묶을 수 있다. `.idea`는 Git에서 제외되므로 checkout마다 설정한다. Funnel은 foreground로 실행하며 해당 실행 탭에서 중지한다. 이미 수동 실행 중인 Funnel이 있다면 먼저 중지한다.
+WebStorm에서는 Git에 포함된 `.run/`의 `Collection` 묶음을 실행하면 수집 frontend, Quest gateway, Funnel이 함께 시작된다. 순찰 연동도 필요하면 `Real` 묶음을 사용한다. 두 묶음은 동시에 실행하지 않는다. Funnel은 foreground로 실행하며 해당 실행 탭에서 중지한다. 이미 수동 실행 중인 Funnel이 있다면 먼저 중지한다.
 
 Funnel은 인터넷에 frontend와 프록시 API를 공개한다. 사설 tailnet 전용 접근이 아니며, Mac의 Tailscale 연결과 인터넷 연결이 필요하다.
 
