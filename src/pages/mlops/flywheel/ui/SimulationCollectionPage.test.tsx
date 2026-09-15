@@ -101,6 +101,8 @@ describe('SimulationCollectionPage', () => {
       expect(within(connect).getByLabelText('인증 코드')).toHaveTextContent(CODE);
       expect(within(connect).getByLabelText('헤드셋 접속 주소')).toHaveTextContent(`${ORIGIN}/?code=${CODE}`);
       expect(within(connect).getByRole('link', { name: 'PC로도 참가' })).toHaveAttribute('href', `${ORIGIN}/?code=${CODE}&name=PC`);
+      expect(within(connect).getByRole('button', { name: '인증 코드 복사' })).toBeVisible();
+      expect(within(connect).getByRole('button', { name: '접속 주소 복사' })).toBeVisible();
       expect(screen.getByText(CODE, { selector: '.font-mono' })).toBeVisible();
       expect(screen.getByRole('link', { name: '수집 콘솔로 돌아가기' })).toHaveAttribute('href', `/mlops/collection/${session.id}?siteId=pangyo-outdoor-zone`);
     } finally { port.dispose(); }
@@ -132,6 +134,8 @@ describe('SimulationCollectionPage', () => {
       const stats = within(panel).getByLabelText('수집 통계');
       expect(within(stats).getByText('프레임').nextElementSibling).toHaveTextContent('362');
       expect(screen.getByText('OP-11 작업 중')).toBeVisible();
+      // 녹화 중이면 시뮬레이션 타일에 REC 표시가 뜬다.
+      expect(screen.getByText('녹화 중')).toBeVisible();
     } finally { port.dispose(); }
   });
 

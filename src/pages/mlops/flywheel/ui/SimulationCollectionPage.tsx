@@ -54,7 +54,7 @@ export function SimulationCollectionPage() {
         title: '시뮬레이션 · 판교 정비창',
         actions: (
           <>
-            <StatusIndicator label={status.label} tone={status.tone} />
+            {feed.recording ? <StatusIndicator label="녹화 중" pulse tone="negative" /> : <StatusIndicator label={status.label} tone={status.tone} />}
             <Button aria-label="시뮬레이션 다시 불러오기" className="size-8 min-h-0 p-0" onClick={() => setStageGeneration((value) => value + 1)} title="다시 불러오기" variant="ghost">
               <Icon name="restart" />
             </Button>

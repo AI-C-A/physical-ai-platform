@@ -1,5 +1,23 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import { simulationOrigin, type SimulationSession } from '@/entities/simulation-collection';
-import { getButtonClassName } from '@/shared/ui/button';
+import { Button, getButtonClassName } from '@/shared/ui/button';
+import { Icon } from '@/shared/ui/icon';
+
+/** 클립보드 복사 + "복사됨" 잠깐 표시. 클립보드가 막힌 환경(비보안 컨텍스트 등)은 조용히 무시한다. */
+function useCopy(): { readonly copied: boolean; readonly copy: (text: string) => void } {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current !== null) clearTimeout(timer.current); }, []);
+  const copy = useCallback((text: string) => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1_500);
+    }).catch(() => { /* 클립보드 불가: 주소는 화면에 그대로 있으니 무시 */ });
+  }, []);
+  return { copied, copy };
+}
 
 /**
  * VR로 접속하는 안내. 콘솔이 릴레이에서 5자리 세션 코드를 발급받으면, 헤드셋에서 같은
@@ -14,11 +32,20 @@ export function SimulationConnectionPanel({ session, participantCount }: {
   const origin = session.publicOrigin ?? simulationOrigin();
   const headsetUrl = code === null ? `${origin}/` : `${origin}/?code=${code}`;
   const localOnly = /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)/u.test(origin);
+  const urlCopy = useCopy();
+  const codeCopy = useCopy();
   return (
     <div className="simulation-connect grid gap-4">
       <div className="grid gap-1">
         <p className="text-xs font-medium text-muted">헤드셋 인증 코드</p>
-        <output aria-label="인증 코드" className="simulation-connect-code text-foreground">{code ?? '·····'}</output>
+        <div className="flex items-center gap-2">
+          <output aria-label="인증 코드" className="simulation-connect-code text-foreground">{code ?? '·····'}</output>
+          {code === null ? null : (
+            <Button aria-label="인증 코드 복사" className="size-9 min-h-0 shrink-0 p-0" onClick={() => codeCopy.copy(code)} title={codeCopy.copied ? '복사됨' : '코드 복사'} variant="ghost">
+              <Icon name={codeCopy.copied ? 'check' : 'download'} />
+            </Button>
+          )}
+        </div>
         <p className="text-xs text-muted" role="status">
           {session.status !== 'connected'
             ? '릴레이에 연결하는 중입니다…'
@@ -38,7 +65,12 @@ export function SimulationConnectionPanel({ session, participantCount }: {
 
       <div className="grid gap-1">
         <p className="text-xs font-medium text-muted">헤드셋 접속 주소</p>
-        <code aria-label="헤드셋 접속 주소" className="break-all text-sm text-foreground">{headsetUrl}</code>
+        <div className="flex items-center gap-2">
+          <code aria-label="헤드셋 접속 주소" className="min-w-0 flex-1 break-all text-sm text-foreground">{headsetUrl}</code>
+          <Button aria-label="접속 주소 복사" className="size-9 min-h-0 shrink-0 p-0" onClick={() => urlCopy.copy(headsetUrl)} title={urlCopy.copied ? '복사됨' : '주소 복사'} variant="ghost">
+            <Icon name={urlCopy.copied ? 'check' : 'download'} />
+          </Button>
+        </div>
         {localOnly ? <p className="text-xs text-warning">이 주소는 이 PC에서만 열립니다. 헤드셋에서 열리게 하려면 WebXR 서버에서 Tailscale Funnel을 켜세요.</p> : null}
       </div>
 

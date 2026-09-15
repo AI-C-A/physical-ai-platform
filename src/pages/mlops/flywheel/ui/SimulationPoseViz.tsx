@@ -202,5 +202,14 @@ export function SimulationPoseViz({ latestRef, connected }: {
     };
   }, [latestRef, connected]);
 
-  return <div ref={wrapRef} className="simulation-pose-viz" aria-label="수집 자세 시각화" role="img"><canvas ref={canvasRef} /></div>;
+  return (
+    <div ref={wrapRef} className="simulation-pose-viz" aria-label="수집 자세 시각화" role="img">
+      <canvas ref={canvasRef} />
+      <div className="simulation-pose-legend" aria-hidden="true">
+        <span><i style={{ background: 'var(--visual-pose-left)' }} />왼손</span>
+        <span><i style={{ background: 'var(--visual-pose-right)' }} />오른손</span>
+        <span><i style={{ background: 'var(--visual-pose-shell)' }} />머리</span>
+      </div>
+    </div>
+  );
 }
