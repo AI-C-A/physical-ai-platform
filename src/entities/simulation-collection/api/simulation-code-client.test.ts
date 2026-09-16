@@ -20,7 +20,8 @@ class FakeSocket {
   get outgoing(): { t?: string }[] { return this.sent.map((s) => JSON.parse(s) as { t?: string }); }
 }
 
-const make = () => new SimulationCodeClient({ url: 'wss://sim/party', createSocket: (url) => new FakeSocket(url) as unknown as WebSocket });
+const make = (opts: { initialCode?: string; onCode?: (code: string) => void } = {}) =>
+  new SimulationCodeClient({ url: 'wss://sim/party', ...opts, createSocket: (url) => new FakeSocket(url) as unknown as WebSocket });
 
 describe('SimulationCodeClient', () => {
   beforeEach(() => { vi.useFakeTimers(); FakeSocket.instances = []; });
@@ -47,6 +48,37 @@ describe('SimulationCodeClient', () => {
     socket.receive({ t: 'welcome', id: 'm', room: 'code:77777', code: '77777', publicUrl: 'https://orca.tail58a6fa.ts.net', peers: [] });
     expect(client.getSnapshot().code).toBe('77777');
     expect(socket.outgoing.some((m) => m.t === 'new_code')).toBe(false);
+    client.close();
+  });
+
+  it('저장된 코드로 그 방에 재접속하고, 코드를 저장 콜백으로 알린다', () => {
+    const saved: string[] = [];
+    const client = make({ initialCode: '48213', onCode: (c) => saved.push(c) });
+    const socket = FakeSocket.instances[0]!;
+    expect(socket.url).toBe('wss://sim/party?code=48213');
+    socket.open();
+    socket.receive({ t: 'welcome', id: 'm', room: 'code:48213', code: '48213', publicUrl: 'https://orca.tail58a6fa.ts.net', peers: [] });
+    expect(client.getSnapshot().code).toBe('48213');
+    expect(socket.outgoing.some((m) => m.t === 'new_code')).toBe(false);
+    expect(saved).toContain('48213');
+    client.close();
+  });
+
+  it('저장된 코드가 만료(denied)되면 코드를 버리고 새로 발급받는다', () => {
+    const client = make({ initialCode: '11111' });
+    const first = FakeSocket.instances[0]!;
+    expect(first.url).toBe('wss://sim/party?code=11111');
+    first.open();
+    first.receive({ t: 'denied', reason: 'code' });
+    first.close();
+    vi.advanceTimersByTime(1_000);
+    const second = FakeSocket.instances[1]!;
+    expect(second.url).toBe('wss://sim/party');
+    second.open();
+    second.receive({ t: 'welcome', id: 'm', room: 'main', code: null, publicUrl: 'https://orca.tail58a6fa.ts.net', peers: [] });
+    expect(second.outgoing.at(-1)).toEqual({ t: 'new_code' });
+    second.receive({ t: 'code', code: '90909' });
+    expect(client.getSnapshot().code).toBe('90909');
     client.close();
   });
 

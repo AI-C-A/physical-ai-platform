@@ -34,7 +34,8 @@ export function SimulationCollectionPage() {
   const session = sessionQuery.status === 'ready' && sessionQuery.data?.kind === 'humanoid' ? sessionQuery.data : null;
   const liveSession = session !== null && session.status !== 'completed' && session.status !== 'abandoned';
   // 콘솔이 릴레이에서 5자리 코드를 받아, 관전 iframe과 헤드셋이 같은 코드 방으로 들어가게 한다.
-  const relaySession = useSimulationSession({ enabled: liveSession });
+  // 코드는 세션별로 저장해 새로고침해도 헤드셋이 쓰던 코드를 유지한다.
+  const relaySession = useSimulationSession({ enabled: liveSession, storageKey: `sim-code:${sessionId}` });
   const { feed, latestRef } = useSimulationBridge({ enabled: liveSession });
   const status = feedStatus(feed);
   const consoleLocation = { pathname: `/mlops/collection/${sessionId}`, search: searchParams.toString() };

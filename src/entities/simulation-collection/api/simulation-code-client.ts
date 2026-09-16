@@ -11,6 +11,10 @@ export interface SimulationSession {
 export interface SimulationCodeClientOptions {
   readonly url: string;
   readonly name?: string;
+  /** 이전에 발급받은 코드. 아직 살아 있으면 그 방을 재사용해 새로고침해도 코드가 유지된다. */
+  readonly initialCode?: string | null;
+  /** 코드가 확정될 때마다 호출(저장용). */
+  readonly onCode?: (code: string) => void;
   readonly createSocket?: (url: string) => WebSocket;
 }
 
@@ -34,6 +38,8 @@ export class SimulationCodeClient {
   #closed = false;
   #everConnected = false;
   #code: string | null = null;
+  /** 접속할 때 붙여 볼 코드. 거부되면(만료) null로 떨궈 다음 재접속에서 새로 발급받는다. */
+  #joinCode: string | null = null;
   readonly #listeners = new Set<() => void>();
   readonly #options: Required<Pick<SimulationCodeClientOptions, 'name' | 'createSocket'>> & SimulationCodeClientOptions;
 
@@ -43,6 +49,7 @@ export class SimulationCodeClient {
       name: options.name ?? 'MONITOR',
       createSocket: options.createSocket ?? ((url) => new WebSocket(url)),
     };
+    this.#joinCode = options.initialCode && CODE_RE.test(options.initialCode) ? options.initialCode : null;
     this.#connect();
   }
 
@@ -68,7 +75,11 @@ export class SimulationCodeClient {
     this.#retry = null;
     let socket: WebSocket;
     try {
-      socket = this.#options.createSocket(this.#options.url);
+      // 저장된 코드가 아직 살아 있으면 그 방으로, 없으면 기본 방으로 붙어 새 코드를 발급받는다.
+      const url = this.#joinCode === null
+        ? this.#options.url
+        : `${this.#options.url}${this.#options.url.includes('?') ? '&' : '?'}code=${this.#joinCode}`;
+      socket = this.#options.createSocket(url);
     } catch {
       this.#scheduleRetry();
       return;
@@ -94,12 +105,16 @@ export class SimulationCodeClient {
         this.#backoffMs = RETRY_MIN_MS;
         const publicOrigin = typeof msg.publicUrl === 'string' && /^https?:\/\//u.test(msg.publicUrl) ? msg.publicUrl.replace(/\/+$/u, '') : this.#session.publicOrigin;
         // 이미 코드가 있는 방에 붙었다면 그 코드를 그대로 쓰고, 없으면 새로 발급받는다.
-        if (typeof msg.code === 'string' && CODE_RE.test(msg.code)) this.#code = msg.code;
+        if (typeof msg.code === 'string' && CODE_RE.test(msg.code)) this.#accept(msg.code);
         this.#set({ status: 'connected', code: this.#code, publicOrigin });
         if (this.#code === null && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ t: 'new_code' }));
       } else if (msg.t === 'code' && typeof msg.code === 'string' && CODE_RE.test(msg.code)) {
-        this.#code = msg.code;
+        this.#accept(msg.code);
         this.#set({ ...this.#session, status: 'connected', code: msg.code });
+      } else if (msg.t === 'denied') {
+        // 저장된 코드가 만료됨: 코드를 버리고 재접속해 새로 발급받는다(onclose가 재접속).
+        this.#joinCode = null;
+        this.#code = null;
       }
     };
     socket.onerror = () => socket.close();
@@ -110,6 +125,12 @@ export class SimulationCodeClient {
       this.#set({ ...this.#session, status: 'reconnecting' });
       this.#scheduleRetry();
     };
+  }
+
+  #accept(code: string): void {
+    this.#code = code;
+    this.#joinCode = code;
+    this.#options.onCode?.(code);
   }
 
   #scheduleRetry(): void {
